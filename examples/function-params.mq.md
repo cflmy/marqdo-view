@@ -7,3 +7,11 @@
 `params(n: Int)`
 
 `return n * 2`
+
+## @exec format_arguments
+
+组合表单提交的文本和列表，用于展示常量参数经过 CLI 后返回的结果。
+
+`params(label: Text, items: List)`
+
+`return label + items[0] + " · " + 文本(items[1])`

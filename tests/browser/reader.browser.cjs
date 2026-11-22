@@ -47,7 +47,11 @@ function localHostOnly(url) {
   const page = await context.newPage();
   const external = [];
   const consoleErrors = [];
+  let submittedRuns = 0;
   page.on("request", (request) => {
+    if (request.method() === "POST" && new URL(request.url()).pathname === "/api/runs") {
+      submittedRuns += 1;
+    }
     if (!localHostOnly(request.url()) && !request.url().startsWith("data:")) {
       external.push(request.url());
     }
@@ -234,11 +238,38 @@ function localHostOnly(url) {
   check("print keeps prose", await page.locator(".mq-document").isVisible());
   await page.emulateMedia({ media: "screen" });
 
+  check("browsing, refresh, search and settings never submit runs", submittedRuns === 0);
+
   // Explicit run flow, only against the control-flow example.
   if (projectName === "control-flow") {
     const runRequests = [];
+    let originalEventId;
+    let reconnectEventId;
     page.on("request", (request) => {
-      if (request.url().includes("/api/runs")) runRequests.push(request.url());
+      const pathname = new URL(request.url()).pathname;
+      if (pathname.startsWith("/api/runs")) {
+        runRequests.push({ method: request.method(), pathname });
+      }
+    });
+    await page.route("**/api/runs/*/events", async (route) => {
+      if (originalEventId !== undefined) {
+        reconnectEventId = (await route.request().allHeaders())["last-event-id"];
+        await route.continue();
+        return;
+      }
+      // Forward one actual frame, then end the response. Chromium must
+      // reconnect automatically and resume from that frame's event ID.
+      const response = await route.fetch({ timeout: 15000 });
+      const body = await response.text();
+      const first = body.split("\n\n").find((frame) => /^id: \d+$/m.test(frame));
+      const id = first && /^id: (\d+)$/m.exec(first);
+      if (!response.ok() || !id) throw new Error("missing first View SSE event");
+      originalEventId = id[1];
+      await route.fulfill({
+        status: 200,
+        contentType: "text/event-stream; charset=utf-8",
+        body: first + "\n\nretry: 50\n\n",
+      });
     });
     await page.click('.mq-dock-btn[data-action="run"]');
     check("run dialog opens", await page.locator("#mq-dialog-run").isVisible());
@@ -287,9 +318,17 @@ function localHostOnly(url) {
       (await page.locator("#mq-run-stdout").innerText()).includes("0")
     );
     check(
-      "no polling API was used",
-      runRequests.every((url) => !url.includes("status")),
-      runRequests.join(", ")
+      "Chromium reconnected with the original Last-Event-ID",
+      originalEventId !== undefined && reconnectEventId === originalEventId,
+      JSON.stringify({ originalEventId, reconnectEventId })
+    );
+    check(
+      "reconnect did not submit a second run or poll status",
+      runRequests.filter(({ method }) => method === "POST").length === 1 &&
+        runRequests.filter(({ method }) => method === "GET").length === 2 &&
+        runRequests.every(({ method, pathname }) =>
+          method === "POST" ? pathname === "/api/runs" : pathname.endsWith("/events")),
+      JSON.stringify(runRequests)
     );
     if (screenshotDir) {
       await page.screenshot({ path: path.join(screenshotDir, "control-flow-run.png") });
@@ -303,6 +342,37 @@ function localHostOnly(url) {
     await page.click('.mq-dock-btn[data-action="clear"]');
     check("clear hides run panel", !(await page.locator("#mq-run-panel").isVisible()));
     check("page was never reloaded by the run", (await page.title()).includes("Marqdo"));
+  }
+
+  if (projectName === "function-params.mq.md") {
+    await page.click('.mq-dock-btn[data-action="run"]');
+    check("no-main Dock opens the functions list", await page.locator("#mq-dialog-functions").isVisible());
+    check("no-main Dock did not submit a run", submittedRuns === 0);
+    const call = (name) => page.locator(`#mq-dialog-functions [data-action="call-function"][data-function-label="${name}"]`);
+    await call("double").click();
+    const n = page.locator('#mq-run-params [data-param-name="n"]');
+    check("Analysis marks n required and Int",
+      await n.getAttribute("aria-required") === "true" &&
+      (await n.locator("..").innerText()).includes("Int"));
+    await page.click('[data-action="run-confirm"]');
+    check("missing required parameter leaves the form open", await page.locator("#mq-dialog-run").isVisible());
+    check("missing required parameter did not submit", submittedRuns === 0);
+    await n.fill("5");
+    const argsPreview = page.locator("#mq-run-command");
+    check("call preview includes the chosen value", (await argsPreview.innerText()).includes("--arg n=5"));
+    await page.click('[data-action="run-confirm"]');
+    await page.waitForSelector('body[data-run-state="succeeded"]');
+    check("installed tool displays the real double(5) result",
+      await page.locator("#mq-run-summary").innerText().then((text) => text.includes("返回值：10")));
+
+    await page.click('.mq-tabs [data-action="functions"]');
+    await call("format_arguments").click();
+    await page.fill('[data-param-name="label"]', '"浏览器 "');
+    await page.fill('[data-param-name="items"]', '["列表", 7]');
+    await page.click('[data-action="run-confirm"]');
+    await page.waitForFunction(() => document.querySelector("#mq-run-summary")
+      .textContent.includes("浏览器 列表 · 7"));
+    check("CLI round-tripped Unicode Text and a List through the form", submittedRuns === 2);
   }
 
   await browser.close();
