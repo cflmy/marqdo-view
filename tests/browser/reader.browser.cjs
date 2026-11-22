@@ -257,11 +257,14 @@ function localHostOnly(url) {
         await route.continue();
         return;
       }
-      // Forward one actual frame, then end the response. Chromium must
-      // reconnect automatically and resume from that frame's event ID.
-      const response = await route.fetch({ timeout: 15000 });
+      // Ask the server to replay from the beginning even if the Core has
+      // already finished. Deliver one genuine nonterminal frame before ending
+      // the response so Chromium has an event ID to use for reconnection.
+      const headers = await route.request().allHeaders();
+      headers["last-event-id"] = "0";
+      const response = await route.fetch({ headers, timeout: 15000 });
       const body = await response.text();
-      const first = body.split("\n\n").find((frame) => /^id: \d+$/m.test(frame));
+      const first = body.split("\n\n").find((frame) => /^event: run\.state$/m.test(frame));
       const id = first && /^id: (\d+)$/m.exec(first);
       if (!response.ok() || !id) throw new Error("missing first View SSE event");
       originalEventId = id[1];
