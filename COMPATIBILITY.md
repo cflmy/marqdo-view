@@ -4,7 +4,7 @@
 
 | 轴 | 本 View 值 | 说明 |
 |---|---|---|
-| View 产品版本 | `0.1.0`（目标 `0.2.0`，RFC-VIEW-0002 PR-01 升级） | 独立 SemVer，与 CLI 不共用 |
+| View 产品版本 | `0.2.0` | 独立 SemVer，与 CLI 不共用 |
 | `marqdo` 产品范围 | `>=3.0.0-beta.1,<4.0.0` | 安装与分发时由 CLI 强制校验 |
 | CLI Tool Protocol | `1` | `tool.json` 清单/整包摘要/分发 |
 | Analysis | `2` | 未知 major 直接拒绝，不回退 |
@@ -34,8 +34,8 @@ Beta 版 CLI 必须使用 prerelease 范围（`>=3.0.0-beta.1,<4.0.0`）；`>=3.
 | 静态离线导出（纯只读） | **已实现**（PR-05，同一渲染器） |
 | 逐语句变量值 / 参数实际值 / 内存快照 | **UNSUPPORTED**（Trace v2 不提供，绝不伪造） |
 | 知识“已证明”状态 | **UNSUPPORTED**（需要独立 Prove 协议与证书） |
-| `project`/`strict` 运行与 grants 授权 | **未实现**（首版仅 `pure`，其他模式 403） |
-| SSE 流式输出 / 取消运行 / 多运行历史 | **未实现**（运行后整页重载并保留位置） |
+| `project`/`strict` 运行与 grants 授权 | **未实现**（首版仅 `pure`；0002 的受控 project grants 在 PR-03/04） |
+| SSE 状态推送 / 取消运行 / 事件重放 | **未实现**（RFC-VIEW-0002 PR-04 阻塞项；当前运行后整页重载） |
 | SVG 曲线侧注 | **未实现**（运行事件用内联 keyed chip，U-04 PARTIAL） |
 | 调试器/断点/单步 | **不实现**（首版非目标） |
 | Knowledge/Prove/Lint 引擎 | **不实现**（独立仓库/未来可选信息层） |

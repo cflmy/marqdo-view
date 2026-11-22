@@ -6,6 +6,20 @@ Protocol axes (Tool v1, Analysis v2, Trace v2) are versioned separately.
 
 ## [Unreleased]
 
+### Changed (RFC-VIEW-0002 PR-01)
+
+- View product version is now `0.2.0` (`Cargo.toml`, `tool.json`, binary
+  `--version`), still independent from the CLI product version.
+- Scripts moved from `tools/` to `scripts/` per RFC-VIEW-0002 §5.3; added
+  `scripts/verify-frozen-cli.sh` (records version/SHA and fails if the frozen
+  CLI changes across a command sequence).
+- Added `.github/workflows/ci.yml`: quality lane (fmt/clippy/test/build) plus a
+  frozen-CLI acceptance lane that verifies the release archive SHA, runs the
+  one-command acceptance and uploads evidence. `.woodpecker.yml` updated to the
+  new script paths.
+- Tool v1 packaging now emits `0.2.0`; install/dispatch/tamper behaviour is
+  re-verified against the frozen `3.0.0-beta.1` CLI.
+
 ### Changed (RFC-VIEW-0002 PR-00)
 
 - Adopted `docs/architecture/RFC-VIEW-0002.md` as the sole implementation

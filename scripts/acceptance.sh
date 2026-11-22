@@ -2,7 +2,7 @@
 # RFC-VIEW-0001 §18.1 one-command acceptance.
 #
 # Usage:
-#   MARQDO_BIN=/abs/path/to/frozen/marqdo tools/acceptance.sh
+#   MARQDO_BIN=/abs/path/to/frozen/marqdo scripts/acceptance.sh
 #
 # Optional:
 #   CLI_SOURCE_SHA=<sha>   override the CLI source SHA for the evidence manifest
@@ -55,7 +55,7 @@ run_step test cargo test --locked
 run_step build cargo build --release --locked
 
 # 1. controlled Tool bundle + frozen-CLI install smoke
-run_step bundle env MARQDO_BIN="$MARQDO_BIN" ./tools/package.sh
+run_step bundle env MARQDO_BIN="$MARQDO_BIN" ./scripts/package.sh
 bundle="$repo_root/dist/marqdo-view"
 archive="$(ls -t "$repo_root"/dist/marqdo-view-*-x86_64-unknown-linux-gnu.tar.gz | head -1)"
 archive_sha="$(sha256sum "$archive" | cut -d' ' -f1)"
@@ -157,12 +157,12 @@ wait "$run_pid" 2>/dev/null || true
 trap - EXIT
 
 # 5. project-local verification suites
-run_step export_suite env MARQDO_BIN="$MARQDO_BIN" ./tools/test-export.sh
-run_step security_suite ./tools/test-security.sh
+run_step export_suite env MARQDO_BIN="$MARQDO_BIN" ./scripts/test-export.sh
+run_step security_suite ./scripts/test-security.sh
 if [[ "${SKIP_BROWSER:-0}" == "1" ]]; then
   record browser SKIP
 elif [[ -d "$repo_root/tests/browser/node_modules/playwright" && -d "$repo_root/tests/.cache/pw-browsers" ]]; then
-  run_step browser env MARQDO_BIN="$MARQDO_BIN" ./tools/test-browser.sh
+  run_step browser env MARQDO_BIN="$MARQDO_BIN" ./scripts/test-browser.sh
 else
   record browser SKIP
 fi
@@ -213,7 +213,7 @@ manifest = {
     },
     "gates": statuses,
     "commands": {
-        "script": "tools/acceptance.sh",
+        "script": "scripts/acceptance.sh",
         "notes": "Generated from real command exit statuses; install/verify/export/run use the frozen CLI archive copied to an isolated tool home.",
     },
 }

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Static export acceptance: pure read-only, offline assets, safe paths.
 #
-# Usage: MARQDO_BIN=/abs/path/marqdo tools/test-export.sh
+# Usage: MARQDO_BIN=/abs/path/marqdo scripts/test-export.sh
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

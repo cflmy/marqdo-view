@@ -17,7 +17,7 @@
 |---|---|---|
 | A-01 无旧 crate 依赖 | PASS | `tests/no_coupling.rs` 依赖/Cargo.lock/源码扫描 |
 | A-02 独立新仓库 clean build | PASS | acceptance `build`；无 `marqdo`/`marqdo-cli` 源码依赖 |
-| A-03 Tool v1 安装/分发 | PASS | acceptance `archive_install`、`tool_list`、`view_help`；`tools/install-smoke.sh` |
+| A-03 Tool v1 安装/分发 | PASS | acceptance `archive_install`、`tool_list`、`view_help`；`scripts/install-smoke.sh` |
 | A-04 CLI SHA-256 前后相同 | PASS | acceptance `core_sha`；manifest 中 before==after=`062cb56e…` |
 | A-05 旧审计与截图基准 | PASS（静态） | `docs/audits/legacy-render-paths.md`（`LEGACY_RUNTIME_UNVERIFIED` 已声明） |
 | A-06 单一 Renderer/CSS 入口 | PASS | `tests/no_coupling.rs`、`tests/asset_integrity.rs`、ADR-0001/0002 |
@@ -37,7 +37,7 @@
 | X-01 恶意 Markdown | PASS | `tests/rendering.rs`、`tests/fixtures/security-project` 浏览器 |
 | X-02 路径穿越/symlink | PASS | `tests/http_live.rs`、`SafeRelativePath` 单测 |
 | X-03 跨站 POST run | PASS | `tests/http_live.rs`（token/Origin/confirm/mode） |
-| X-04 无 JS/禁网/file:// | PASS | 浏览器 no-JS/外部请求检查；`tools/test-export.sh` file:// Chromium |
+| X-04 无 JS/禁网/file:// | PASS | 浏览器 no-JS/外部请求检查；`scripts/test-export.sh` file:// Chromium |
 | X-05 stdout 注入转义 | PASS | `tests/http_live.rs::program_stdout_is_escaped...` |
 | X-06 超时/子进程清理 | PASS | `tests/core_contract.rs::timeout_kills_the_process_group...` |
 | P-01 文档可复现 | PASS | README / RFC / STATUS / COMPATIBILITY / ADR / 审计 / 证据 |
@@ -59,7 +59,7 @@
 
 ```bash
 export MARQDO_BIN=/abs/path/to/frozen/marqdo-3.0.0-beta.1
-tools/acceptance.sh
+scripts/acceptance.sh
 cat docs/evidence/2c7c4f31e7a388d3fcfa717a77067e696ed13854/manifest.json
 ```
 

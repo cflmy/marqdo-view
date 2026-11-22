@@ -1,6 +1,6 @@
 # marqdo-view
 
-Marqdo View 是一个独立的可执行文档阅读器：以**原始 Markdown 为阅读主体**，把冻结
+Marqdo View（`0.2.0`）是一个独立的可执行文档阅读器：以**原始 Markdown 为阅读主体**，把冻结
 `marqdo` CLI 的静态语义（Analysis v2）与用户显式触发的真实运行轨迹（Trace v2）
 附着回原文，而不是把文档翻译成另一套语言。
 
@@ -38,7 +38,7 @@ MARQDO_BIN=/absolute/path/to/marqdo
 "$MARQDO_BIN" --version
 
 # 2) 构建并制作 Tool v1 bundle
-./tools/package.sh
+./scripts/package.sh
 # → dist/marqdo-view/tool.json + dist/marqdo-view/bin/marqdo-view
 
 # 3) 安装为 `marqdo view`
@@ -105,20 +105,20 @@ cargo build --release --locked
 
 ```bash
 export MARQDO_BIN=/absolute/path/to/frozen/marqdo
-./tools/acceptance.sh
+./scripts/acceptance.sh
 ```
 
 单独套件：
 
 ```bash
-MARQDO_BIN=... ./tools/test-contract.sh   # code + Tool v1 + verify + export
-MARQDO_BIN=... ./tools/test-export.sh     # 纯只读导出 + file:// Chromium
-./tools/test-security.sh                  # HTTP/路径/XSS/导出对抗
+MARQDO_BIN=... ./scripts/test-contract.sh   # code + Tool v1 + verify + export
+MARQDO_BIN=... ./scripts/test-export.sh     # 纯只读导出 + file:// Chromium
+./scripts/test-security.sh                  # HTTP/路径/XSS/导出对抗
 (cd tests/browser && npm install && PLAYWRIGHT_BROWSERS_PATH="$PWD/../.cache/pw-browsers" npx playwright install chromium)
-MARQDO_BIN=... ./tools/test-browser.sh    # 真实 Chromium 视觉/交互/响应式/运行
+MARQDO_BIN=... ./scripts/test-browser.sh    # 真实 Chromium 视觉/交互/响应式/运行
 ```
 
-协议 golden 由冻结 CLI 生成，见 `tests/golden/README.md` 与 `tools/gen-golden.sh`。
+协议 golden 由冻结 CLI 生成，见 `tests/golden/README.md` 与 `scripts/gen-golden.sh`。
 
 ## 已知限制（诚实状态）
 

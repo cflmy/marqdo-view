@@ -2,7 +2,7 @@
 # Security/contract suite: HTTP boundary, CSRF/Origin, path escapes, XSS
 # sanitization, export-no-exec, architectural coupling gates.
 #
-# Usage: tools/test-security.sh
+# Usage: scripts/test-security.sh
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -15,7 +15,7 @@ cargo test --locked --test no_coupling
 cargo test --locked --test asset_integrity
 
 if [[ -n "${MARQDO_FROZEN_BIN:-}" ]]; then
-  MARQDO_BIN="$MARQDO_FROZEN_BIN" ./tools/test-export.sh
+  MARQDO_BIN="$MARQDO_FROZEN_BIN" ./scripts/test-export.sh
 else
   echo "note: MARQDO_FROZEN_BIN not set; skipped real-core export script"
 fi

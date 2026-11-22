@@ -20,5 +20,5 @@
 ## 后果
 
 - 对抗测试 `tests/export.rs` 使用会写 marker 的假核心：导出后 marker 不存在、假核心 argv 中没有 `run`。
-- 真实冻结核心导出两个文档页面均为 `static-ok`；`tools/test-export.sh` 校验离线资源、manifest 哈希与核心 SHA 不变。
+- 真实冻结核心导出两个文档页面均为 `static-ok`；`scripts/test-export.sh` 校验离线资源、manifest 哈希与核心 SHA 不变。
 - 副作用：导出对每个文档执行一次 `check`（非执行），大项目导出耗时与文档数线性相关；首版不做增量导出，保持正确性优先。

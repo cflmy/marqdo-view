@@ -7,7 +7,7 @@
 
 | 项 | 值 |
 |---|---|
-| View 产品版本 | `0.1.0`（目标 `0.2.0`，PR-01 升级） |
+| View 产品版本 | `0.2.0` |
 | 实施规范 | `docs/architecture/RFC-VIEW-0002.md`（2026-11-22） |
 | 目标 CLI 产品范围 | `>=3.0.0-beta.1,<4.0.0` |
 | 冻结 CLI 二进制 SHA-256 | `062cb56e226bee55c21d238e195920caa985e62bb3877ba7b07abcc04dc0fe3f` |
@@ -21,7 +21,7 @@
 | 阶段 | 状态 | 证据 |
 |---|---|---|
 | PR-00 基线、旧 View 取证、冻结 CLI 合同 | **完成** | `docs/audits/legacy-view.md`、`docs/audits/protocol-contract-0002.md`、`docs/decisions/0007` |
-| PR-01 Tool v1 打包/安装/调度、0.2.0、scripts/、CI | 待开始 | — |
+| PR-01 Tool v1 打包/安装/调度、0.2.0、scripts/、CI | **完成** | `scripts/package.sh`、`scripts/install-smoke.sh`、`scripts/verify-frozen-cli.sh`、`.github/workflows/ci.yml`；冻结 CLI `tool install`/`view --help`/篡改拒绝实测 |
 | PR-02 Reader/Analysis 只读面与目标目录结构 | 待开始（现有 0001 实现可迁移） | `src/document.rs`、`src/semantic.rs`、`src/render.rs`、`src/server.rs` |
 | PR-03 执行层：request/process/controller、pure + project grants | 待开始（现有同步 `pure` 执行可迁移） | `src/core_client.rs`、`src/app.rs` |
 | PR-04 SSE 任务生命周期、取消、7 路由、会话 Cookie/CSRF | **未实现（MVP 阻塞项）** | — |
@@ -67,8 +67,8 @@
    `src/execution`、`src/server`、`tests/{contract,integration,security,browser,
    fixtures,golden}`、`scripts/`、`examples/{welcome,branch-loop,function-params,
    knowledge-only,unsafe-side-effect}.mq.md`、`.github/workflows/ci.yml`。
-9. **版本与文档**：View 仍为 0.1.0；README/COMPATIBILITY/ACCEPTANCE 仍以 0001
-   为口径，需在 PR-06 前全部更新。
+9. **文档口径**：README/COMPATIBILITY/ACCEPTANCE 仍含 0001 时期表述，需在
+   PR-06 前全部更新为 0002 口径。
 10. **视觉回归矩阵**：0002 要求 2048×1133 源参考与 1664×920/1440×900/1024×768/
     768×1024/390×844 宽度；现有截图集合不完整。
 
@@ -88,7 +88,7 @@
 - 旧 View 取证：`docs/audits/legacy-view.md`（静态；运行时 `LEGACY_RUNTIME_UNVERIFIED`）
 - 0002 条款映射：`docs/CONFORMANCE.md`
 - 验收（0001 时期，历史）：`docs/ACCEPTANCE.md`、`docs/evidence/`
-- 0001 时期一键验收脚本：`tools/acceptance.sh`（PR-01 后迁移为 `scripts/` 口径）
+- 0001 时期一键验收脚本：`scripts/acceptance.sh`（PR-01 后迁移为 `scripts/` 口径）
 
 ## 复现文档
 

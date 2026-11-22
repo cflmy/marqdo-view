@@ -36,7 +36,7 @@ fn version_is_the_tool_version() {
     let output = run_view(&["--version"], &cwd, &clean_env());
     assert_eq!(output.status.code(), Some(0));
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("marqdo-view 0.1.0"), "{stdout}");
+    assert!(stdout.contains("marqdo-view 0.2.0"), "{stdout}");
 }
 
 #[test]

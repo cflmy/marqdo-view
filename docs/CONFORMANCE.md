@@ -11,7 +11,7 @@
 
 | # | 条款 | 状态 | 实现位置 / 证据 |
 |---|---|---|---|
-| M1 | 独立构建/测试/打包/安装；不改/不重编译 CLI；无私有 crate/Git/path 依赖 | PASS（0001 基线） | `Cargo.toml`、`tests/no_coupling.rs`、`tools/acceptance.sh`（SHA 前后一致） |
+| M1 | 独立构建/测试/打包/安装；不改/不重编译 CLI；无私有 crate/Git/path 依赖 | PASS（0001 基线） | `Cargo.toml`、`tests/no_coupling.rs`、`scripts/acceptance.sh`（SHA 前后一致） |
 | M2 | 语言真相=Analysis v2；运行真相=`run/call --json`+Trace v2；原文=`.mq.md`；Markdown 不判语义 | PARTIAL | 已实现 Analysis 严格校验与 Trace 绑定；`call` 入口与请求合同待 PR-03/04 |
 | M3 | 打开/刷新/搜索/切换/导出/预览/目录/诊断绝不运行 | PASS（0001 证据，待 0002 复核） | `tests/http_live.rs`、`tests/export.rs`、浏览器证据 |
 | M4 | 单一 Read Model / HTML 组件 / CSS / JS；Live=Export | PASS（0001 证据） | `src/render.rs`、`src/assets.rs`、`tests/no_coupling.rs`、`tests/asset_integrity.rs` |
@@ -76,7 +76,7 @@
 | PR | 状态 | 提交 |
 |---|---|---|
 | PR-00 取证/基线 | **完成** | 待提交（本提交） |
-| PR-01 Tool/打包/scripts/CI/0.2.0 | PENDING | — |
+| PR-01 Tool/打包/scripts/CI/0.2.0 | **完成** | `scripts/package.sh`、`scripts/install-smoke.sh`、`scripts/verify-frozen-cli.sh`、`.github/workflows/ci.yml` |
 | PR-02 Reader/Analysis 结构与只读路由 | PENDING | — |
 | PR-03 执行层/请求/进程/控制器 | PENDING | — |
 | PR-04 SSE/路由/会话/前端闭环 | PENDING | — |
@@ -87,7 +87,7 @@
 
 | 组 | 状态 | 说明 |
 |---|---|---|
-| E01 Tool 安装/卸载/分发 | PASS（0001 证据；PR-01 重跑） | `tools/acceptance.sh` |
+| E01 Tool 安装/卸载/分发 | PASS（0001 证据；PR-01 重跑） | `scripts/acceptance.sh` |
 | E02 打开 knowledge+exec 文件不运行 | PASS | `tests/http_live.rs` |
 | E03 Source/Document 切换 | PASS | 浏览器证据 |
 | E04 中文/Emoji/表格/公式 span | PASS | `tests/unicode_spans.rs`、golden |

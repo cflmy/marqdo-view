@@ -173,7 +173,7 @@ CLI `call FILE FUNCTION` 的查找实现：`Module::function(name)`
   规范化文件清单（path/size/sha256，拒绝符号链接/特殊文件）→ staging 复制并
   复算一致 → 原子发布；失败清理 staging。
 - 分发：启动前重新计算磁盘整包清单并与记录逐项比较；**修改已安装包任意一个字节
-  后分发被拒绝**（tests 已覆盖，见 `tools/install-smoke.sh`）。
+  后分发被拒绝**（tests 已覆盖，见 `scripts/install-smoke.sh`）。
 - 运行时向工具注入 `MARQDO_TOOL_PROTOCOL=1`、
   `MARQDO_PROTOCOL_ANALYSIS=2`、`MARQDO_PROTOCOL_TRACE=2`（兼容协商成功时）；
   原样保留 cwd/stdin/stdout/stderr 与可保留环境，用

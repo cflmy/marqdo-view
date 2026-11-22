@@ -2,7 +2,7 @@
 # Browser acceptance for the Live reader: real Chromium, real frozen core.
 #
 # Usage:
-#   MARQDO_BIN=/abs/path/marqdo tools/test-browser.sh
+#   MARQDO_BIN=/abs/path/marqdo scripts/test-browser.sh
 #
 # Requires `cd tests/browser && npm install` once (Playwright + Chromium).
 set -euo pipefail

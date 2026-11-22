@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Regenerate committed Analysis v2 goldens from the frozen CLI release binary.
 #
-# Usage: MARQDO_BIN=/abs/path/marqdo tools/gen-golden.sh
+# Usage: MARQDO_BIN=/abs/path/marqdo scripts/gen-golden.sh
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

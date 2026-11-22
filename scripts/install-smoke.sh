@@ -2,7 +2,7 @@
 # Install the built bundle with a frozen marqdo CLI into an isolated tool home,
 # then prove the command is served by this program (not by the Core).
 #
-# Usage: MARQDO_BIN=/abs/path/marqdo tools/install-smoke.sh [tool.json]
+# Usage: MARQDO_BIN=/abs/path/marqdo scripts/install-smoke.sh [tool.json]
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

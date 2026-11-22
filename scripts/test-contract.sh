@@ -2,7 +2,7 @@
 # Contract-focused gate: formatting, lints, all tests, Tool v1 install smoke,
 # static verify and static export against the frozen core. No browser.
 #
-# Usage: MARQDO_BIN=/abs/path/marqdo tools/test-contract.sh
+# Usage: MARQDO_BIN=/abs/path/marqdo scripts/test-contract.sh
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -17,7 +17,7 @@ cargo clippy --all-targets -- -D warnings
 cargo test --locked
 cargo build --release --locked
 
-MARQDO_BIN="$MARQDO_BIN" ./tools/package.sh
+MARQDO_BIN="$MARQDO_BIN" ./scripts/package.sh
 
 export MARQDO_TOOL_HOME="$repo_root/dist/contract-tool-home"
 rm -rf "$MARQDO_TOOL_HOME"

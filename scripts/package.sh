@@ -110,7 +110,7 @@ tar --sort=name --owner=0 --group=0 --numeric-owner --mtime='UTC 2026-01-01' \
 
 if [[ -n "$MARQDO_BIN" ]]; then
   echo "==> smoke install against frozen core"
-  MARQDO_BIN="$MARQDO_BIN" "$repo_root/tools/install-smoke.sh" "$bundle/tool.json"
+  MARQDO_BIN="$MARQDO_BIN" "$repo_root/scripts/install-smoke.sh" "$bundle/tool.json"
 fi
 
 echo "bundle: $bundle"

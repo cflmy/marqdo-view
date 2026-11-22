@@ -28,7 +28,7 @@ Tool Protocol v1 安装时复制整个 bundle，并对每个文件做 SHA-256、
    CSS/JS/图片不额外放在 bundle 根（已内嵌），避免“内嵌 + 外部”双来源。
 3. `tool.json` 由源码模板 `tool.json` 固定，`compatibility.marqdo = ">=3.0.0-beta.1,<4.0.0"`、`analysis: [2]`、`trace: [2]`；bundle 目录内 `bin/marqdo-view` 是 release 构建产物。
 4. 开发时允许 `marqdo-view --marqdo-bin PATH` 直启；安装态必须以 `MARQDO_BIN` 为准，且不向核心传自定义参数格式。
-5. `tools/package.sh` 负责：`cargo build --release --locked` → 校验工具协议/SHA → 组装 dist → 写 `SHA256SUMS`/`SOURCE_SHA`/`RELEASE_INFO.json` → 用冻结 CLI 做一次 `tool install` + `view --help` 烟测。
+5. `scripts/package.sh` 负责：`cargo build --release --locked` → 校验工具协议/SHA → 组装 dist → 写 `SHA256SUMS`/`SOURCE_SHA`/`RELEASE_INFO.json` → 用冻结 CLI 做一次 `tool install` + `view --help` 烟测。
 
 ## 后果
 

@@ -33,7 +33,7 @@ steps:
         mkdir -p /tmp/marqdo && tar -xzf "$MARQDO_ARCHIVE" -C /tmp/marqdo
       - export MARQDO_BIN="$(find /tmp/marqdo -maxdepth 2 -name marqdo -type f | head -1)"
       - sha256sum "$MARQDO_BIN"
-      - MARQDO_BIN="$MARQDO_BIN" ./tools/test-contract.sh
+      - MARQDO_BIN="$MARQDO_BIN" ./scripts/test-contract.sh
       - sha256sum "$MARQDO_BIN"
 
   export:
@@ -46,7 +46,7 @@ steps:
       - mkdir -p /tmp/marqdo && tar -xzf "$MARQDO_ARCHIVE" -C /tmp/marqdo
       - export MARQDO_BIN="$(find /tmp/marqdo -maxdepth 2 -name marqdo -type f | head -1)"
       - cargo build --release --locked
-      - MARQDO_BIN="$MARQDO_BIN" ./tools/test-export.sh
+      - MARQDO_BIN="$MARQDO_BIN" ./scripts/test-export.sh
 
   browser:
     image: mcr.microsoft.com/playwright:v1.49.0-noble
@@ -56,13 +56,13 @@ steps:
       - export PATH="$HOME/.cargo/bin:$PATH"
       - cargo build --release --locked
       - (cd tests/browser && npm install --no-audit --no-fund)
-      - MARQDO_BIN="$(find /tmp/marqdo -maxdepth 2 -name marqdo -type f | head -1)" ./tools/test-browser.sh
+      - MARQDO_BIN="$(find /tmp/marqdo -maxdepth 2 -name marqdo -type f | head -1)" ./scripts/test-browser.sh
 
   release-bundle:
     image: rust:1.85-bookworm
     depends_on: [code]
     commands:
       - cargo build --release --locked
-      - MARQDO_BIN="" ./tools/package.sh
+      - MARQDO_BIN="" ./scripts/package.sh
       - sha256sum dist/marqdo-view-*.tar.gz
       - tar -tzf dist/marqdo-view-*.tar.gz | sort

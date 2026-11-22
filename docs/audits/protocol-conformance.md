@@ -17,12 +17,12 @@
 
 | 条款 | 实现 | 测试/证据 |
 |---|---|---|
-| `tool.json` schema/字段/SemVer/command/entrypoint | `tool.json`、`tools/package.sh` | `tests/no_coupling.rs`；`tools/install-smoke.sh` |
-| 冻结核心安装、整包摘要、启动校验 | `tools/install-smoke.sh`、`tools/acceptance.sh` | acceptance `archive_install` PASS；手工篡改字节验证 README（PR-01 证据） |
+| `tool.json` schema/字段/SemVer/command/entrypoint | `tool.json`、`scripts/package.sh` | `tests/no_coupling.rs`；`scripts/install-smoke.sh` |
+| 冻结核心安装、整包摘要、启动校验 | `scripts/install-smoke.sh`、`scripts/acceptance.sh` | acceptance `archive_install` PASS；手工篡改字节验证 README（PR-01 证据） |
 | 环境变量 `MARQDO_BIN`/协议协商 | `src/core_client.rs`、`src/version.rs` | `tests/core_contract.rs`、`tests/http_live.rs` |
 | argv 数组、无 shell、保留退出码/stdio | `src/core_client.rs` | `tests/core_contract.rs`（argv、timeout、fake core） |
 | 不链接/不重编译/不读 CLI 源码 | 依赖图 | `tests/no_coupling.rs`、`docs/ADR/0001` |
-| 篡改/缺文件/协议不兼容拒绝 | CLI 自身 + View 侧协商 | `tests/core_contract.rs`、`tools/install-smoke.sh` |
+| 篡改/缺文件/协议不兼容拒绝 | CLI 自身 + View 侧协商 | `tests/core_contract.rs`、`scripts/install-smoke.sh` |
 
 ## 3. Analysis v2
 
@@ -74,7 +74,7 @@
 | CSRF/Origin/确认 | `POST /api/run` | `tests/http_live.rs` |
 | 路径边界/单次解码/无遍历 | `SafeRelativePath`、`percent_decode` | `tests/http_live.rs`、`tests/project` 单测 |
 | 导出纯只读、无执行 | `src/export.rs` | `tests/export.rs`（marker 假核心） |
-| 离线文件:// | 内嵌资产 + 相对链接 | `tools/test-export.sh` Chromium file:// |
+| 离线文件:// | 内嵌资产 + 相对链接 | `scripts/test-export.sh` Chromium file:// |
 | 输出/错误不泄露绝对路径 | `ViewError::public_message`、manifest 相对路径 | `tests/http_live.rs`、`tests/export.rs` |
 | 无第二渲染器/第二主题 | 代码门禁 | `tests/no_coupling.rs`、`tests/asset_integrity.rs` |
 
@@ -90,9 +90,9 @@
 
 ```bash
 export MARQDO_BIN=/abs/path/to/frozen/marqdo
-tools/acceptance.sh          # §18.1 全链路 + evidence manifest
-tools/test-contract.sh       # code + Tool v1 + verify + export
-tools/test-export.sh         # 纯只读导出 + file:// Chromium
-tools/test-security.sh       # HTTP/路径/XSS/导出对抗
-tools/test-browser.sh        # 真实 Chromium 视觉/交互/响应式/运行
+scripts/acceptance.sh          # §18.1 全链路 + evidence manifest
+scripts/test-contract.sh       # code + Tool v1 + verify + export
+scripts/test-export.sh         # 纯只读导出 + file:// Chromium
+scripts/test-security.sh       # HTTP/路径/XSS/导出对抗
+scripts/test-browser.sh        # 真实 Chromium 视觉/交互/响应式/运行
 ```
