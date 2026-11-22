@@ -23,7 +23,11 @@ cd "$work"
 
 echo "==> check all five example documents (no execution)"
 for file in welcome.mq.md branch-loop.mq.md function-params.mq.md knowledge-only.mq.md unsafe-side-effect.mq.md; do
-  "$MARQDO_BIN" check "$file" --emit "analysis-$file.json" --json >/dev/null
+  if ! "$MARQDO_BIN" check "$file" --emit "analysis-$file.json" --json > "check-$file.json"; then
+    echo "error: frozen CLI refused $file" >&2
+    cat "check-$file.json" >&2
+    exit 1
+  fi
   test -s "analysis-$file.json"
 done
 

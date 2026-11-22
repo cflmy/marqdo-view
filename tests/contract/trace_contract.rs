@@ -73,9 +73,9 @@ fn real_control_flow_trace_binds_and_projects_events() {
     );
     let projection = &run.projection;
     assert_eq!(projection.state, RunDisplayState::Succeeded);
-    assert_eq!(projection.counts.total(), 285);
-    assert_eq!(projection.entry_event_count, 18);
-    assert_eq!(projection.other_event_count, 267);
+    assert_eq!(projection.counts.total(), 27);
+    assert_eq!(projection.entry_event_count, 27);
+    assert_eq!(projection.other_event_count, 0);
     assert_eq!(projection.run_status, "ok");
     assert!(projection.truncated.is_none());
     assert_eq!(projection.stdout, "0\n0\n2\n");

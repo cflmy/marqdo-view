@@ -49,3 +49,9 @@ Beta 版 CLI 必须使用 prerelease 范围（`>=3.0.0-beta.1,<4.0.0`）；`>=3.
 - `trace.source.root_id == analysis.project.root_id`；事件 `module_id` 必须存在于 Analysis。
 - `trace.truncated != null` → `TRUNCATED`，不声明全部分支/循环已遍历。
 - 运行只使用 `MARQDO_BIN` 子进程与公开 JSON；不链接 Core crate、不读 Core 源码、不依赖私有 IR。
+
+## 官方 Beta 归档的标准库
+
+`v3.0.0-beta.1` 的 Linux 归档未携带 `stdlib/`。View 的冻结验收示例使用
+该二进制公开的 Memory、stdout 和文件资源原语。含 `std:` 导入的项目由
+所选 Core 校验，缺少标准库时由 View 展示 Core 的诊断。

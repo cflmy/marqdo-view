@@ -9,47 +9,48 @@
       "span": null
     },
     {
-      "detail": "continue",
-      "function_id": "root:control-flow@0.1.0::index.mq.md::演示.main",
-      "kind": "loop.iteration",
+      "detail": "initial_pages=1 max_pages=1",
+      "function_id": null,
+      "kind": "memory.new",
       "module_id": "root:control-flow@0.1.0::index.mq.md",
       "seq": 1,
       "span": {
-        "end": 197,
-        "start": 182
+        "end": 230,
+        "start": 214
       }
     },
     {
-      "detail": "false",
+      "detail": "byte",
       "function_id": "root:control-flow@0.1.0::index.mq.md::演示.main",
-      "kind": "branch.eval",
+      "kind": "memory.write",
       "module_id": "root:control-flow@0.1.0::index.mq.md",
       "seq": 2,
       "span": {
-        "end": 211,
-        "start": 199
+        "end": 243,
+        "start": 234
       }
     },
     {
-      "detail": "true",
-      "function_id": "root:control-flow@0.1.0::index.mq.md::演示.main",
-      "kind": "branch.eval",
+      "detail": "kind=stdio descriptor=stdout",
+      "function_id": null,
+      "kind": "resource.open",
       "module_id": "root:control-flow@0.1.0::index.mq.md",
       "seq": 3,
       "span": {
-        "end": 211,
-        "start": 199
+        "end": 304,
+        "start": 261
       }
     },
     {
-      "detail": null,
-      "function_id": "std:marqdo-stdlib@0.1.0#5407d3665ba2fe105820d0f1af5efaafa10c277a69eb819c3225719813c8c713::io.mq.md::io.写值",
-      "kind": "call.enter",
+      "detail": "ok",
+      "duration_micros": 10,
+      "kind": "effect",
       "module_id": "root:control-flow@0.1.0::index.mq.md",
+      "operation": "resource.open",
       "seq": 4,
       "span": {
-        "end": 247,
-        "start": 239
+        "end": 304,
+        "start": 261
       }
     },
     {
@@ -66,13 +67,13 @@
   },
   "run": {
     "entry": "root:control-flow@0.1.0::index.mq.md::main",
-    "id": "6-1795317753027990146",
+    "id": "31-1795354081721454068",
     "status": "ok"
   },
   "schema": "marqdo.trace",
   "schema_version": 2,
   "source": {
-    "analysis_digest": "sha256:e2aca5a1a0c9fa073a21b5af7deb8ef493ac981b97c788b721347c24c94f48ab",
+    "analysis_digest": "sha256:392c82598cdd9d649951133df9a364d85bca7036aa653a4139aab190e9040af4",
     "root_id": "root:control-flow@0.1.0"
   },
   "truncated": {
