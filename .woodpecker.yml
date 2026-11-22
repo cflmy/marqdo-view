@@ -1,7 +1,9 @@
 # The published beta needs glibc 2.39. Use the matching Playwright image
 # so the installed-tool tests get both Ubuntu Noble and Chromium.
 when:
-  event: [push, pull_request, manual]
+  - event: [pull_request, manual]
+  - event: push
+    branch: master
 
 steps:
   frozen-acceptance:
