@@ -72,6 +72,7 @@ run_step tool_list bash -c "'$MARQDO_BIN' tool list | grep -q view"
 run_step view_help bash -c "'$MARQDO_BIN' view --help | grep -q 'marqdo-view'"
 run_step verify "$MARQDO_BIN" view verify examples/mixed-modes/index.mq.md
 run_step export "$MARQDO_BIN" view export examples/control-flow --out "$work/site"
+run_step examples_check env MARQDO_BIN="$MARQDO_BIN" ./scripts/check-examples.sh
 test -f "$work/site/manifest.json"
 
 # 3. Live browse smoke (no execution on open)
@@ -126,6 +127,7 @@ trap - EXIT
 
 # 5. project-local verification suites
 run_step export_suite env MARQDO_BIN="$MARQDO_BIN" ./scripts/test-export.sh
+run_step no_exec_suite env MARQDO_BIN="$MARQDO_BIN" ./scripts/test-no-exec.sh
 run_step security_suite ./scripts/test-security.sh
 if [[ "${SKIP_BROWSER:-0}" == "1" ]]; then
   record browser SKIP
@@ -175,8 +177,10 @@ manifest = {
     "generated_at_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
     "tests": {
         "contract": statuses.get("test", "FAIL"),
+        "examples": statuses.get("examples_check", "FAIL"),
         "browser": statuses.get("browser", "SKIP"),
         "export": statuses.get("export_suite", "FAIL"),
+        "no_exec": statuses.get("no_exec_suite", "FAIL"),
         "security": statuses.get("security_suite", "FAIL"),
     },
     "gates": statuses,

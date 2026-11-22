@@ -13,8 +13,11 @@ Marqdo View（`0.2.0`）是一个独立的可执行文档阅读器：以**原始
 - 兼容性：[`COMPATIBILITY.md`](COMPATIBILITY.md) / 变更：[`CHANGELOG.md`](CHANGELOG.md)
 - 决策记录：[`docs/decisions/`](docs/decisions/)
 
-> **当前开发状态**：仓库正按 RFC-VIEW-0002 迭代（PR-00～PR-06）。下方能力表与
-> 限制按实际实现更新；未完成项以 `docs/STATUS.md` 为准，不宣称 0002 已完成。
+> **当前状态**：RFC-VIEW-0002 PR-00～PR-06 已完成，按 §10 发布门禁验收
+> **PASS**（真实冻结 CLI + 真实 Chromium；见
+> [`docs/ACCEPTANCE.md`](docs/ACCEPTANCE.md) 与
+> `docs/evidence/<CLI-SHA>/manifest.json`）。像素级人工比对与完整
+> screen-reader 走查仍为 `UNVERIFIED`，见 `docs/STATUS.md`。
 
 ## 能力
 
@@ -56,6 +59,10 @@ marqdo view examples/control-flow --port 0 --no-open
 # 校验 CLI / Analysis / 源码绑定（无执行）
 marqdo view verify examples/mixed-modes/index.mq.md
 marqdo view verify examples/mixed-modes --refs --json
+
+# RFC §13.3 示例（可检查/调用/运行；无隐式执行）
+marqdo view examples/function-params.mq.md --no-open
+marqdo view examples/unsafe-side-effect.mq.md --no-open
 
 # 纯只读静态导出（永不执行；导出后可用 file:// 离线打开）
 marqdo view export examples/welcome --out ./site
@@ -117,6 +124,8 @@ export MARQDO_BIN=/absolute/path/to/frozen/marqdo
 单独套件：
 
 ```bash
+MARQDO_BIN=... ./scripts/check-examples.sh  # RFC §13.3 示例真实 check/call/run
+MARQDO_BIN=... ./scripts/test-no-exec.sh     # 打开/导出零副作用哨兵
 MARQDO_BIN=... ./scripts/test-contract.sh   # code + Tool v1 + verify + export
 MARQDO_BIN=... ./scripts/test-export.sh     # 纯只读导出 + file:// Chromium
 ./scripts/test-security.sh                  # HTTP/路径/XSS/导出对抗
@@ -134,5 +143,7 @@ MARQDO_BIN=... ./scripts/test-browser.sh    # 真实 Chromium 视觉/交互/响�
 - SSE 只推送 View 生命周期与终态数据，不承诺逐字 stdout/Token 流；Trace v2 不含
   参数实际值/逐语句变量/内存快照。
 - 平台：仅 Linux x86_64 正式验证；Windows/macOS 不支持声明。
+- 远端 CI 配置已提供（`.github/workflows/ci.yml`），本环境未实际运行远端 CI；
+  验收证据来自本地真实命令。
 - 像素级人工视觉比对与完整 screen-reader 走查为 `UNVERIFIED`（自动化几何/响应式/
   无外部资源/无 JS/打印证据见 `docs/evidence/PR-04/`）。

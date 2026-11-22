@@ -228,7 +228,7 @@ impl ReaderRenderer {
         &self,
         html: &mut String,
         model: &PresentationModel,
-        _ctx: &RenderContext,
+        ctx: &RenderContext,
         navigation: &crate::reader::model::Navigation,
     ) {
         let active = model
@@ -238,6 +238,11 @@ impl ReaderRenderer {
             .map(|path| path.as_str())
             .unwrap_or("");
         let files_count = navigation.documents.len();
+        let run_tab = if ctx.live {
+            "<button type=\"button\" class=\"mq-tab\" data-action=\"run\" title=\"显式运行\">运行</button>".to_string()
+        } else {
+            String::new()
+        };
         let _ = write!(
             html,
             r##"<header class="mq-topbar">
@@ -255,19 +260,13 @@ impl ReaderRenderer {
 <nav class="mq-tabs" aria-label="阅读导航">
   <button type="button" class="mq-tab" data-action="mode-document" aria-current="page">文档</button>
   <button type="button" class="mq-tab" data-action="functions">函数</button>
-  <button type="button" class="mq-tab" data-action="run" data-disabled="{run_disabled}" title="{run_title}">运行</button>
+{run_tab}
 </nav>
 "##,
             menu_icon = icon("M4 6h16M4 12h16M4 18h16"),
             site_title = escape_text(&navigation.site_title),
             logo = escape_attr(&self.assets.logo().data_uri()),
             search_icon = icon("M21 21l-5-5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0"),
-            run_disabled = if _ctx.run_available { "false" } else { "true" },
-            run_title = if _ctx.run_available {
-                "运行文档（需要确认）"
-            } else {
-                "运行入口尚未启用；当前版本不会执行文档"
-            },
         );
         let _ = (files_count, active);
     }
@@ -527,14 +526,17 @@ impl ReaderRenderer {
     }
 
     fn render_dock(&self, html: &mut String, ctx: &RenderContext) {
-        let run_disabled = if ctx.core_available {
-            ""
-        } else {
-            " data-disabled=\"true\""
-        };
-        let _ = write!(
-            html,
-            r##"<div class="mq-dock" role="toolbar" aria-label="文档操作">
+        let settings = icon("M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2");
+        let more = icon("M5 12h.01M12 12h.01M19 12h.01");
+        if ctx.live {
+            let run_disabled = if ctx.core_available {
+                ""
+            } else {
+                " data-disabled=\"true\""
+            };
+            let _ = write!(
+                html,
+                r##"<div class="mq-dock" role="toolbar" aria-label="文档操作">
   <button type="button" class="mq-dock-btn" data-action="reload" aria-label="刷新页面">{reload}<span>刷新</span></button>
   <button type="button" class="mq-dock-btn" data-action="settings" aria-label="阅读设置">{settings}<span>设置</span></button>
   <button type="button" class="mq-dock-btn" data-action="run" aria-label="运行文档"{run_disabled}>{play}<span>运行</span></button>
@@ -542,13 +544,26 @@ impl ReaderRenderer {
   <button type="button" class="mq-dock-btn" data-action="more" aria-label="更多操作">{more}<span>更多</span></button>
 </div>
 "##,
-            reload = icon("M20 7V3l-3 3a8 8 0 1 0 2 11M20 3h-5"),
-            settings = icon("M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"),
-            play = icon("m9 5 11 7-11 7z"),
-            clear = icon("m14 3 4 2-4 8M5 12l8 2 2 6H3zM7 15l-1 4M10 16l-1 4"),
-            more = icon("M5 12h.01M12 12h.01M19 12h.01"),
-            run_disabled = run_disabled
-        );
+                reload = icon("M20 7V3l-3 3a8 8 0 1 0 2 11M20 3h-5"),
+                settings = settings,
+                play = icon("m9 5 11 7-11 7z"),
+                clear = icon("m14 3 4 2-4 8M5 12l8 2 2 6H3zM7 15l-1 4M10 16l-1 4"),
+                more = more,
+                run_disabled = run_disabled
+            );
+        } else {
+            // Static export has no execution controls (RFC-VIEW-0002 §7.2).
+            let _ = write!(
+                html,
+                r##"<div class="mq-dock" role="toolbar" aria-label="文档操作">
+  <button type="button" class="mq-dock-btn" data-action="settings" aria-label="阅读设置">{settings}<span>设置</span></button>
+  <button type="button" class="mq-dock-btn" data-action="more" aria-label="更多操作">{more}<span>更多</span></button>
+</div>
+"##,
+                settings = settings,
+                more = more
+            );
+        }
     }
 
     fn render_toast(&self, html: &mut String) {

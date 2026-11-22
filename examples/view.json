@@ -1,0 +1,6 @@
+{
+  "schema": "marqdo.view-config",
+  "schema_version": 1,
+  "welcome": "welcome.mq.md",
+  "site_title": "Marqdo View 示例"
+}

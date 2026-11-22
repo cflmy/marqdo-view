@@ -40,7 +40,7 @@ Beta 版 CLI 必须使用 prerelease 范围（`>=3.0.0-beta.1,<4.0.0`）；`>=3.
 | 调试器/断点/单步 | **不实现**（首版非目标） |
 | Knowledge/Prove/Lint 引擎 | **不实现**（独立仓库/未来可选信息层） |
 
-实际完成状态以 [`docs/STATUS.md`](docs/STATUS.md) 与 [`docs/ACCEPTANCE.md`](docs/ACCEPTANCE.md) 为准，本文不代替现状。远端 CI 未实际运行（`.woodpecker.yml` 已提供），本地冻结 CLI 验收证据见 `docs/evidence/`。
+实际完成状态以 [`docs/STATUS.md`](docs/STATUS.md) 与 [`docs/ACCEPTANCE.md`](docs/ACCEPTANCE.md) 为准，本文不代替现状。RFC-VIEW-0002 §10 门禁已按真实冻结 CLI + Chromium 验收 PASS；远端 CI 配置已提供但本环境未实际运行远端 CI，本地证据见 `docs/evidence/`。
 
 ## 消费者契约
 

@@ -126,7 +126,10 @@ fn explicit_run_streams_sse_accepted_running_and_terminal_with_verified_trace() 
     let mut reader = http::SseReader::open(
         server.port,
         &format!("/api/runs/{run_id}/events"),
-        &[("Cookie", session.cookie.clone())],
+        &[
+            ("Cookie", session.cookie.clone()),
+            ("Last-Event-ID", "0".to_string()),
+        ],
     );
     assert_eq!(reader.status, 200);
     assert!(reader

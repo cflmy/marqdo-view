@@ -1,0 +1,12 @@
+==> check all five example documents (no execution)
+==> call function-params.double(n=5) -> 10
+call double(5): PASS (Int 10)
+==> run branch-loop main -> Int 0 with loop/return trace
+run branch-loop: PASS (value 0, events: call.enter,call.exit,loop.iteration,return)
+==> knowledge-only has no main (truthful failure, no fallback)
+knowledge-only: PASS (explicit sem.no_entry_function)
+==> unsafe-side-effect writes nothing in pure mode
+unsafe-side-effect pure: PASS (permission.denied, no file)
+==> unsafe-side-effect writes only with explicit project grants
+unsafe-side-effect project+grants: PASS (sentinel written explicitly)
+examples: PASS (frozen CLI sha256 062cb56e226bee55c21d238e195920caa985e62bb3877ba7b07abcc04dc0fe3f unchanged)

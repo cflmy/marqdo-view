@@ -4,7 +4,12 @@ All notable changes to `marqdo-view` are documented here. The format follows
 Keep a Changelog and the project uses SemVer for the View product version.
 Protocol axes (Tool v1, Analysis v2, Trace v2) are versioned separately.
 
-## [Unreleased]
+`0.2.0` is the first release implementing RFC-VIEW-0002 end to end (SSE execution
+loop, 7-route Live API, controlled project grants and Trace-bound annotations).
+The earlier `0.1.0` development line was never published; its verified reader /
+Analysis / export work is folded into this entry.
+
+## [0.2.0] - 2026-11-22
 
 ### Added (RFC-VIEW-0002 PR-05)
 
@@ -96,6 +101,26 @@ Protocol axes (Tool v1, Analysis v2, Trace v2) are versioned separately.
   new script paths.
 - Tool v1 packaging now emits `0.2.0`; install/dispatch/tamper behaviour is
   re-verified against the frozen `3.0.0-beta.1` CLI.
+
+### Added (RFC-VIEW-0002 PR-06)
+
+- Five RFC §13.3 example documents at `examples/{welcome,branch-loop,
+  function-params,knowledge-only,unsafe-side-effect}.mq.md` plus explicit
+  `examples/view.json`; all are checked with the frozen CLI and recorded via
+  `scripts/check-examples.sh` (double(5)=Int 10, branch-loop=Int 0 with
+  loop/return Trace, knowledge-only has no main, unsafe-side-effect writes only
+  with explicit project grants).
+- `scripts/test-no-exec.sh`: opens/lists/searches/reloads/exports the
+  unsafe-side-effect document, hashes every example source and the lock file,
+  asserts no write sentinel appears and that exported HTML contains no run
+  controls, CSRF material or external URLs.
+- Static export no longer renders run controls: no run Dock button, no run tab,
+  no call buttons and no run dialog; only settings/more remain offline.
+- `scripts/acceptance.sh` extended with `examples_check` and `no_exec_suite`
+  gates and refreshed evidence manifest schema (`tests.examples`, `tests.no_exec`).
+- Final documentation closure: `docs/ACCEPTANCE.md` rewritten against
+  RFC-VIEW-0002 §9/§10, STATUS/CONFORMANCE/README/COMPATIBILITY updated, final
+  evidence manifest generated from the frozen CLI release (CLI SHA unchanged).
 
 ### Changed (RFC-VIEW-0002 PR-00)
 

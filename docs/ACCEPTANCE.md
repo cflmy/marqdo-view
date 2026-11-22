@@ -1,67 +1,125 @@
-# 验收状态（RFC-VIEW-0001 §18）
+# 验收状态（RFC-VIEW-0002 §9 / §10）
 
-> **历史证据说明（2026-11-22）**：本文件的 PASS 是 **RFC-VIEW-0001 时期**
-> 的验收结论，用作已实现能力的证据来源，**不是 RFC-VIEW-0002 的发布门禁**。
-> 0002 要求 SSE、7 路由、单函数调用、project grants、0.2.0 发行包与新的浏览器
-> 矩阵；这些将在 PR-04～PR-06 重新验收并更新本文件（见 `docs/CONFORMANCE.md`）。
+> 结论：**RFC-VIEW-0002 PR-00～PR-06 的 BETA-CANDIDATE 强制门禁通过**。
+> 证据来自真实冻结 CLI（`marqdo 3.0.0-beta.1`）+ 真实进程 HTTP/SSE 测试 +
+> 真实 Chromium 131；生成命令为 `MARQDO_BIN=… scripts/acceptance.sh`。
+> 机器可读证据：`docs/evidence/2c7c4f31e7a388d3fcfa717a77067e696ed13854/manifest.json`
+> （最终 PR-06 提交上重跑；manifest 记录 View source/binary SHA、CLI 前后 SHA 与
+> 每个 gate 的真实退出状态）。
 
+- 日期：2026-11-22
+- View：`0.2.0`（Linux x86_64）
+- 冻结 CLI：`marqdo 3.0.0-beta.1`，SHA-256
+  `062cb56e226bee55c21d238e195920caa985e62bb3877ba7b07abcc04dc0fe3f`
+- CLI 源码：tag `v3.0.0-beta.1`，`2c7c4f31e7a388d3fcfa717a77067e696ed13854`
+- 规范：`docs/architecture/RFC-VIEW-0002.md`；矩阵：`docs/CONFORMANCE.md`
 
-> 结论：首个 Beta 的 **P0 门禁全部 PASS**（由真实冻结 CLI + 真实 Chromium 生成，
-> 见 `docs/evidence/2c7c4f31e7a388d3fcfa717a77067e696ed13854/manifest.json`）。
-> P1 视觉/交互门禁大部分 PASS，**U-01 像素级人工比对与 U-04 动态曲线侧注未完成/未实现**，
-> 已在 README/CHANGELOG/STATUS 明确标注，不以自动化结果替代人工判断。
+## 1. §10 发布门禁（强制）
 
-## P0 门禁
+| # | 门禁 | 结果 | 证据 |
+|---|---|---|---|
+| 1 | PR-00～06 完成、P0 检验、无伪交付 | **PASS** | 本文件 §2/§3；各 PR `docs/evidence/PR-0x/` |
+| 2 | Tool v1 独立安装；CLI 无 View 核心提交；SHA 不变 | **PASS** | acceptance `archive_install`/`tool_list`/`view_help`/`core_sha`；CLI before=after=`062cb56e…` |
+| 3 | 打开/刷新/导出零副作用；执行只来自显式 POST；跨站/CSRF 全绿 | **PASS** | `no_exec_suite`（源/锁哈希不变、无 sentinel、导出无执行控件）、`security_suite`、`tests/security/` |
+| 4 | SSE 生命周期/心跳/序号/断线重连/有界重放；无轮询 | **PASS** | `tests/integration/http_live.rs`（10 SSE/HTTP 测试）、浏览器 EventSource 断言、`docs/evidence/PR-04/` |
+| 5 | 真值来自 CLI `--json`/Trace v2；语义来自 Analysis v2；文档来自 `.mq.md` | **PASS** | `execution/controller.rs`、`protocol/*`、`trace_contract`；stale/invalid/truncated 测试 |
+| 6 | Live/Export 同一 HTML/CSS/JS；无旧叠层 | **PASS** | `tests/contract/no_coupling.rs`、`asset_integrity.rs`、`integration/export.rs`、`test-export.sh` |
+| 7 | Linux x86_64 可重现发行包；文档/帮助/限制一致 | **PASS** | `bundle`/`archive_install`；`dist/marqdo-view-0.2.0-x86_64-unknown-linux-gnu.tar.gz`；README/COMPATIBILITY/STATUS |
+| 8 | N01–N22 负面回归；失败不执行不泄漏不提升权限 | **PASS** | §3 映射；`tests/security/`、`tests/integration/`、`scripts/check-examples.sh`、`scripts/test-no-exec.sh` |
 
-| ID | 结果 | 证据 |
-|---|---|---|
-| A-01 无旧 crate 依赖 | PASS | `tests/contract/no_coupling.rs` 依赖/Cargo.lock/源码扫描 |
-| A-02 独立新仓库 clean build | PASS | acceptance `build`；无 `marqdo`/`marqdo-cli` 源码依赖 |
-| A-03 Tool v1 安装/分发 | PASS | acceptance `archive_install`、`tool_list`、`view_help`；`scripts/install-smoke.sh` |
-| A-04 CLI SHA-256 前后相同 | PASS | acceptance `core_sha`；manifest 中 before==after=`062cb56e…` |
-| A-05 旧审计与截图基准 | PASS（静态） | `docs/audits/legacy-render-paths.md`（`LEGACY_RUNTIME_UNVERIFIED` 已声明） |
-| A-06 单一 Renderer/CSS 入口 | PASS | `tests/contract/no_coupling.rs`、`tests/contract/asset_integrity.rs`、ADR-0001/0002 |
-| S-01 Knowledge/Exec/继承 | PASS | `tests/integration/rendering.rs`、`tests/integration/unicode_spans.rs`、冻结 Analysis golden |
-| S-02 Emph/Strong/Code 载体 | PASS | `tests/integration/rendering.rs`（4 个 Exec 锚点）、`tests/integration/unicode_spans.rs` |
-| S-03 Knowledge 惰性 | PASS | `knowledge_emphasis_never_becomes_an_execution_anchor` |
-| S-04 中文/emoji/CRLF/重复语句 | PASS | `examples/unicode-spans` + 冻结 golden + `tests/integration/unicode_spans.rs` |
-| S-05 check 失败可读 | PASS | `tests/contract/presentation_states.rs`、浏览器 diagnostics 区 |
-| S-06 未知 Analysis major 拒绝 | PASS | `tests/semantic` 单测、`tests/contract/presentation_states.rs`、`verify` 负测 |
-| S-07 digest/span 篡改 | PASS | `tests/contract/trace_contract.rs`、`tests/contract/presentation_states.rs` |
-| R-01 刷新 10 次不运行 | PASS | `tests/integration/http_live.rs::opening_and_refreshing_never_runs_the_document` |
-| R-02 导出纯静态 | PASS | `tests/integration/export.rs`（marker 假核心 + argv 无 run） |
-| R-03 用户确认后真实运行 | PASS | acceptance `real_run`（安装态、CSRF、真实 Trace） |
-| R-04 trace 不匹配 → STALE | PASS | `tests/contract/trace_contract.rs`、`tests/integration/http_live.rs` |
-| R-05 截断/运行错误 | PASS | 真实 truncated/arity golden + 页面状态 |
-| R-06 不猜未公开值 | PASS | Trace 模型无这些字段；UI `UNSUPPORTED`（`docs/design/state-matrix.md`） |
-| X-01 恶意 Markdown | PASS | `tests/integration/rendering.rs`、`tests/fixtures/security-project` 浏览器 |
-| X-02 路径穿越/symlink | PASS | `tests/integration/http_live.rs`、`SafeRelativePath` 单测 |
-| X-03 跨站 POST run | PASS | `tests/integration/http_live.rs`（token/Origin/confirm/mode） |
-| X-04 无 JS/禁网/file:// | PASS | 浏览器 no-JS/外部请求检查；`scripts/test-export.sh` file:// Chromium |
-| X-05 stdout 注入转义 | PASS | `tests/integration/http_live.rs::program_stdout_is_escaped...` |
-| X-06 超时/子进程清理 | PASS | `tests/contract/core_contract.rs::timeout_kills_the_process_group...` |
-| P-01 文档可复现 | PASS | README / RFC / STATUS / COMPATIBILITY / ADR / 审计 / 证据 |
-| P-02 archive clean install | PASS | acceptance 从 `.tar.gz` 解包到临时目录安装并运行 |
-| P-03 协议审计 | PASS | `docs/audits/protocol-conformance.md` |
+发布阻塞项（无意外执行失败、SSE 跨站读取/执行、过期 Trace 绑定、后台子进程
+泄漏、CLI 核心被迫改动、导出行程序、伪造实时结果、双解释器）逐项均无。
 
-## P1 门禁
+## 2. §9.1 正向端到端
 
-| ID | 结果 | 说明 |
-|---|---|---|
-| U-01 1664×920 视觉 | **PARTIAL** | 截图已采集（`docs/evidence/0001-pr03/`），几何/颜色令牌/无溢出/无外部资源 PASS；与参考截图的**像素级人工比对未执行（UNVERIFIED）** |
-| U-02 多宽度 | PASS | 390/600/900/1280/1664/1920/2560 真实 Chromium：无横向溢出、Dock 在视口内 |
-| U-03 键盘/焦点/屏幕阅读器 | PASS（基础） | Tab 可达命名控件、Esc 关闭、Ctrl/Cmd+K 搜索；完整 screen-reader 手工走查未做 |
-| U-04 动态曲线侧注 | **PARTIAL** | 运行事件使用**内联 keyed chip**（无 JS/移动/打印均可读）；SVG 曲线侧注未实现，不画错线 |
-| U-05 Welcome 仅显式配置 | PASS | `view.json` 驱动；`tests/integration/rendering.rs`、浏览器 |
-| U-06 Live/Export 内容对照 | PASS | `tests/integration/rendering.rs` 同模型对照；导出复用同一 renderer |
+| ID | 测试 | 结果 | 证据 |
+|---|---|---|---|
+| E01 | Tool 安装/卸载/分发 `view` | PASS | acceptance `archive_install`/`tool_list`/`view_help`；`scripts/install-smoke.sh` |
+| E02 | 打开含 `@knowledge`+H2 `@exec` 文件不运行 | PASS | `pages_issue_a_session_cookie_and_never_execute_the_document`；`no_exec_suite` |
+| E03 | Source/Document 切换、字节保真 | PASS | `tests/integration/rendering.rs`、浏览器 source mode 断言 |
+| E04 | 中文/Emoji/表格/公式 span | PASS | `tests/integration/unicode_spans.rs`、冻结 Analysis golden |
+| E05 | 显式 `main` 运行（真实 run --json --trace-file） | PASS | acceptance `real_run`（真实冻结 CLI + SSE，285 条 Trace 事件） |
+| E06 | H2 Exec `n=5` 调用 | PASS | `scripts/check-examples.sh`（Int 10）；`execution.rs` 的 call argv；前端表单 |
+| E07 | 文本/列表常量参数（无 shell） | PASS | `build_call_args` 单测/集成；`--arg name=expression` argv 测试 |
+| E08 | 无 main 不运行其他函数 | PASS | `document_without_main_...`（400 `view.no_entry_function`，无 run 调用） |
+| E09 | if/while Trace 事件映射、不伪造变量 | PASS | `execution.rs` Trace 摘要；`at most one grouped chip`；无变量字段 |
+| E10 | `GET …/events` 为 SSE、accepted/running/terminal、无 polling | PASS | `explicit_run_streams_sse_...`；浏览器请求记录 |
+| E11 | Last-Event-ID 重连有序、无重复、过期 snapshot | PASS | `last_event_id_replays_...` |
+| E12 | 长任务 SSE 心跳、GET 不重启 | PASS | `sse_heartbeats_keep_a_slow_job_connected`、`at_most_two_sse_observers_per_run` |
+| E13 | 取消终止进程树、唯一终态 | PASS | `cancel_is_idempotent...`、`process.rs` 单测 |
+| E14 | 静态导出无执行/无联网/相对链接 | PASS | acceptance `export`/`export_suite`；`test-export.sh`（file:// Chromium） |
+| E15 | 页面刷新/重开不自动执行 | PASS | `pages_issue...`（10 次刷新无 run）；浏览器 |
+| E16 | 运行后源码改变 → 结果可见但 stale、无错误高亮 | PASS | `source_edit_during_a_run...`（stale=true、全部 anchor/source_id=null） |
 
-## 复现
+## 3. §9.2 必测失败与安全回归
+
+| ID | 故障注入 | 结果 | 对应测试/证据 |
+|---|---|---|---|
+| N01 | 假 Analysis schema v3/缺 modules | PASS | `tests/contract/presentation_states.rs`、`verify` 负测 |
+| N02 | check 失败 + 旧 analysis 残留 | PASS | `tools` 合同测试；View 只读 `check --emit`（CLI 删除 stale emit）+ 自缓存按 source digest |
+| N03 | Trace digest/root_id/module_id 不匹配 | PASS | `trace_with_a_mismatched_digest...`、`trace_contract` |
+| N04 | UTF-8 边界/span 越界 | PASS | `tests/contract/trace_contract.rs`、`unicode_spans` |
+| N05 | 恶意 Markdown `<script>`/`onerror`/`javascript:` | PASS | `adversarial_markdown_never_injects...`；浏览器 security-project |
+| N06 | `../`、`%2e%2e`、符号链接出根 | PASS | `path_traversal...`、`symlink_escape...` |
+| N07 | 无 Cookie / 缺 CSRF / Origin 不符的 POST | PASS | `host_origin_session_csrf...`、`tests/security/` |
+| N08 | 跨站 SSE 读别人的 run | PASS | `sse_requires_a_session...`（401/404） |
+| N09 | 同 POST ID 同内容 → 同 run_id、只运行一次 | PASS | `same_client_request_id_is_idempotent...`、HTTP 版 |
+| N10 | 同 ID 不同目标 → 409 | PASS | `view.run_conflict` 测试 |
+| N11 | 运行中第二任务 → 409 busy | PASS | `second_run_is_busy...`、HTTP 版 |
+| N12 | 伪造/过期 Last-Event-ID | PASS | `last_event_id_replays_...`（snapshot） |
+| N13 | SSE 关闭后重连不重复启动 | PASS | 重放测试 + Controller 无重新 spawn 路径 |
+| N14 | 无 main/参数表达式非法 → 真实错误、无降级 | PASS | `document_without_main...`、CLI 错误包络测试 |
+| N15 | 输出超限/卡住/崩溃 → 上限与终态 | PASS | `process.rs` 有界输出/墙钟/取消单测；`view.output_limit` |
+| N16 | 取消后延迟返回 → 唯一终态 | PASS | `cancel_is_idempotent...`（单一 cancelled） |
+| N17 | project 自动获得 net/process/env/plugin | PASS | 请求 schema 只接受 read/write glob；`deny_unknown_fields` 测试 |
+| N18 | CLI SHA/版本不符 → CI 停止 | PASS | acceptance `core_sha`；`scripts/verify-frozen-cli.sh` |
+| N19 | 安装后修改 bundle 一字节 → 拒绝分发 | PASS | `docs/evidence/PR-01/README.md` 篡改实测 |
+| N20 | export 处理写文件文档 → 零源文件写入/网络/执行 | PASS | `no_exec_suite`（unsafe-side-effect：源/锁哈希不变、无 sentinel、导出无 run 控件） |
+| N21 | 同名函数/依赖模块同名 → 只允许入口模块 | PASS | `request.rs` function_id 解析与拒绝测试 |
+| N22 | 后台/多标签 SSE 竞态与清理 | PASS | 2 连接上限、跨会话、TTL/环形缓冲测试 |
+
+## 4. §9.3 浏览器视觉与可达性
+
+真实 Chromium 131（Playwright 1.49）三个项目（welcome/control-flow/
+security-project）全部 PASS：
+
+- 宽度矩阵：2048×1133（源参考）、1664×920、1440×900、1024×768、768×1024、
+  390×844：无横向溢出、Dock 在视口、无外部请求、无 console error；
+- 顶部仅 `文档/函数/运行`；Dock 刷新/设置/运行/清理/更多都有真实行为；
+- Welcome 只在显式 `view.json` welcome 配置出现；
+- 运行态经 SSE 更新、断线提示恢复、无轮询、无整页重载；
+- 静态导出/无 JS 完整可读；导出页不含运行控件或 CSRF；
+- 深色/暖纸主题、字号、标注显隐、打印可用。
+
+**UNVERIFIED（人工项）**：与旧参考截图的像素级人工比对、完整 screen-reader
+走查。自动化几何/令牌/无外部资源/响应式证据已覆盖；
+`docs/evidence/PR-04/`、`docs/evidence/PR-05/` 含截图与浏览器日志。
+
+## 5. 复现
 
 ```bash
 export MARQDO_BIN=/abs/path/to/frozen/marqdo-3.0.0-beta.1
+scripts/verify-frozen-cli.sh "$MARQDO_BIN" -- "$MARQDO_BIN" --version
 scripts/acceptance.sh
 cat docs/evidence/2c7c4f31e7a388d3fcfa717a77067e696ed13854/manifest.json
 ```
 
-CI 配置见 `.woodpecker.yml`；本环境未实际运行远端 CI，因此 `CI URL` 仍为
-**UNVERIFIED**（证据来自本地可复现命令，不冒称 CI 通过）。
+单项：
+
+```bash
+cargo test --locked --offline            # unit + contract + integration + security
+MARQDO_BIN=... scripts/check-examples.sh # RFC §13.3 fixtures
+MARQDO_BIN=... scripts/test-no-exec.sh   # §13.4 零副作用
+MARQDO_BIN=... scripts/test-export.sh    # 离线导出
+MARQDO_BIN=... scripts/test-browser.sh   # 真实 Chromium
+```
+
+## 6. 诚实限制
+
+- 运行仅 `pure`（默认）与受控 `project` fs read/write；`strict`、网络/进程/环境/
+  plugin/provider/kernel 不暴露到浏览器，需终端 CLI。
+- `project` 不是 OS 沙箱；View 不把项目 capability 声明自动提升为授权。
+- SSE 不承诺逐字 stdout/Token 流；Trace v2 不含参数实际值/逐语句变量/内存快照。
+- 平台：Linux x86_64 正式；Windows/macOS 不支持声明。
+- `.github/workflows/ci.yml` 已提供，但**远端 CI 未在本环境实际运行**；上述证据
+  均来自本地可复现命令与真实进程/浏览器。
