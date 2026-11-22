@@ -17,7 +17,7 @@ Beta 版 CLI 必须使用 prerelease 范围（`>=3.0.0-beta.1,<4.0.0`）；`>=3.
 
 | 平台 | 状态 | 说明 |
 |---|---|---|
-| Linux x86_64 (glibc) | **Supported** | 与 CLI Beta 唯一发布目标一致 |
+| Linux x86_64 (glibc 2.39+) | **Supported** | 完整验收使用官方 CLI Beta |
 | Linux aarch64 | 未构建 | 未验证 |
 | macOS / Windows | 未验证 | 不声明支持；路径/进程组逻辑留有平台分支，但未做实测 |
 
@@ -28,7 +28,7 @@ Beta 版 CLI 必须使用 prerelease 范围（`>=3.0.0-beta.1,<4.0.0`）；`>=3.
 | 原始 Markdown 只读浏览（GFM 表/列表/引用/代码围栏/数学文本） | **已实现**（PR-02） |
 | Analysis v2 静态语义（函数/Unit/诊断/引用/资源） | **已实现**（PR-02） |
 | 文档态 / 源码态切换 | **已实现**（PR-02） |
-| 暖纸 Reader 视觉（单一 CSS/JS） | 计划 PR-03 |
+| 暖纸 Reader 视觉（单一 CSS/JS） | 已实现并经 Chromium 验收 |
 | 用户显式触发运行 + SSE + Trace v2 事件可视化 | **已实现**（0002 PR-04；`pure`/受控 `project`，显式确认 + 会话 CSRF） |
 | Live 本机安全 API（7 路由） | **已实现**（0002 PR-04；Cookie/CSRF/Origin/CSP/单任务/SSE） |
 | 静态离线导出（纯只读） | **已实现**（PR-05，同一渲染器） |
@@ -40,7 +40,7 @@ Beta 版 CLI 必须使用 prerelease 范围（`>=3.0.0-beta.1,<4.0.0`）；`>=3.
 | 调试器/断点/单步 | **不实现**（首版非目标） |
 | Knowledge/Prove/Lint 引擎 | **不实现**（独立仓库/未来可选信息层） |
 
-实际完成状态以 [`docs/STATUS.md`](docs/STATUS.md) 与 [`docs/ACCEPTANCE.md`](docs/ACCEPTANCE.md) 为准，本文不代替现状。RFC-VIEW-0002 §10 门禁已按真实冻结 CLI + Chromium 验收 PASS；远端 CI 配置已提供但本环境未实际运行远端 CI，本地证据见 `docs/evidence/`。
+实际完成状态以 [`docs/STATUS.md`](docs/STATUS.md) 与 [`docs/ACCEPTANCE.md`](docs/ACCEPTANCE.md) 为准，本文不代替现状。RFC-VIEW-0002 §10 门禁已按真实冻结 CLI + Chromium 验收 PASS；本地证据见 `docs/evidence/`。
 
 ## 消费者契约
 

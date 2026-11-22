@@ -1,6 +1,6 @@
 # 验收证据
 
-本目录保存**由真实命令生成**的验收证据。主证据命名 `<CLI-SOURCE-SHA>/manifest.json`：
+本目录保存**由真实命令生成**的验收证据。历史证据使用 `<CLI-SOURCE-SHA>/manifest.json`，工单复验另存于 `issue-2/manifest.json`：
 
 - `schema`/`schema_version`：`marqdo.view-conformance` v1（View 自有，非 CLI 协议）；
 - `view_source_sha`：生成证据时的 View Git SHA；
@@ -8,15 +8,13 @@
 - `cli_source_sha`：CLI 发布归档记录的源码 SHA；
 - `cli_binary_sha256_before/after`：冻结 CLI 在验收前后的 SHA-256，必须相同；
 - `tool_protocol`/`analysis_protocol`/`trace_protocol`、`target`、`archive_sha256`；
-- `gates`：`scripts/acceptance.sh` 每一步的真实退出状态
-  （fmt/clippy/test/build/bundle/archive_install/tool_list/view_help/verify/export/
-  examples_check/browse/real_run/export_suite/no_exec_suite/security_suite/browser/
-  core_sha）；
+- `gates`：`scripts/acceptance.sh` 每一步的真实退出状态，包括冻结身份、代码、浏览器、Tool 完整性和卸载；
 - `tests`：contract/examples/export/no_exec/security/browser 的 PASS/FAIL/SKIP。
 
 生成方式（不要手写/篡改）：
 
 ```bash
+# 输出到 dist/acceptance/manifest.json
 MARQDO_BIN=/abs/path/to/frozen/marqdo scripts/acceptance.sh
 ```
 

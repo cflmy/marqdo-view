@@ -114,12 +114,19 @@ cargo test --locked
 cargo build --release --locked
 ```
 
-全链路（Tool 安装、浏览、显式运行、导出、浏览器、安全、冻结内核 SHA 不变）：
+全链路验收使用 Rust 1.89 或更新版本，以及能运行官方 Beta 的 Linux x86_64
+环境（glibc 2.39 起）。浏览器、显式运行和离线导出通过已安装的 Tool 执行。
 
 ```bash
-export MARQDO_BIN=/absolute/path/to/frozen/marqdo
+(cd tests/browser && npm ci && PLAYWRIGHT_BROWSERS_PATH="$PWD/../.cache/pw-browsers" npx playwright install chromium)
+MARQDO_BIN="$(./scripts/frozen-beta.sh fetch "$(mktemp -d)")"
+export MARQDO_BIN
 ./scripts/acceptance.sh
+cat dist/acceptance/manifest.json
 ```
+
+也可将 `MARQDO_BIN` 指向已解包的官方 Beta。验收核对源码 SHA 和二进制
+SHA-256。
 
 单独套件：
 

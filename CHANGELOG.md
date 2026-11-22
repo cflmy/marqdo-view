@@ -11,6 +11,15 @@ Analysis / export work is folded into this entry.
 
 ## [0.2.0] - 2026-11-22
 
+### Fixed during issue #2 acceptance
+
+- Terminate the HTTP/1.1 SSE body after the terminal frame, including a
+  replayed terminal frame. Preserve View Run Events v1 and flush every frame.
+- Verify Chromium reconnects with the received event ID without resubmitting
+  the run. Exercise the installed Tool's Int, Unicode Text and List controls.
+- Pin the official Beta archive in CI. Run the installed Tool, browser trace,
+  no-side-effect and artifact integrity checks in the acceptance gate.
+
 ### Added (RFC-VIEW-0002 PR-05)
 
 - Trace v2 evidence binding hardened end to end: the SSE trace summary carries
