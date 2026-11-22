@@ -363,15 +363,14 @@ function localHostOnly(url) {
     await page.click('[data-action="run-confirm"]');
     await page.waitForSelector('body[data-run-state="succeeded"]');
     check("installed tool displays the real double(5) result",
-      await page.locator("#mq-run-summary").innerText().then((text) => text.includes("返回值：10")));
+      await page.locator("#mq-run-summary").innerText().then((text) => text.includes("返回值：Int(10)")));
 
     await page.click('.mq-tabs [data-action="functions"]');
     await call("format_arguments").click();
     await page.fill('[data-param-name="label"]', '"浏览器 "');
     await page.fill('[data-param-name="items"]', '["列表", 7]');
     await page.click('[data-action="run-confirm"]');
-    await page.waitForFunction(() => document.querySelector("#mq-run-summary")
-      .textContent.includes("浏览器 列表 · 7"));
+    await page.getByText("返回值：Text(浏览器 列表 · 7)", { exact: true }).waitFor();
     check("CLI round-tripped Unicode Text and a List through the form", submittedRuns === 2);
   }
 
