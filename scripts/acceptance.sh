@@ -20,6 +20,7 @@ cd "$repo_root"
 MARQDO_BIN="$(realpath "$MARQDO_BIN")"
 export MARQDO_BIN
 "$repo_root/scripts/frozen-beta.sh" verify "$MARQDO_BIN"
+export MARQDO_FROZEN_BIN="$MARQDO_BIN"
 
 work="$repo_root/dist/acceptance"
 rm -rf "$work"
@@ -64,7 +65,7 @@ FAKE
 }
 run_step wrong_cli_refused check_wrong_cli
 run_step fmt cargo fmt --all -- --check
-run_step clippy cargo clippy --all-targets -- -D warnings
+run_step clippy cargo clippy --locked --all-targets -- -D warnings
 run_step test cargo test --locked
 run_step build cargo build --release --locked
 
