@@ -59,14 +59,14 @@
 | 条款 | 状态 | 计划 |
 |---|---|---|
 | 7 条最小路由 | **PENDING** | PR-04 |
-| POST /api/runs 两阶段确认请求体（document/target/parameters/analysis_digest/mode/grants/client_request_id） | **PENDING** | PR-03/04 |
-| 校验顺序（会话→CSRF/Origin/Host→大小/schema→containment→check→digest→函数/参数→模式/grants→并发→202） | **PENDING** | PR-03/04 |
-| 同 `client_request_id` 幂等/不同 payload 409 | **PENDING** | PR-04 |
+| POST /api/runs 两阶段确认请求体（document/target/parameters/analysis_digest/mode/grants/client_request_id） | PARTIAL | `execution/request.rs` 校验/解析/计划已实现；HTTP 路由 PR-04 |
+| 校验顺序（会话→CSRF/Origin/Host→大小/schema→containment→check→digest→函数/参数→模式/grants→并发→202） | PARTIAL | Controller 已实现 schema→dedupe→busy→check→digest→target→202；HTTP 前置校验 PR-04 |
+| 同 `client_request_id` 幂等/不同 payload 409 | PASS（Controller） | `tests/integration/execution.rs`；HTTP 映射 PR-04 |
 | SSE 帧合同（事件类型/seq/id/schema/心跳） | **PENDING** | PR-04 |
 | Last-Event-ID 重放、快照、128 缓冲、TTL、≤2 连接/任务 | **PENDING** | PR-04 |
-| 单活动任务、409 run.busy、后台执行不阻塞 SSE | **PENDING** | PR-03/04 |
-| 进程组取消（TERM→2s→KILL）、墙钟上限、有界输出 | **PENDING** | PR-03 |
-| 显式预算参数 | **PENDING** | PR-03 |
+| 单活动任务、409 run.busy、后台执行不阻塞 SSE | PARTIAL | Controller 单任务/后台线程已实现并测试；HTTP/SSE PR-04 |
+| 进程组取消（TERM→2s→KILL）、墙钟上限、有界输出 | PASS（模块） | `src/execution/process.rs`、`tests/integration/execution.rs` |
+| 显式预算参数 | PASS（模块） | `src/execution/controller.rs`、`--run-timeout` 1..=120 |
 | 会话 Cookie（HttpOnly/SameSite=Strict）+ X-View-CSRF + Origin/Host | **PENDING** | PR-04 |
 | loopback only、请求体≤64KiB、CSP、路径 containment | PARTIAL | 大部分已有；会话 Cookie 待 PR-04 |
 | SSE 按会话隔离、跨站读取拒绝 | **PENDING** | PR-04 |
@@ -78,7 +78,7 @@
 | PR-00 取证/基线 | **完成** | 待提交（本提交） |
 | PR-01 Tool/打包/scripts/CI/0.2.0 | **完成** | `scripts/package.sh`、`scripts/install-smoke.sh`、`scripts/verify-frozen-cli.sh`、`.github/workflows/ci.yml` |
 | PR-02 Reader/Analysis 结构与只读路由 | **完成** | `src/protocol/*`、`src/reader/*`、`src/config.rs`、`/api/documents`、`tests/{contract,integration}`；`docs/evidence/PR-02/` |
-| PR-03 执行层/请求/进程/控制器 | PENDING | — |
+| PR-03 执行层/请求/进程/控制器 | **完成** | `src/execution/*`、ADR-0008、`docs/evidence/PR-03/` |
 | PR-04 SSE/路由/会话/前端闭环 | PENDING | — |
 | PR-05 Trace 绑定/标注/浏览器回归 | PENDING | — |
 | PR-06 导出/发布/文档闭环 | PENDING | — |
@@ -92,14 +92,14 @@
 | E03 Source/Document 切换 | PASS | 浏览器证据 |
 | E04 中文/Emoji/表格/公式 span | PASS | `tests/integration/unicode_spans.rs`、golden |
 | E05 main 运行 run --json --trace-file | PARTIAL | 同步路径有；SSE 终态待 PR-04 |
-| E06 H2 Exec n=5 call | **PENDING** | PR-03/04 |
-| E07 文本/列表常量参数 | **PENDING** | PR-03/04 |
+| E06 H2 Exec n=5 call | PARTIAL | `build_call_args` + Controller 测试；真实 CLI/UI PR-04/06 |
+| E07 文本/列表常量参数 | PARTIAL | `--arg name=expression` argv 已实现；真实 CLI/UI PR-04/06 |
 | E08 无 main 不自动运行别的函数 | PARTIAL | 现有 `can_offer_run` 逻辑；PR-04 复核 |
 | E09 Trace 事件映射不伪造变量 | PARTIAL | `src/trace.rs`；SSE 后复核 |
 | E10 SSE text/event-stream 无 polling | **PENDING** | PR-04 |
 | E11 Last-Event-ID 重连 | **PENDING** | PR-04 |
 | E12 长任务心跳/GET 不重启 | **PENDING** | PR-04 |
-| E13 取消终止进程树 | **PENDING** | PR-03/04 |
+| E13 取消终止进程树 | PARTIAL | Controller/process 已测（`second_run_is_busy...`、`process.rs` 单测）；HTTP 接线 PR-04 |
 | E14 静态导出零联网/相对链接 | PARTIAL | 已实现；PR-06 复核 |
 | E15 刷新/重开不自动执行 | PASS | `tests/integration/http_live.rs` |
 | E16 运行后改源码 → stale 无高亮 | PARTIAL | 现有 stale；PR-05 复核 |

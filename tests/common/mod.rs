@@ -73,9 +73,6 @@ dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
   printf 'invocation\n'
   for arg in "$@"; do printf 'arg=%s\n' "$arg"; done
 } >> "$dir/argv.txt"
-if [ -f "$dir/sleep" ]; then
-  sleep "$(cat "$dir/sleep")"
-fi
 case "$1" in
   --version)
     if [ -f "$dir/version" ]; then cat "$dir/version"; else printf 'marqdo 3.0.0-beta.1\n'; fi
@@ -94,8 +91,11 @@ case "$1" in
     if [ -f "$dir/check_exit" ]; then exit "$(cat "$dir/check_exit")"; fi
     exit 0
     ;;
-  run)
+  run|call)
     : > "$dir/run-was-called"
+    if [ -f "$dir/sleep" ]; then
+      sleep "$(cat "$dir/sleep")"
+    fi
     trace=""
     prev=""
     for a in "$@"; do

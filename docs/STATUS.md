@@ -23,7 +23,7 @@
 | PR-00 基线、旧 View 取证、冻结 CLI 合同 | **完成** | `docs/audits/legacy-view.md`、`docs/audits/protocol-contract-0002.md`、`docs/decisions/0007` |
 | PR-01 Tool v1 打包/安装/调度、0.2.0、scripts/、CI | **完成** | `scripts/package.sh`、`scripts/install-smoke.sh`、`scripts/verify-frozen-cli.sh`、`.github/workflows/ci.yml`；冻结 CLI `tool install`/`view --help`/篡改拒绝实测 |
 | PR-02 Reader/Analysis 只读面与目标目录结构 | **完成** | `src/protocol/*`、`src/reader/*`、`src/config.rs`、`tests/{contract,integration}/`、`/api/documents`；证据 `docs/evidence/PR-02/` |
-| PR-03 执行层：request/process/controller、pure + project grants | 待开始（现有同步 `pure` 执行可迁移） | `src/core_client.rs`、`src/app.rs` |
+| PR-03 执行层：request/process/controller、pure + project grants | **完成** | `src/execution/{request,process,controller,events}.rs`、`--run-timeout`、ADR-0008、`tests/integration/execution.rs`；证据 `docs/evidence/PR-03/` |
 | PR-04 SSE 任务生命周期、取消、7 路由、会话 Cookie/CSRF | **未实现（MVP 阻塞项）** | — |
 | PR-05 Trace 绑定/原文标注/浏览器回归 | 待开始（现有 Trace 校验可迁移） | `src/trace.rs` |
 | PR-06 静态导出/发布包/文档闭环 | 待开始（现有导出可迁移） | `src/export.rs` |
@@ -37,7 +37,7 @@
 | 原始 Markdown/GFM 阅读、源码态、搜索/设置/打印 | 已实现（单一 `assets/reader.css`/`assets/reader.js`） |
 | Analysis v2 严格校验、函数/Unit/签名/诊断/导入/引用/资源投影 | 已实现（无效 span 降级） |
 | 单一 `ReaderRenderer`，Live/Export 共用 | 已实现（`src/reader/render.rs`，门禁测试） |
-| 显式确认后同步运行 `pure` + Trace v2 校验与展示 | 已实现，但**不是 0002 的异步 SSE 闭环** |
+| 显式确认后同步运行 `pure` + Trace v2 校验与展示 | 旧同步路径仍在（过渡）；新的异步 Controller/SSE 就绪于 PR-03/04 |
 | 静态离线导出（无执行、manifest/哈希、原子发布） | 已实现，待按 0002 重新验收 |
 | Tool v1 打包/安装/分发、冻结 CLI SHA 前后一致 | 已实现，待迁移至 `scripts/` 与 0.2.0 |
 | HTTP 安全（Host/Origin/CSRF/路径 containment/CSP） | 部分实现；缺**会话 Cookie**模型与 7 路由合同 |
@@ -57,12 +57,15 @@
 4. **无 project grants**：0002 要求受控 fs read/write glob（明确二次确认），
    其它 net/process/env/plugin 一律拒绝并引导 CLI。
 5. **无运行会话 Cookie**：CSRF 目前是进程级 token；0002 要求
-   `HttpOnly; SameSite=Strict` 随机会话 Cookie + 每会话 CSRF，且 SSE 按会话隔离。
-6. **无取消/单任务状态机/重复请求去重**：缺 `cancel_requested`、唯一终态、
-   `client_request_id` 幂等/409、409 run.busy。
-7. **执行预算未按 0002**：默认 30s（最大 120s）、`--fuel 1000000`、
-   `--max-output 1048576`、`--trace-max-events 10000`、`--trace-max-bytes 4194304`、
-   JSON/Trace/日志 4 MiB 有界读取与 `view.output_limit` 未实现。
+   `HttpOnly; SameSite=Strict` 随机会话 Cookie + 每会话 CSRF，且 SSE 按会话隔离
+   （PR-04）。
+6. **HTTP/SSE 传输未接**：Controller 已实现单任务状态机、取消、去重、
+   `client_request_id` 幂等/409 与 `409 run.busy`（`src/execution/controller.rs`），
+   但 `POST /api/runs`、`GET .../events`、`POST .../cancel` 与前端尚未切换（PR-04）。
+7. **执行预算**：Controller 已显式发送 `--timeout`（默认 30s/最大 120s）、
+   `--fuel 1000000`、`--max-output 1048576`、`--trace-max-events 10000`、
+   `--trace-max-bytes 4194304`，并做 4 MiB JSON/Trace 有界读取与
+   `view.output_limit`；HTTP 层仍需映射为终态事件（PR-04）。
 8. **目录/测试/示例仍有缺口**：`src/protocol`/`src/reader`/`src/config.rs`/
    `tests/{contract,integration}`/`scripts/`/`.github/workflows/ci.yml` 已就位；
    仍缺 `src/execution/*`、`src/server/{mod,routes,security,sse}.rs`、

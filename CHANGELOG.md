@@ -6,6 +6,27 @@ Protocol axes (Tool v1, Analysis v2, Trace v2) are versioned separately.
 
 ## [Unreleased]
 
+### Added (RFC-VIEW-0002 PR-03)
+
+- Execution layer: `src/execution/{request,process,controller,events}.rs`.
+  - request validation per §6.3 (size/path/target/parameter/mode/fs grants) and
+    exact `function_id` -> CLI name resolution from Analysis v2;
+  - one cancellable process adapter (explicit argv, process group,
+    SIGTERM→2s→SIGKILL, bounded stdout/stderr, spawn hook, wall clock); the
+    CoreClient now uses the same adapter for `check`/`--version`;
+  - single active job, `client_request_id` + payload digest idempotency/409,
+    unique terminal states, cancellation, 128-event ring buffer with
+    `Last-Event-ID` replay/snapshot, and `marqdo.view-run-events` v1 frames;
+  - Trace v2 verification against the exact pre-run Analysis bytes with safe
+    event summaries; missing/invalid trace is reported without faking evidence.
+- Explicit budgets on every run/call (`--fuel`, `--max-output`, `--timeout`,
+  trace limits) plus 4 MiB JSON/Trace bounded reads and `view.output_limit`.
+- New `--run-timeout` option clamped to 1..=120 seconds (default 30).
+- ADR-0008 records lifecycle/cancel-race/Trace-missing semantics.
+- Tests: `tests/integration/execution.rs` with a real fake-Core executable
+  (accepted/running/terminal SSE-ready events, call argv, dedupe, busy, cancel,
+  session isolation, stale digest, grants, unavailable trace).
+
 ### Changed (RFC-VIEW-0002 PR-02)
 
 - Restructured the crate into the RFC-VIEW-0002 §5.3 layout: `src/protocol/
@@ -115,7 +136,7 @@ Protocol axes (Tool v1, Analysis v2, Trace v2) are versioned separately.
   search, settings, 7 viewport widths without horizontal overflow or dock
   clipping, no-JS reading, print mode, explicit run + clear.
 - Screenshot evidence for the Welcome page (1664×920, 390×844) and a real
-  Trace run page in `docs/evidence/PR-03/`.
+  Trace run page in `docs/evidence/0001-pr03/`.
 - Meta CSP no longer carries the ignored `frame-ancestors` directive (the HTTP
   header still enforces framing).
 

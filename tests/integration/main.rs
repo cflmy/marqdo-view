@@ -4,6 +4,7 @@
 #[path = "../common/mod.rs"]
 mod common;
 
+mod execution;
 mod export;
 mod http_live;
 mod rendering;

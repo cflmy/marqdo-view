@@ -41,6 +41,16 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub no_open: bool,
 
+    /// Wall-clock limit for one explicit run, in seconds (RFC-VIEW-0002 §6.7).
+    /// The frozen Core receives the same value via `--timeout`.
+    #[arg(
+        long,
+        default_value_t = 30,
+        global = true,
+        value_parser = clap::value_parser!(u64).range(1..=120)
+    )]
+    pub run_timeout: u64,
+
     /// Advanced: allow a non-loopback bind. No execution API is opened by it.
     #[arg(long, global = true, hide = true)]
     pub unsafe_expose: bool,
@@ -97,6 +107,7 @@ pub struct RuntimeOpts {
     pub port: u16,
     pub no_open: bool,
     pub unsafe_expose: bool,
+    pub run_timeout_secs: u64,
 }
 
 impl Cli {
@@ -108,6 +119,7 @@ impl Cli {
             port: self.port,
             no_open: self.no_open,
             unsafe_expose: self.unsafe_expose,
+            run_timeout_secs: self.run_timeout,
         }
     }
 }
@@ -141,6 +153,7 @@ mod tests {
         assert!(cli.command.is_none());
         assert_eq!(cli.host, "127.0.0.1");
         assert_eq!(cli.port, 7429);
+        assert_eq!(cli.run_timeout, 30);
     }
 
     #[test]
@@ -185,6 +198,14 @@ mod tests {
             }
             other => panic!("expected verify, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn run_timeout_is_bounded_to_rfc_range() {
+        assert!(Cli::try_parse_from(["marqdo-view", "--run-timeout", "0"]).is_err());
+        assert!(Cli::try_parse_from(["marqdo-view", "--run-timeout", "121"]).is_err());
+        let cli = Cli::parse_from(["marqdo-view", "--run-timeout", "45"]);
+        assert_eq!(cli.runtime().run_timeout_secs, 45);
     }
 
     #[test]

@@ -10,6 +10,7 @@ pub mod cli;
 pub mod config;
 pub mod core_client;
 pub mod error;
+pub mod execution;
 pub mod export;
 pub mod protocol;
 pub mod reader;

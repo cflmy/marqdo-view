@@ -42,6 +42,22 @@ pub enum ViewError {
     ResourceLimit { detail: String },
     /// Core subprocess could not be spawned.
     CoreSpawn { detail: String },
+    /// The submitted run request failed schema/target/parameter validation.
+    RunInvalid { detail: String },
+    /// The entry document has no resolvable `main`; View never substitutes one.
+    NoEntryFunction { detail: String },
+    /// Another explicit run is already active; View allows one at a time.
+    RunBusy { detail: String },
+    /// The same client request id was reused with a different payload.
+    RunConflict { detail: String },
+    /// The requested run id is unknown, expired or belongs to another session.
+    RunNotFound { detail: String },
+    /// Bounded capture of CLI stdout/stderr/JSON/trace exceeded the budget.
+    OutputLimit { detail: String },
+    /// The CLI exited but its `--json` document was missing or invalid.
+    CoreProtocol { detail: String },
+    /// More than two concurrent SSE observers for one job.
+    SseBusy { detail: String },
     /// Core subprocess exceeded the View-level timeout and was killed.
     CoreTimeout { detail: String },
     /// Local file system / HTTP I/O failure.
@@ -67,6 +83,14 @@ impl ViewError {
             ViewError::ResourceLimit { .. } => "view.resource_limit",
             ViewError::CoreSpawn { .. } => "view.core_spawn",
             ViewError::CoreTimeout { .. } => "view.core_timeout",
+            ViewError::RunInvalid { .. } => "view.run_invalid",
+            ViewError::NoEntryFunction { .. } => "view.no_entry_function",
+            ViewError::RunBusy { .. } => "view.run_busy",
+            ViewError::RunConflict { .. } => "view.run_conflict",
+            ViewError::RunNotFound { .. } => "view.run_not_found",
+            ViewError::OutputLimit { .. } => "view.output_limit",
+            ViewError::CoreProtocol { .. } => "view.core_protocol",
+            ViewError::SseBusy { .. } => "view.sse_busy",
             ViewError::Io { .. } => "view.io",
             ViewError::Unsupported { .. } => "view.unsupported",
         }
@@ -80,7 +104,15 @@ impl ViewError {
             | ViewError::PathForbidden { .. }
             | ViewError::BindDenied { .. }
             | ViewError::SourceSpanInvalid { .. }
-            | ViewError::Unsupported { .. } => ExitClass::Argument,
+            | ViewError::Unsupported { .. }
+            | ViewError::RunInvalid { .. }
+            | ViewError::NoEntryFunction { .. }
+            | ViewError::RunBusy { .. }
+            | ViewError::RunConflict { .. }
+            | ViewError::RunNotFound { .. }
+            | ViewError::OutputLimit { .. }
+            | ViewError::CoreProtocol { .. }
+            | ViewError::SseBusy { .. } => ExitClass::Argument,
             _ => ExitClass::Runtime,
         }
     }
@@ -118,6 +150,14 @@ impl ViewError {
             "view.resource_limit" => "超过配置的资源上限。",
             "view.core_spawn" => "无法启动冻结核心。",
             "view.core_timeout" => "冻结核心执行超时，已终止。",
+            "view.run_invalid" => "运行请求未通过校验（目标、参数、模式或授权不合法）。",
+            "view.no_entry_function" => "文档没有可调用的 main；请改选一个 H2 Exec 函数。",
+            "view.run_busy" => "已有一次运行正在进行；本版本每个 View 服务只允许一个任务。",
+            "view.run_conflict" => "同一客户端请求 ID 携带了不同内容，拒绝执行。",
+            "view.run_not_found" => "运行任务不存在、已过期或不属于当前会话。",
+            "view.core_protocol" => "冻结核心退出但未给出合法的 --json 结果。",
+            "view.sse_busy" => "该运行任务的 SSE 观察连接超过上限，请稍后重试。",
+            "view.output_limit" => "执行输出超过 View 的接收上限，已停止接收。",
             "view.io" => "本地 I/O 失败。",
             "view.unsupported" => "当前版本不支持该功能。",
             _ => "View 内部错误。",
@@ -162,6 +202,14 @@ impl ViewError {
             | ViewError::ResourceLimit { detail }
             | ViewError::CoreSpawn { detail }
             | ViewError::CoreTimeout { detail }
+            | ViewError::RunInvalid { detail }
+            | ViewError::NoEntryFunction { detail }
+            | ViewError::RunBusy { detail }
+            | ViewError::RunConflict { detail }
+            | ViewError::RunNotFound { detail }
+            | ViewError::OutputLimit { detail }
+            | ViewError::CoreProtocol { detail }
+            | ViewError::SseBusy { detail }
             | ViewError::Io { detail }
             | ViewError::Unsupported { detail } => detail,
             ViewError::SourceMismatch { expected, actual } => {

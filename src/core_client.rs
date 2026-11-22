@@ -10,15 +10,14 @@
 //!   drop.
 
 use crate::error::{ViewError, ViewResult};
+use crate::execution::process::{run_bounded, ProcessBudget};
 use crate::protocol::tool_v1::{self, CoreVersion};
 use crate::reader::source::{sha256_hex, sha256_prefixed};
 use crate::reader::source::{Project, SafeRelativePath};
 use serde::{Deserialize, Serialize};
 use std::ffi::OsString;
-use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 /// Default View-level wall clock cap for one Core `run`.
 pub const DEFAULT_RUN_TIMEOUT: Duration = Duration::from_secs(120);
@@ -433,75 +432,27 @@ impl CoreClient {
         })
     }
 
-    /// Spawn the core with an explicit argv, private cwd and a wall-clock cap.
+    /// Spawn the core through the single process adapter with an explicit
+    /// argv, private cwd, bounded capture and a wall-clock cap.
     fn execute(&self, args: &[OsString], cwd: &Path, timeout: Duration) -> ViewResult<ExecOutput> {
-        let mut command = Command::new(&self.bin);
-        command
-            .args(args)
-            .current_dir(cwd)
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        // Put the core in its own process group so a View-level timeout kills
-        // the whole subtree, not just the immediate shell-less child.
-        #[cfg(unix)]
-        {
-            use std::os::unix::process::CommandExt;
-            // SAFETY: `setpgid` is async-signal-safe and only touches the child
-            // before exec.
-            unsafe {
-                command.pre_exec(|| {
-                    if libc::setpgid(0, 0) != 0 {
-                        return Err(std::io::Error::last_os_error());
-                    }
-                    Ok(())
-                });
-            }
-        }
-
-        let mut child = command.spawn().map_err(|err| ViewError::CoreSpawn {
-            detail: format!("spawn {}: {err}", self.bin.display()),
-        })?;
-        let stdout = child.stdout.take().expect("piped stdout");
-        let stderr = child.stderr.take().expect("piped stderr");
-        let stdout_thread = std::thread::spawn(move || read_all(stdout));
-        let stderr_thread = std::thread::spawn(move || read_all(stderr));
-
-        let deadline = Instant::now() + timeout;
-        let status = loop {
-            match child.try_wait() {
-                Ok(Some(status)) => break status,
-                Ok(None) => {
-                    if Instant::now() >= deadline {
-                        kill_process_tree(&mut child);
-                        let _ = child.wait();
-                        let _ = stdout_thread.join();
-                        let _ = stderr_thread.join();
-                        return Err(ViewError::CoreTimeout {
-                            detail: format!(
-                                "core did not finish within {}s and was killed",
-                                timeout.as_secs()
-                            ),
-                        });
-                    }
-                    std::thread::sleep(Duration::from_millis(10));
-                }
-                Err(err) => {
-                    let _ = child.kill();
-                    return Err(ViewError::CoreSpawn {
-                        detail: format!("wait for {}: {err}", self.bin.display()),
-                    });
-                }
-            }
+        let budget = ProcessBudget {
+            wall_clock: timeout,
+            ..Default::default()
         };
-
-        let stdout_bytes = stdout_thread.join().unwrap_or_default();
-        let stderr_bytes = stderr_thread.join().unwrap_or_default();
-        let stdout = String::from_utf8_lossy(&stdout_bytes).to_string();
-        let stderr = String::from_utf8_lossy(&stderr_bytes).to_string();
+        let outcome = run_bounded(&self.bin, args, cwd, &budget, None)?;
+        if outcome.timed_out {
+            return Err(ViewError::CoreTimeout {
+                detail: format!(
+                    "core did not finish within {}s and was killed",
+                    timeout.as_secs()
+                ),
+            });
+        }
+        let stdout = outcome.stdout.text_lossy();
+        let stderr = outcome.stderr.text_lossy();
         Ok(ExecOutput {
-            exit_code: status.code().unwrap_or(-1),
-            stdout_bytes,
+            exit_code: outcome.exit_code.unwrap_or(-1),
+            stdout_bytes: outcome.stdout.bytes,
             stdout,
             stderr,
         })
@@ -515,86 +466,88 @@ struct ExecOutput {
     stderr: String,
 }
 
-/// Kill the core and every descendant in its process group (Unix), or just the
-/// direct child elsewhere. Never leaves a runaway subprocess behind.
-fn kill_process_tree(child: &mut std::process::Child) {
-    #[cfg(unix)]
-    {
-        let pid = child.id() as i32;
-        if pid > 0 {
-            // SAFETY: negative pid targets the process group created by
-            // pre_exec(setpgid); ESRCH is harmless when it already exited.
-            unsafe {
-                libc::kill(-pid, libc::SIGKILL);
-            }
-        }
-    }
-    let _ = child.kill();
-}
-
-fn read_all(mut reader: impl Read) -> Vec<u8> {
-    let mut bytes = Vec::new();
-    let _ = reader.read_to_end(&mut bytes);
-    bytes
-}
-
 /// Build the base `check` arguments. The caller appends `--emit <path>` and
 /// optionally `--refs`; this function exists so the argv shape is unit-testable.
 fn build_check_args(entry: &Path) -> Vec<OsString> {
     vec![OsString::from("check"), entry.as_os_str().to_os_string()]
 }
 
-/// Build `run` arguments from an already user-approved request.
-pub fn build_run_args(entry: &Path, trace_path: &Path, options: &RunOptions) -> Vec<OsString> {
-    let mut args = vec![
-        OsString::from("run"),
-        entry.as_os_str().to_os_string(),
-        OsString::from("--mode"),
-        OsString::from(options.mode.as_str()),
-        OsString::from("--json"),
-        OsString::from("--trace-file"),
-        trace_path.as_os_str().to_os_string(),
-    ];
+/// Common explicit flags shared by `run` and `call`. Budgets are always sent
+/// explicitly by the execution controller (RFC-VIEW-0002 §6.7).
+fn append_common_args(args: &mut Vec<OsString>, trace_path: &Path, options: &RunOptions) {
     fn push_pair(args: &mut Vec<OsString>, flag: &str, value: &str) {
         args.push(OsString::from(flag));
         args.push(OsString::from(value));
     }
+    args.push(OsString::from("--mode"));
+    args.push(OsString::from(options.mode.as_str()));
+    args.push(OsString::from("--json"));
+    args.push(OsString::from("--trace-file"));
+    args.push(trace_path.as_os_str().to_os_string());
     for glob in &options.grants.allow_read {
-        push_pair(&mut args, "--allow-read", glob);
+        push_pair(args, "--allow-read", glob);
     }
     for glob in &options.grants.allow_write {
-        push_pair(&mut args, "--allow-write", glob);
+        push_pair(args, "--allow-write", glob);
     }
     for host in &options.grants.allow_net {
-        push_pair(&mut args, "--allow-net", host);
+        push_pair(args, "--allow-net", host);
     }
     for name in &options.grants.allow_env {
-        push_pair(&mut args, "--allow-env", name);
+        push_pair(args, "--allow-env", name);
     }
     for program in &options.grants.allow_process {
-        push_pair(&mut args, "--allow-process", program);
+        push_pair(args, "--allow-process", program);
     }
     if options.grants.allow_random {
         args.push(OsString::from("--allow-random"));
     }
     if let Some(fuel) = options.fuel {
-        push_pair(&mut args, "--fuel", &fuel.to_string());
+        push_pair(args, "--fuel", &fuel.to_string());
     }
     if let Some(stack) = options.stack {
-        push_pair(&mut args, "--stack", &stack.to_string());
+        push_pair(args, "--stack", &stack.to_string());
     }
     if let Some(max_output) = options.max_output {
-        push_pair(&mut args, "--max-output", &max_output.to_string());
+        push_pair(args, "--max-output", &max_output.to_string());
     }
     if let Some(timeout) = options.timeout_seconds {
-        push_pair(&mut args, "--timeout", &timeout.to_string());
+        push_pair(args, "--timeout", &timeout.to_string());
     }
     if let Some(max_events) = options.trace_max_events {
-        push_pair(&mut args, "--trace-max-events", &max_events.to_string());
+        push_pair(args, "--trace-max-events", &max_events.to_string());
     }
     if let Some(max_bytes) = options.trace_max_bytes {
-        push_pair(&mut args, "--trace-max-bytes", &max_bytes.to_string());
+        push_pair(args, "--trace-max-bytes", &max_bytes.to_string());
     }
+}
+
+/// Build `run` arguments from an already user-approved request.
+pub fn build_run_args(entry: &Path, trace_path: &Path, options: &RunOptions) -> Vec<OsString> {
+    let mut args = vec![OsString::from("run"), entry.as_os_str().to_os_string()];
+    append_common_args(&mut args, trace_path, options);
+    args
+}
+
+/// Build `call` arguments: explicit argv, one `--arg name=expression` per
+/// parameter, never a shell string and never client-supplied flags.
+pub fn build_call_args(
+    entry: &Path,
+    function: &str,
+    arguments: &[(String, String)],
+    trace_path: &Path,
+    options: &RunOptions,
+) -> Vec<OsString> {
+    let mut args = vec![
+        OsString::from("call"),
+        entry.as_os_str().to_os_string(),
+        OsString::from(function),
+    ];
+    for (name, expression) in arguments {
+        args.push(OsString::from("--arg"));
+        args.push(OsString::from(format!("{name}={expression}")));
+    }
+    append_common_args(&mut args, trace_path, options);
     args
 }
 

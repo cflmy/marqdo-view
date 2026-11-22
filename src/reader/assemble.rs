@@ -11,7 +11,7 @@ use crate::reader::markdown::{DocumentIdentity, DocumentModel};
 use crate::reader::model::{
     Navigation, OutlineEntry, OutlineKind, PresentationModel, SourceStatus,
 };
-use crate::reader::source::{Project, SafeRelativePath};
+use crate::reader::source::{sha256_hex, Project, SafeRelativePath};
 
 use crate::core_client::{
     CheckOptions, CheckResponse, CoreClient, RawCheckDiagnostic, RunOptions, SandboxMode,
@@ -183,6 +183,10 @@ impl DocumentService {
     }
 
     pub fn core(&self) -> Option<&CoreClient> {
+        self.core.as_ref()
+    }
+
+    pub fn core_client(&self) -> Option<&CoreClient> {
         self.core.as_ref()
     }
 
@@ -428,5 +432,88 @@ fn diagnostic_to_view(
         code: diagnostic.code.clone(),
         message: diagnostic.message.clone(),
         hints: diagnostic.hints.clone(),
+    }
+}
+
+/// One read-only, byte-verified static view of a document, used by explicit
+/// run validation and Trace binding. Nothing here executes the document.
+#[derive(Debug)]
+pub struct StaticDocument {
+    pub relative: SafeRelativePath,
+    pub source: String,
+    pub source_index: crate::reader::source::SourceIndex,
+    pub source_sha256: String,
+    /// Exact bytes written by `marqdo check --emit`.
+    pub analysis_bytes: Vec<u8>,
+    pub analysis_digest: String,
+    pub verified: crate::protocol::analysis_v2::VerifiedAnalysis,
+}
+
+impl DocumentService {
+    /// Re-run the read-only `check --emit` and verify Analysis v2 against the
+    /// current exact source bytes. This is the only static truth used before an
+    /// explicit run is accepted.
+    pub fn static_document(&self, relative: &SafeRelativePath) -> ViewResult<StaticDocument> {
+        let client = self.core.as_ref().ok_or_else(|| ViewError::RunDenied {
+            detail: "没有可用的冻结核心（MARQDO_BIN）；无法验证运行请求".to_string(),
+        })?;
+        let source_bytes = self.project.read_source(relative)?;
+        let source_sha256 = sha256_hex(&source_bytes);
+        let source = String::from_utf8(source_bytes).map_err(|err| ViewError::Io {
+            detail: format!("{relative} is not valid UTF-8: {err}"),
+        })?;
+        let source_index = crate::reader::source::SourceIndex::new(&source);
+        let response = client.check(
+            &self.project,
+            relative,
+            &CheckOptions {
+                refs: false,
+                timeout: Some(std::time::Duration::from_secs(30)),
+            },
+        )?;
+        let check = match response {
+            CheckResponse {
+                success: true,
+                analysis: Some(check),
+                ..
+            } => check,
+            CheckResponse {
+                success: false,
+                diagnostics,
+                exit_code,
+                ..
+            } => {
+                let first = diagnostics
+                    .first()
+                    .map(|diagnostic| format!("{}: {}", diagnostic.code, diagnostic.message))
+                    .unwrap_or_else(|| "no diagnostic detail".to_string());
+                return Err(ViewError::AnalysisFailed {
+                    detail: format!(
+                        "Core 检查失败（exit {exit_code}, {} diagnostic(s)）；拒绝执行。first: {first}",
+                        diagnostics.len()
+                    ),
+                });
+            }
+            CheckResponse { analysis: None, .. } => {
+                return Err(ViewError::AnalysisFailed {
+                    detail: "Core 声称检查成功但没有产出 Analysis".to_string(),
+                });
+            }
+        };
+        let verified = crate::protocol::analysis_v2::verify_analysis(
+            &check.analysis_bytes,
+            &source,
+            &source_index,
+            relative.as_str(),
+        )?;
+        Ok(StaticDocument {
+            relative: relative.clone(),
+            source,
+            source_index,
+            source_sha256,
+            analysis_digest: check.analysis_digest,
+            analysis_bytes: check.analysis_bytes,
+            verified,
+        })
     }
 }
