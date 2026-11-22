@@ -7,7 +7,7 @@
 mod common;
 
 use common::{minimal_analysis, sha256_hex, FakeCore, TempProject};
-use marqdo_view::core_client::{CheckOptions, CoreClient, RunOptions};
+use marqdo_view::core_client::{CheckOptions, CheckResponse, CoreClient, RunOptions};
 use marqdo_view::project::Project;
 
 fn fixture(name: &str) -> (TempProject, FakeCore) {
@@ -27,9 +27,11 @@ fn check_returns_exact_analysis_bytes_and_digest() {
     let client = CoreClient::with_bin(&core.script).unwrap();
     let project = Project::open(&project.path("index.mq.md")).unwrap();
     let entry = project.entry().relative.clone();
-    let output = client
-        .check(&project, &entry, &CheckOptions::default())
-        .unwrap();
+    let output = expect_check_ok(
+        client
+            .check(&project, &entry, &CheckOptions::default())
+            .unwrap(),
+    );
 
     assert_eq!(output.analysis_bytes, analysis.as_bytes());
     assert_eq!(output.analysis_sha256, sha256_hex(analysis.as_bytes()));
@@ -52,16 +54,18 @@ fn check_refs_is_forwarded_as_a_stricter_flag() {
     let client = CoreClient::with_bin(&core.script).unwrap();
     let project = Project::open(&project.path("index.mq.md")).unwrap();
     let entry = project.entry().relative.clone();
-    client
-        .check(
-            &project,
-            &entry,
-            &CheckOptions {
-                refs: true,
-                timeout: None,
-            },
-        )
-        .unwrap();
+    expect_check_ok(
+        client
+            .check(
+                &project,
+                &entry,
+                &CheckOptions {
+                    refs: true,
+                    timeout: None,
+                },
+            )
+            .unwrap(),
+    );
     assert!(core.last_args().contains(&"--refs".to_string()));
 }
 
@@ -72,13 +76,12 @@ fn check_failure_preserves_core_stderr_and_code() {
     let client = CoreClient::with_bin(&core.script).unwrap();
     let project = Project::open(&project.path("index.mq.md")).unwrap();
     let entry = project.entry().relative.clone();
-    let err = client
+    let response = client
         .check(&project, &entry, &CheckOptions::default())
-        .unwrap_err();
-    assert_eq!(err.code(), "view.analysis_failed");
-    assert_eq!(err.exit_code(), 1);
-    let text = err.to_string();
-    assert!(text.contains("sem.unclosed_control"), "{text}");
+        .unwrap();
+    assert!(!response.success);
+    assert_eq!(response.exit_code, 1);
+    assert!(response.stderr.contains("sem.unclosed_control"));
 }
 
 #[test]
@@ -191,6 +194,33 @@ fn missing_emit_after_success_is_an_analysis_failure() {
         .check(&project, &entry, &CheckOptions::default())
         .unwrap_err();
     assert_eq!(err.code(), "view.analysis_failed");
+}
+
+fn expect_check_ok(response: CheckResponse) -> marqdo_view::core_client::CheckOutput {
+    assert!(response.success, "check failed: {:?}", response.diagnostics);
+    response.analysis.expect("analysis on success")
+}
+
+#[test]
+fn failed_check_normalizes_diagnostics_without_absolute_paths() {
+    let (project, core) = fixture("check_diagnostics");
+    core.set_check(1, "");
+    core.set_check_json(
+        r#"{"command":"check","success":false,"errors":1,"diagnostics":[{"code":"sem.unclosed_control","column":1,"file":"/home/secret/project/index.mq.md","hints":[],"line":5,"message":"`if` is not closed by `end`","module":"root:fixture@0.1.0::index.mq.md","severity":"error"}]}"#,
+    );
+    let client = CoreClient::with_bin(&core.script).unwrap();
+    let project = Project::open(&project.path("index.mq.md")).unwrap();
+    let entry = project.entry().relative.clone();
+    let response = client
+        .check(&project, &entry, &CheckOptions::default())
+        .unwrap();
+    assert!(!response.success);
+    assert_eq!(response.diagnostics.len(), 1);
+    assert_eq!(response.diagnostics[0].code, "sem.unclosed_control");
+    assert_eq!(response.diagnostics[0].line, Some(5));
+    // The raw absolute `file` field is not part of the normalized type at all.
+    let rendered = serde_json::to_string(&response.diagnostics).unwrap();
+    assert!(!rendered.contains("/home/secret"), "{rendered}");
 }
 
 #[test]

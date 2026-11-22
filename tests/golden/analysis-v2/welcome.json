@@ -1,0 +1,69 @@
+{
+  "diagnostics": [],
+  "modules": [
+    {
+      "calls": [],
+      "functions": [],
+      "id": "root:welcome-demo@0.1.0::00-welcome.mq.md",
+      "imports": [],
+      "package_instance_id": "root:welcome-demo@0.1.0",
+      "references": [
+        {
+          "source": "root:welcome-demo@0.1.0::00-welcome.mq.md",
+          "span": {
+            "end": 536,
+            "start": 507
+          },
+          "state": "resolved",
+          "target_module": "root:welcome-demo@0.1.0::guide.mq.md",
+          "target_unit": null,
+          "url": "./guide.mq.md"
+        }
+      ],
+      "relative_path": "00-welcome.mq.md",
+      "resources": [],
+      "source_digest": "879215bf0dc432b78924800a08eac37d353a9694652c5542294f4ce7fe6da173",
+      "units": [
+        {
+          "function": null,
+          "id": "root:welcome-demo@0.1.0::00-welcome.mq.md#",
+          "kind": "root",
+          "level": 0,
+          "name": "",
+          "span": {
+            "end": 659,
+            "start": 0
+          }
+        },
+        {
+          "function": null,
+          "id": "root:welcome-demo@0.1.0::00-welcome.mq.md#欢迎来到 Marqdo",
+          "kind": "namespace",
+          "level": 1,
+          "name": "欢迎来到 Marqdo",
+          "span": {
+            "end": 32,
+            "start": 0
+          }
+        }
+      ]
+    }
+  ],
+  "producer": {
+    "markdown_profile": "marqdo.md.v1",
+    "name": "marqdo",
+    "version": "3.0.0-beta.1"
+  },
+  "project": {
+    "identity_kind": "manifest",
+    "lock_digest": "",
+    "root_id": "root:welcome-demo@0.1.0",
+    "stdlib": {
+      "digest": "sha256:5407d3665ba2fe105820d0f1af5efaafa10c277a69eb819c3225719813c8c713",
+      "instance_id": "std:marqdo-stdlib@0.1.0#5407d3665ba2fe105820d0f1af5efaafa10c277a69eb819c3225719813c8c713",
+      "version": "0.1.0"
+    }
+  },
+  "schema": "marqdo.analysis",
+  "schema_version": 2
+}

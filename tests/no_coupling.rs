@@ -135,8 +135,8 @@ fn exactly_one_reader_theme_and_script_entry() {
     let mut js = Vec::new();
     collect_files(&assets, "css", &mut css);
     collect_files(&assets, "js", &mut js);
-    assert!(css.len() <= 1, "more than one CSS entry: {css:?}");
-    assert!(js.len() <= 1, "more than one JS entry: {js:?}");
+    assert_eq!(css.len(), 1, "exactly one CSS entry: {css:?}");
+    assert_eq!(js.len(), 1, "exactly one JS entry: {js:?}");
     for path in &css {
         assert_eq!(
             path.file_name().and_then(|n| n.to_str()),

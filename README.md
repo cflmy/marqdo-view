@@ -10,7 +10,7 @@ Marqdo View 是一个独立的可执行文档阅读器：以**原始 Markdown �
 
 ## 当前状态
 
-**开发中，尚未可运行。** PR-00（基线、旧 View 静态取证、视觉/状态设计基准）已完成；后续按 PR-01→PR-06 交付 Tool Protocol v1 安装闭环、只读浏览、Reader 视觉、Trace 可视化、Live/Export 安全与端到端验收。任何未完成能力都必须在 `docs/STATUS.md` 与 CHANGELOG 明确标注，不以占位功能冒充已实现。
+**开发中。** PR-00（基线/取证/设计基准）、PR-01（Tool Protocol v1 + verify）、PR-02（DocumentModel/Analysis v2 只读浏览 + 单一渲染器 + 本机 Live 阅读）已完成。`marqdo view [PATH]` 当前提供本机只读浏览；`export` 与显式运行入口按 PR-05/PR-04 顺序交付。任何未完成能力都在 `docs/STATUS.md` 与 CHANGELOG 明确标注，不以占位功能冒充已实现。
 
 ## 架构约束（摘要）
 
@@ -41,6 +41,13 @@ cargo fmt --all -- --check
 cargo clippy --all-targets -- -D warnings
 cargo test --locked
 cargo build --release --locked
+```
+
+本机浏览（默认只绑定 127.0.0.1，不自动执行）：
+
+```bash
+MARQDO_BIN=/absolute/path/to/marqdo cargo run -- examples/welcome --no-open
+# 或用已安装 bundle：marqdo view examples/welcome --no-open
 ```
 
 安装到冻结 CLI（开发期）：

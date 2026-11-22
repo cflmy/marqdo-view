@@ -57,17 +57,30 @@ fn non_loopback_bind_is_refused_by_default() {
 }
 
 #[test]
-fn browse_without_core_reports_core_missing() {
-    // Browse is not implemented yet, but the reader must still fail with a
-    // stable View code and exit class rather than pretending to work.
+fn browse_on_missing_path_fails_without_starting_a_server() {
     let cwd = std::env::current_dir().unwrap();
-    let output = run_view(&[], &cwd, &clean_env());
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert_eq!(output.status.code(), Some(2), "stderr: {stderr}");
-    assert!(
-        stderr.contains("view.unsupported") || stderr.contains("view.core_missing"),
-        "unexpected diagnostic: {stderr}"
+    let output = run_view(
+        &["definitely-missing.mq.md", "--no-open"],
+        &cwd,
+        &clean_env(),
     );
+    assert_eq!(output.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("view.io"));
+}
+
+#[test]
+fn degradation_without_core_keeps_prose_readable() {
+    // The reader must degrade to prose-only with an explicit status, never
+    // invent semantic annotations or a fake run state.
+    let project = common::TempProject::new("cli-degrade-no-core");
+    project.marqdo_project("# @knowledge 标题\n\n正文 **加粗**。\n");
+    let context = marqdo_view::app::AppContext::open(&project.dir, None).unwrap();
+    let relative = context.project().entry().relative.clone();
+    let model = context.load(&relative).unwrap();
+    assert_eq!(model.source_status.data_value(), "core-unavailable");
+    assert!(model.semantic.is_none());
+    assert!(model.document.plain_text().contains("正文"));
+    assert!(model.status_note.is_some());
 }
 
 #[test]

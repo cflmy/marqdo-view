@@ -1,0 +1,7 @@
+{
+  "schema": "marqdo.view-config",
+  "schema_version": 1,
+  "welcome": "./00-welcome.mq.md",
+  "site_title": "Marqdo",
+  "theme": "botanical"
+}

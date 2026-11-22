@@ -1,15 +1,156 @@
 //! Application layer: turns parsed commands into use cases.
 //!
-//! No HTML is built here; no Markdown is parsed here. Browse uses the single
-//! renderer (PR-02+), verify only checks bindings, export only writes static
-//! files through the same renderer (PR-05).
+//! No HTML is built here and no Markdown semantics are decided here. Browse and
+//! (later) Export call the same `load` + one `ReaderRenderer`.
 
 use crate::cli::{ExportArgs, RuntimeOpts, VerifyArgs};
-use crate::core_client::{CheckOptions, CoreClient};
+use crate::core_client::{CheckOptions, CheckResponse, CoreClient, RawCheckDiagnostic};
+use crate::document::{DocumentIdentity, DocumentModel};
 use crate::error::{ViewError, ViewResult};
-use crate::project::Project;
-use crate::source_map::sha256_hex;
+use crate::presentation::{self, BuildInput, Navigation, PresentationModel, SourceStatus};
+use crate::project::{Project, SafeRelativePath, ViewConfig};
+use crate::semantic::{self, CoreDiagnostic};
 use crate::version;
+
+/// Process-wide context for one browsed project: root, optional site config and
+/// an optional negotiated frozen core. A missing core degrades to prose only;
+/// an incompatible protocol is a hard error (RFC §4).
+pub struct AppContext {
+    project: Project,
+    config: ViewConfig,
+    core: Option<CoreClient>,
+    core_version: Option<String>,
+    core_note: Option<String>,
+}
+
+impl AppContext {
+    pub fn open(path: &std::path::Path, marqdo_bin: Option<&std::path::Path>) -> ViewResult<Self> {
+        let project = Project::open(path)?;
+        let config = ViewConfig::load(project.root())?;
+        let (core, core_version, core_note) = match CoreClient::from_env(marqdo_bin) {
+            Ok(client) => match client.negotiate() {
+                Ok(version) => (Some(client), Some(version.version.to_string()), None),
+                Err(err) if err.code() == "view.protocol_incompatible" => return Err(err),
+                Err(err) => (None, None, Some(generic_core_note(&err))),
+            },
+            Err(err) if err.code() == "view.core_missing" => {
+                (None, None, Some(generic_core_note(&err)))
+            }
+            Err(err) => return Err(err),
+        };
+        Ok(Self {
+            project,
+            config,
+            core,
+            core_version,
+            core_note,
+        })
+    }
+
+    pub fn project(&self) -> &Project {
+        &self.project
+    }
+
+    pub fn config(&self) -> &ViewConfig {
+        &self.config
+    }
+
+    pub fn core(&self) -> Option<&CoreClient> {
+        self.core.as_ref()
+    }
+
+    pub fn core_version(&self) -> Option<&str> {
+        self.core_version.as_deref()
+    }
+
+    pub fn core_note(&self) -> Option<&str> {
+        self.core_note.as_deref()
+    }
+
+    /// Read + parse + (optionally) check one document into the one presentation
+    /// model. Never executes the document.
+    pub fn load(&self, relative: &SafeRelativePath) -> ViewResult<PresentationModel> {
+        let source_bytes = self.project.read_source(relative)?;
+        let source = String::from_utf8(source_bytes).map_err(|err| ViewError::Io {
+            detail: format!("{relative} is not valid UTF-8: {err}"),
+        })?;
+        let document = DocumentModel::parse(source, DocumentIdentity::placeholder(relative));
+        let navigation = Navigation::from_project(&self.project, &self.config, relative);
+
+        let mut status = SourceStatus::CoreUnavailable;
+        let mut status_note = self.core_note.clone();
+        let mut diagnostics = Vec::new();
+        let mut verified = None;
+
+        if let Some(client) = &self.core {
+            match client.check(&self.project, relative, &CheckOptions::default())? {
+                CheckResponse {
+                    success: false,
+                    diagnostics: raw_diagnostics,
+                    exit_code,
+                    ..
+                } => {
+                    status = SourceStatus::CoreError;
+                    status_note = Some(format!(
+                        "Core 检查失败（exit {exit_code}）：语义标注已撤销，正文仍可阅读。"
+                    ));
+                    diagnostics = raw_diagnostics
+                        .iter()
+                        .map(|diagnostic| diagnostic_to_view(diagnostic, relative))
+                        .collect();
+                }
+                CheckResponse {
+                    success: true,
+                    analysis: Some(check),
+                    ..
+                } => match semantic::verify_analysis(
+                    &check.analysis_bytes,
+                    &document.source,
+                    &document.source_index,
+                    relative.as_str(),
+                ) {
+                    Ok(verified_analysis) => {
+                        status = SourceStatus::StaticOk;
+                        status_note = None;
+                        verified = Some(verified_analysis);
+                    }
+                    Err(err) if err.code() == "view.source_mismatch" => {
+                        status = SourceStatus::SourceMismatch;
+                        status_note = Some(
+                            "当前源码字节与 Analysis 的 source_digest 不一致，语义标注已禁用。"
+                                .to_string(),
+                        );
+                    }
+                    Err(err) if err.code() == "view.protocol_incompatible" => {
+                        return Err(err);
+                    }
+                    Err(err) => {
+                        status = SourceStatus::CoreError;
+                        status_note = Some(generic_core_note(&err));
+                    }
+                },
+                CheckResponse {
+                    success: true,
+                    analysis: None,
+                    ..
+                } => {
+                    status = SourceStatus::CoreError;
+                    status_note = Some("Core 声称检查成功但没有产出 Analysis。".to_string());
+                }
+            }
+        }
+
+        Ok(presentation::build(BuildInput {
+            document,
+            analysis: verified.as_ref(),
+            status,
+            status_note,
+            diagnostics,
+            navigation,
+            core_version: self.core_version.clone(),
+        }))
+    }
+}
 
 pub fn verify(opts: &RuntimeOpts, args: &VerifyArgs) -> ViewResult<i32> {
     let path = args
@@ -20,14 +161,14 @@ pub fn verify(opts: &RuntimeOpts, args: &VerifyArgs) -> ViewResult<i32> {
     let project = Project::open(&path)?;
     let entry = project.entry().relative.clone();
     let source_bytes = project.read_source(&entry)?;
-    let source_text = String::from_utf8(source_bytes.clone()).map_err(|err| ViewError::Io {
+    let source = String::from_utf8(source_bytes).map_err(|err| ViewError::Io {
         detail: format!("{entry} is not valid UTF-8: {err}"),
     })?;
-    let _ = source_text;
+    let source_index = crate::source_map::SourceIndex::new(&source);
 
     let client = CoreClient::from_env(opts.marqdo_bin.as_deref())?;
     let core_version = client.negotiate()?;
-    let check = client.check(
+    let response = client.check(
         &project,
         &entry,
         &CheckOptions {
@@ -35,12 +176,51 @@ pub fn verify(opts: &RuntimeOpts, args: &VerifyArgs) -> ViewResult<i32> {
             timeout: None,
         },
     )?;
-
-    let analysis: serde_json::Value =
-        serde_json::from_slice(&check.analysis_bytes).map_err(|err| ViewError::AnalysisFailed {
-            detail: format!("emitted Analysis is not JSON: {err}"),
-        })?;
-    let summary = validate_static_binding(&analysis, entry.as_str(), &source_bytes)?;
+    let check = match response {
+        CheckResponse {
+            success: false,
+            diagnostics,
+            exit_code,
+            ..
+        } => {
+            let first = diagnostics
+                .first()
+                .map(|diagnostic| {
+                    format!(
+                        "{}: {}",
+                        if diagnostic.code.is_empty() {
+                            "diagnostic"
+                        } else {
+                            &diagnostic.code
+                        },
+                        diagnostic.message
+                    )
+                })
+                .unwrap_or_else(|| "no diagnostic detail".to_string());
+            return Err(ViewError::AnalysisFailed {
+                detail: format!(
+                    "`marqdo check` failed with exit code {exit_code} ({} diagnostic(s)); first: {first}",
+                    diagnostics.len()
+                ),
+            });
+        }
+        CheckResponse {
+            analysis: Some(check),
+            ..
+        } => check,
+        CheckResponse { analysis: None, .. } => {
+            return Err(ViewError::AnalysisFailed {
+                detail: "`marqdo check` succeeded but emitted no Analysis".to_string(),
+            })
+        }
+    };
+    let verified = semantic::verify_analysis(
+        &check.analysis_bytes,
+        &source,
+        &source_index,
+        entry.as_str(),
+    )?;
+    let projection = &verified.projection;
 
     if args.json {
         let doc = serde_json::json!({
@@ -53,17 +233,24 @@ pub fn verify(opts: &RuntimeOpts, args: &VerifyArgs) -> ViewResult<i32> {
             },
             "analysis": {
                 "schema": "marqdo.analysis",
-                "schema_version": 2,
-                "digest": check.analysis_digest,
-                "producer_version": summary.producer_version,
+                "schema_version": version::ANALYSIS_PROTOCOL,
+                "digest": projection.analysis_digest,
+                "producer_version": projection.producer_version,
+                "markdown_profile": projection.markdown_profile,
+                "functions": projection.functions.len(),
+                "units": projection.units.len(),
+                "diagnostics": projection.diagnostics.len(),
             },
             "project": {
-                "root_id": summary.root_id,
-                "identity_kind": summary.identity_kind,
+                "root_id": projection.project_root_id,
+                "identity_kind": projection.identity_kind,
+                "lock_digest": projection.lock_digest,
+                "stdlib_version": projection.stdlib_version,
             },
             "document": {
                 "relative_path": entry.as_str(),
-                "source_digest": summary.source_digest,
+                "module_id": projection.module_id,
+                "source_digest": projection.source_digest,
                 "source_digest_matches": true,
             },
             "result": "PASS",
@@ -80,11 +267,16 @@ pub fn verify(opts: &RuntimeOpts, args: &VerifyArgs) -> ViewResult<i32> {
             core_version.version,
             version::PRODUCT_RANGE
         );
-        println!("project: {} ({})", summary.root_id, summary.identity_kind);
-        println!("document: {}", entry);
         println!(
-            "analysis: schema=marqdo.analysis v2 modules={} digest={}",
-            summary.module_count, check.analysis_digest
+            "project: {} ({})",
+            projection.project_root_id, projection.identity_kind
+        );
+        println!("document: {entry}");
+        println!(
+            "analysis: schema=marqdo.analysis v2 modules={} functions={} digest={}",
+            projection.modules.len(),
+            projection.functions.len(),
+            projection.analysis_digest
         );
         println!("source digest: match");
         println!("result: PASS (static only; document not executed)");
@@ -92,130 +284,59 @@ pub fn verify(opts: &RuntimeOpts, args: &VerifyArgs) -> ViewResult<i32> {
     Ok(0)
 }
 
+pub fn browse(opts: &RuntimeOpts) -> ViewResult<i32> {
+    let path = opts
+        .path
+        .clone()
+        .unwrap_or_else(|| std::path::PathBuf::from("."));
+    let context = AppContext::open(&path, opts.marqdo_bin.as_deref())?;
+    crate::server::serve(context, opts)
+}
+
 pub fn export(_opts: &RuntimeOpts, _args: &ExportArgs) -> ViewResult<i32> {
     Err(ViewError::Unsupported {
-        detail: "static export lands with PR-05; this build teaches Tool Protocol and statics only"
+        detail: "static export lands with PR-05; browse and verify are available in this build"
             .to_string(),
     })
 }
 
-pub fn browse(_opts: &RuntimeOpts) -> ViewResult<i32> {
-    Err(ViewError::Unsupported {
-        detail: "the Live reader lands with PR-02/PR-03; this build teaches Tool Protocol and statics only"
-            .to_string(),
-    })
+fn generic_core_note(err: &ViewError) -> String {
+    match err.code() {
+        "view.core_missing" => {
+            "未找到可用的冻结核心（MARQDO_BIN）；当前为无语义标注的纯 Markdown 阅读模式。"
+                .to_string()
+        }
+        "view.analysis_failed" => "Core 检查失败；语义标注已撤销，正文仍可阅读。".to_string(),
+        other => format!("{other}：语义标注不可用，正文仍可阅读。"),
+    }
 }
 
-struct BindingSummary {
-    root_id: String,
-    identity_kind: String,
-    producer_version: String,
-    module_count: usize,
-    source_digest: String,
-}
-
-/// Structural binding checks that do not need the full typed projection yet
-/// (the typed `SemanticProjection` replaces this in PR-02 without changing the
-/// externally visible `verify` result).
-fn validate_static_binding(
-    analysis: &serde_json::Value,
-    relative_path: &str,
-    source_bytes: &[u8],
-) -> ViewResult<BindingSummary> {
-    let schema = analysis
-        .get("schema")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
-    if schema != "marqdo.analysis" {
-        return Err(ViewError::ProtocolIncompatible {
-            detail: format!("unexpected Analysis schema {schema:?}"),
-        });
+fn diagnostic_to_view(
+    diagnostic: &RawCheckDiagnostic,
+    relative: &SafeRelativePath,
+) -> CoreDiagnostic {
+    let belongs_to_entry = diagnostic
+        .module
+        .as_deref()
+        .map(|module| module.ends_with(relative.as_str()))
+        .unwrap_or(true);
+    CoreDiagnostic {
+        module: diagnostic.module.clone(),
+        relative_path: if belongs_to_entry {
+            Some(relative.as_str().to_string())
+        } else {
+            None
+        },
+        span: None,
+        line: diagnostic.line,
+        column: diagnostic.column,
+        severity: if diagnostic.severity.is_empty() {
+            "error".to_string()
+        } else {
+            diagnostic.severity.clone()
+        },
+        code: diagnostic.code.clone(),
+        message: diagnostic.message.clone(),
+        hints: diagnostic.hints.clone(),
     }
-    match analysis.get("schema_version").and_then(|v| v.as_u64()) {
-        Some(2) => {}
-        other => {
-            return Err(ViewError::ProtocolIncompatible {
-                detail: format!(
-                    "Analysis schema_version {other:?} is not supported (View implements v{})",
-                    version::ANALYSIS_PROTOCOL
-                ),
-            })
-        }
-    }
-    let producer = analysis
-        .get("producer")
-        .ok_or_else(|| ViewError::AnalysisFailed {
-            detail: "Analysis is missing producer".to_string(),
-        })?;
-    let producer_version = producer
-        .get("version")
-        .and_then(|v| v.as_str())
-        .unwrap_or("")
-        .to_string();
-    let markdown_profile = producer
-        .get("markdown_profile")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
-    if markdown_profile != "marqdo.md.v1" {
-        return Err(ViewError::ProtocolIncompatible {
-            detail: format!(
-                "unexpected Markdown profile {markdown_profile:?}; this View targets marqdo.md.v1"
-            ),
-        });
-    }
-    let project = analysis
-        .get("project")
-        .ok_or_else(|| ViewError::AnalysisFailed {
-            detail: "Analysis is missing project".to_string(),
-        })?;
-    let root_id = project
-        .get("root_id")
-        .and_then(|v| v.as_str())
-        .unwrap_or("")
-        .to_string();
-    if root_id.is_empty() {
-        return Err(ViewError::AnalysisFailed {
-            detail: "Analysis project.root_id is empty".to_string(),
-        });
-    }
-    let identity_kind = project
-        .get("identity_kind")
-        .and_then(|v| v.as_str())
-        .unwrap_or("")
-        .to_string();
-    let modules = analysis
-        .get("modules")
-        .and_then(|v| v.as_array())
-        .ok_or_else(|| ViewError::AnalysisFailed {
-            detail: "Analysis is missing modules[]".to_string(),
-        })?;
-    let expected_digest = sha256_hex(source_bytes);
-    let mut matches = 0usize;
-    for module in modules {
-        if module.get("relative_path").and_then(|v| v.as_str()) == Some(relative_path) {
-            matches += 1;
-            let digest = module
-                .get("source_digest")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
-            if digest != expected_digest {
-                return Err(ViewError::SourceMismatch {
-                    expected: digest.to_string(),
-                    actual: expected_digest,
-                });
-            }
-        }
-    }
-    if matches == 0 {
-        return Err(ViewError::AnalysisFailed {
-            detail: format!("Analysis has no module for {relative_path}"),
-        });
-    }
-    Ok(BindingSummary {
-        root_id,
-        identity_kind,
-        producer_version,
-        module_count: modules.len(),
-        source_digest: expected_digest,
-    })
 }

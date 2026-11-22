@@ -127,6 +127,34 @@ impl SourceIndex {
         is_char_boundary(bytes, start) && is_char_boundary(bytes, end)
     }
 
+    /// Byte offset of the start of a 1-based line.
+    pub fn line_start(&self, line: usize) -> Option<usize> {
+        if line == 0 {
+            return None;
+        }
+        self.line_starts.get(line - 1).copied()
+    }
+
+    /// Number of lines in the source.
+    pub fn line_count(&self) -> usize {
+        self.line_starts.len()
+    }
+
+    /// Text of a 1-based line without its trailing newline.
+    pub fn line_text<'a>(&self, source: &'a str, line: usize) -> Option<&'a str> {
+        let start = self.line_start(line)?;
+        let end = self.line_starts.get(line).copied().unwrap_or(self.len);
+        let bytes = source.as_bytes();
+        let mut end = end.min(bytes.len());
+        if end > start && bytes.get(end - 1) == Some(&b'\n') {
+            end -= 1;
+            if end > start && bytes.get(end - 1) == Some(&b'\r') {
+                end -= 1;
+            }
+        }
+        source.get(start..end)
+    }
+
     /// 1-based line and 1-based byte column for a byte offset, clamped to the
     /// file length. Column counts bytes, matching Core's presentation fields.
     pub fn line_col(&self, byte: usize) -> (usize, usize) {

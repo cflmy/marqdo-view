@@ -13,7 +13,11 @@ pub fn view_bin() -> &'static str {
 }
 
 pub fn temp_root(name: &str) -> PathBuf {
-    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(name);
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    let seq = NEXT.fetch_add(1, Ordering::Relaxed);
+    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
+        .join(format!("{name}-{}-{seq}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).expect("create test temp dir");
     dir
@@ -79,6 +83,7 @@ case "$1" in
     ;;
   check)
     if [ -f "$dir/check_stderr" ]; then cat "$dir/check_stderr" >&2; fi
+    if [ -f "$dir/check_json" ]; then cat "$dir/check_json"; fi
     emit=""
     prev=""
     for a in "$@"; do
@@ -124,6 +129,10 @@ esac
     pub fn set_check(&self, exit_code: i32, stderr: &str) {
         std::fs::write(self.dir.join("check_exit"), exit_code.to_string()).expect("write exit");
         std::fs::write(self.dir.join("check_stderr"), stderr).expect("write stderr");
+    }
+
+    pub fn set_check_json(&self, json: &str) {
+        std::fs::write(self.dir.join("check_json"), json).expect("write check json");
     }
 
     pub fn set_analysis(&self, analysis: &str) {

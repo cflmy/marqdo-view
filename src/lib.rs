@@ -7,10 +7,16 @@
 //! this library so there is never a second renderer or a second parser.
 
 pub mod app;
+pub mod assets;
 pub mod cli;
 pub mod core_client;
+pub mod document;
 pub mod error;
+pub mod presentation;
 pub mod project;
+pub mod render;
+pub mod semantic;
+pub mod server;
 pub mod source_map;
 pub mod version;
 

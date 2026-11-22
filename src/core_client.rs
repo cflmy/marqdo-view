@@ -106,6 +106,37 @@ pub struct CheckOutput {
     pub stderr: String,
 }
 
+/// One compile diagnostic from `check --json`, normalized so no absolute
+/// machine path can leak into pages, exports or logs.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RawCheckDiagnostic {
+    #[serde(default)]
+    pub code: String,
+    #[serde(default)]
+    pub severity: String,
+    #[serde(default)]
+    pub message: String,
+    #[serde(default)]
+    pub line: Option<u64>,
+    #[serde(default)]
+    pub column: Option<u64>,
+    #[serde(default)]
+    pub module: Option<String>,
+    #[serde(default)]
+    pub hints: Vec<String>,
+}
+
+/// Result of one `check` invocation. A failed check is **not** an I/O error:
+/// the prose stays readable and diagnostics must be shown (RFC §12.3).
+#[derive(Debug)]
+pub struct CheckResponse {
+    pub success: bool,
+    pub analysis: Option<CheckOutput>,
+    pub diagnostics: Vec<RawCheckDiagnostic>,
+    pub exit_code: i32,
+    pub stderr: String,
+}
+
 #[derive(Debug)]
 pub struct RunOutput {
     /// Exactly one JSON document emitted on stdout by the Core.
@@ -267,19 +298,20 @@ impl CoreClient {
         Ok(version)
     }
 
-    /// `check --emit`; on success returns the exact Analysis v2 bytes.
+    /// `check --json --emit`. On success the exact Analysis v2 bytes are
+    /// returned; on failure the structured diagnostics are returned without
+    /// any absolute path. Only spawn/timeout/IO failures are hard errors.
     pub fn check(
         &self,
         project: &Project,
         relative: &SafeRelativePath,
         options: &CheckOptions,
-    ) -> ViewResult<CheckOutput> {
+    ) -> ViewResult<CheckResponse> {
         let entry = project.absolute_for(relative)?;
         let scratch = ScratchDir::create("check")?;
         let emit = scratch.file("analysis.json");
         let mut args = build_check_args(&entry);
-
-        // Scratch path is ours; the argument vector is explicit, no shell.
+        args.push(OsString::from("--json"));
         args.push(OsString::from("--emit"));
         args.push(emit.clone().into_os_string());
         if options.refs {
@@ -291,13 +323,32 @@ impl CoreClient {
             project.root(),
             options.timeout.unwrap_or(DEFAULT_CHECK_TIMEOUT),
         )?;
-        if output.exit_code != 0 {
-            return Err(ViewError::AnalysisFailed {
-                detail: format!(
-                    "`marqdo check` failed with exit code {}: {}",
-                    output.exit_code,
-                    summarize_stderr(&output.stderr)
-                ),
+        let check_json: Option<serde_json::Value> =
+            serde_json::from_slice(&output.stdout_bytes).ok();
+        let success = output.exit_code == 0
+            && check_json
+                .as_ref()
+                .and_then(|json| json.get("success"))
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(true);
+        let diagnostics = check_json
+            .as_ref()
+            .and_then(|json| json.get("diagnostics"))
+            .and_then(serde_json::Value::as_array)
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(|item| serde_json::from_value(item.clone()).ok())
+                    .collect::<Vec<RawCheckDiagnostic>>()
+            })
+            .unwrap_or_default();
+        if !success {
+            return Ok(CheckResponse {
+                success: false,
+                analysis: None,
+                diagnostics,
+                exit_code: output.exit_code,
+                stderr: output.stderr,
             });
         }
         let analysis_bytes = std::fs::read(&emit).map_err(|err| ViewError::AnalysisFailed {
@@ -311,12 +362,18 @@ impl CoreClient {
                 detail: "`marqdo check` emitted an empty Analysis file".to_string(),
             });
         }
-        Ok(CheckOutput {
-            analysis_sha256: sha256_hex(&analysis_bytes),
-            analysis_digest: sha256_prefixed(&analysis_bytes),
-            analysis_bytes,
-            stdout: output.stdout,
-            stderr: output.stderr,
+        Ok(CheckResponse {
+            success: true,
+            analysis: Some(CheckOutput {
+                analysis_sha256: sha256_hex(&analysis_bytes),
+                analysis_digest: sha256_prefixed(&analysis_bytes),
+                analysis_bytes,
+                stdout: output.stdout,
+                stderr: output.stderr,
+            }),
+            diagnostics,
+            exit_code: 0,
+            stderr: String::new(),
         })
     }
 

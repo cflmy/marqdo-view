@@ -22,10 +22,33 @@ Protocol axes (Tool v1, Analysis v2, Trace v2) are versioned separately.
   stderr preservation, missing emit, timeout, invalid JSON) and architectural
   coupling gates.
 
+### Added (PR-02)
+
+- Reader-oriented `DocumentModel` over the frozen `marqdo.md.v1` Comrak profile:
+  headings, GFM tables/task lists, blockquotes, code fences, math literals,
+  exact UTF-8 byte spans, source line index.
+- Typed `SemanticProjection` with full Analysis v2 validation: schema/product/
+  profile checks, project identity, exact `source_digest`, unit/function/
+  statement/resource/import/reference/call/diagnostic projection and
+  per-span UTF-8 boundary validation with explicit warnings.
+- One `PresentationModel` + one `ReaderRenderer`; Live and Export share the same
+  bytes and differ only by `LinkPolicy` and control availability.
+- Single `assets/reader.css` + `assets/reader.js` theme (layered tokens, warm
+  paper, serif prose, gold/olive semantics, source pane, dialogs, responsive,
+  print, reduced motion) and `src/assets.rs` SHA-256 asset bundle.
+- Local Live reader: loopback Host validation, strict request limits,
+  single-pass percent decoding, safe project paths, CSP/security headers,
+  read-only `/`, `/file`, `/assets/*`, `/api/document`, `/api/health`.
+- `AppContext` degradation: missing core → prose-only with `CORE_UNAVAILABLE`;
+  failed check → diagnostics + revoked semantics; protocol mismatch → hard error.
+- Examples (`welcome`, `mixed-modes`, `control-flow`, `tables-math`,
+  `diagnostics`) and real Analysis v2 goldens generated from the frozen CLI.
+- Tests: rendering contracts, XSS/URL sanitization, Live/Export link parity,
+  raw HTTP server security tests, asset integrity, architectural gates.
+
 ### Known limitations
 
-- `browse` and `export` currently return `view.unsupported`; they land in
-  PR-02/PR-03 (reader) and PR-05 (export).
-- The single `assets/reader.css` + `assets/reader.js` theme is not present yet.
-- `verify` uses a structural binding check; the typed `SemanticProjection`
-  replaces it in PR-02 with the same external result.
+- `export` still returns `view.unsupported` (PR-05); the run control is
+  explicitly disabled (PR-04) and never fakes execution.
+- Variables/memory/proof states remain `UNSUPPORTED`.
+- Browser screenshot/geometry acceptance is scheduled for PR-06.
