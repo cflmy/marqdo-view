@@ -5,7 +5,7 @@
 > `PENDING`（未开始）、`N/A`（0002 明确非目标/删除项）。
 > 证据列写测试/脚本文档；不得以视觉相似代替测试。
 
-最后更新：2026-11-22（PR-04）
+最后更新：2026-11-22（PR-05）
 
 ## 1. §0 核心不可妥协条件
 
@@ -80,7 +80,7 @@
 | PR-02 Reader/Analysis 结构与只读路由 | **完成** | `src/protocol/*`、`src/reader/*`、`src/config.rs`、`/api/documents`、`tests/{contract,integration}`；`docs/evidence/PR-02/` |
 | PR-03 执行层/请求/进程/控制器 | **完成** | `src/execution/*`、ADR-0008、`docs/evidence/PR-03/` |
 | PR-04 SSE/路由/会话/前端闭环 | **完成** | `docs/evidence/PR-04/`（含真实 Chromium + 真实冻结 CLI） |
-| PR-05 Trace 绑定/标注/浏览器回归 | PENDING | — |
+| PR-05 Trace 绑定/标注/浏览器回归 | **完成** | ADR-0010、`docs/evidence/PR-05/` |
 | PR-06 导出/发布/文档闭环 | PENDING | — |
 
 ## 6. §9 验收测试矩阵（E01–E16 / N01–N22）
@@ -95,15 +95,15 @@
 | E06 H2 Exec n=5 call | PASS | call argv 测试 + 前端函数表单；真实 CLI 在 PR-06 验收 |
 | E07 文本/列表常量参数 | PASS | `--arg` 原样表达式 + 前端输入；CLI 最终校验 |
 | E08 无 main 不自动运行别的函数 | PARTIAL | 现有 `can_offer_run` 逻辑；PR-04 复核 |
-| E09 Trace 事件映射不伪造变量 | PARTIAL | `src/trace.rs`；SSE 后复核 |
+| E09 Trace 事件映射不伪造变量 | PASS | Controller Trace 摘要 + JS 分组 chip；无变量值 |
 | E10 SSE text/event-stream 无 polling | PASS | 集成 + 浏览器请求记录 |
 | E11 Last-Event-ID 重连 | PASS | 重放/伪造游标 snapshot 测试 |
 | E12 长任务心跳/GET 不重启 | PASS | 心跳 + 2 连接 + GET 观察不启动任务 |
 | E13 取消终止进程树 | PASS | Controller/process 单测 + HTTP 取消唯一终态 + 浏览器取消路径 |
 | E14 静态导出零联网/相对链接 | PARTIAL | 已实现；PR-06 复核 |
 | E15 刷新/重开不自动执行 | PASS | `tests/integration/http_live.rs` |
-| E16 运行后改源码 → stale 无高亮 | PARTIAL | 现有 stale；PR-05 复核 |
-| N01–N22 | PARTIAL | 0001 已覆盖部分（路径/XSS/跨站/digest/超时/打包完整性）；SSE/去重/取消/会话项待 PR-04 补齐，逐项记录在 PR-05/06 证据 |
+| E16 运行后改源码 → stale 无高亮 | PASS | `source_edit_during_a_run...`（stale + 全部 anchor=null） |
+| N01–N22 | PARTIAL | N01–N17/N19/N21/N22 已有对应测试（contract/integration/security）；N18（CLI SHA/版本）与 N20（导出零执行）在 PR-06 冻结验收中登记 |
 
 ## 7. §10 发布门禁
 

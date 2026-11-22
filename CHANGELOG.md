@@ -6,6 +6,22 @@ Protocol axes (Tool v1, Analysis v2, Trace v2) are versioned separately.
 
 ## [Unreleased]
 
+### Added (RFC-VIEW-0002 PR-05)
+
+- Trace v2 evidence binding hardened end to end: the SSE trace summary carries
+  per-event `source_id` only for verified entry-module spans, observed chips are
+  marked `data-annotation-source="trace"`, static anchors
+  `data-annotation-source="analysis"`, and grouped chips collapse >3 events per
+  anchor with a real count in `title`.
+- Stale/invalid/truncated Trace semantics covered by tests: editing source during
+  a run yields `stale=true` with all anchors/source ids null; a mismatched Trace
+  digest yields `trace.status=invalid` while the run still succeeds; truncated
+  traces are reported without claiming complete coverage.
+- ADR-0010 records the annotation/staleness strategy (inline keyed chips instead
+  of SVG curves, per RFC §4.4's allowed degradation).
+- Browser regression at the RFC width matrix incl. 2048x1133, provenance/grouping
+  assertions, dark-theme run screenshot; evidence in `docs/evidence/PR-05/`.
+
 ### Added (RFC-VIEW-0002 PR-04)
 
 - `src/server/{mod,routes,security,sse}.rs`: the fixed 7-route Live API with one

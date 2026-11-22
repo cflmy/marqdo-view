@@ -800,14 +800,30 @@
       $$("[data-source-id]").forEach(function (element) {
         bySource[element.dataset.sourceId] = element;
       });
+      var grouped = {};
       entryEvents.forEach(function (event) {
         if (!event.source_id || !bySource[event.source_id]) return;
+        if (!grouped[event.source_id]) grouped[event.source_id] = [];
+        grouped[event.source_id].push(event);
+      });
+      Object.keys(grouped).forEach(function (sourceId) {
+        var group = grouped[sourceId];
+        var last = group[group.length - 1];
+        var kinds = [];
+        group.forEach(function (event) {
+          if (kinds.indexOf(event.kind) < 0) kinds.push(event.kind);
+        });
         var chip = document.createElement("span");
         chip.className = "mq-run-chip";
         chip.dataset.viewChip = "1";
-        chip.dataset.runSeq = String(event.seq);
-        chip.textContent = event.detail || event.kind;
-        bySource[event.source_id].appendChild(chip);
+        chip.dataset.annotationSource = "trace";
+        chip.dataset.runSeq = String(last.seq);
+        chip.dataset.runKind = kinds.join(",");
+        var text = last.detail || last.kind;
+        if (group.length > 3) text += " ×" + group.length;
+        chip.textContent = text;
+        chip.title = "本次 Trace 事件：" + group.length + " 条（" + kinds.join(",") + "）";
+        bySource[sourceId].appendChild(chip);
       });
     }
   }

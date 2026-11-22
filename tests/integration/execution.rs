@@ -512,3 +512,141 @@ fn event_frames_use_the_view_run_events_schema_and_numeric_ids() {
     assert_eq!(terminal["run_id"], accepted.run_id.as_str());
     assert!(!events.is_empty());
 }
+
+#[test]
+fn source_edit_during_a_run_marks_the_result_stale_and_drops_anchor_ids() {
+    let project = crate::common::TempProject::new("exec-stale");
+    let source = std::fs::read_to_string(repo_root().join("examples/control-flow/index.mq.md"))
+        .expect("example source");
+    project.write(
+        "marqdo.yaml",
+        "project:\n  name: control-flow\n  version: 0.1.0\n",
+    );
+    project.write("index.mq.md", &source);
+    let analysis = golden("control-flow.json");
+    let run =
+        std::fs::read_to_string(repo_root().join("tests/golden/trace-v2/control-flow.run.json"))
+            .expect("run golden");
+    let trace =
+        std::fs::read_to_string(repo_root().join("tests/golden/trace-v2/control-flow.trace.json"))
+            .expect("trace golden");
+    let core = FakeCore::new("exec-stale-core");
+    core.set_analysis(&analysis);
+    core.set_run(0, &run, Some(&trace));
+    core.set_sleep_seconds(1);
+    let service = Arc::new(
+        DocumentService::open(&project.dir, Some(core.script.as_path())).expect("service"),
+    );
+    let controller = Arc::new(ExecutionController::new(
+        Arc::clone(&service),
+        ExecutionConfig::default().with_timeout(10),
+    ));
+    let body = request_body(
+        &analysis,
+        serde_json::json!({"kind": "entry"}),
+        "pure",
+        serde_json::json!({}),
+        "req-stale-source",
+    );
+    let accepted = controller.submit("session-a", &body).expect("accepted");
+    wait_for_file(&core.dir.join("run-was-called"));
+    project.write("index.mq.md", &format!("{source}\n\n追加的编辑。\n"));
+    let subscription = controller
+        .subscribe("session-a", &accepted.run_id, Some(0))
+        .expect("subscribe");
+    let (_events, terminal) = terminal_events(subscription);
+    assert_eq!(terminal["state"], "succeeded");
+    assert_eq!(terminal["result"]["stale"], true);
+    assert_eq!(terminal["trace"]["status"], "verified");
+    assert_eq!(terminal["trace"]["stale"], true);
+    let events = terminal["trace"]["events"].as_array().expect("events");
+    assert!(!events.is_empty());
+    assert!(
+        events
+            .iter()
+            .all(|event| event["anchor"].is_null() && event["source_id"].is_null()),
+        "stale runs must not anchor to the current text"
+    );
+}
+
+#[test]
+fn trace_with_a_mismatched_digest_is_reported_invalid_but_the_run_still_succeeds() {
+    let analysis = golden("control-flow.json");
+    let run =
+        std::fs::read_to_string(repo_root().join("tests/golden/trace-v2/control-flow.run.json"))
+            .expect("run golden");
+    let mut trace: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(repo_root().join("tests/golden/trace-v2/control-flow.trace.json"))
+            .expect("trace golden"),
+    )
+    .expect("trace json");
+    trace["source"]["analysis_digest"] = serde_json::json!(format!("sha256:{}", "0".repeat(64)));
+    let fixture = fixture_with(
+        "exec-trace-invalid",
+        "examples/control-flow",
+        &analysis,
+        &run,
+        Some(&trace.to_string()),
+        ExecutionConfig::default().with_timeout(10),
+    );
+    let body = request_body(
+        &analysis,
+        serde_json::json!({"kind": "entry"}),
+        "pure",
+        serde_json::json!({}),
+        "req-trace-invalid",
+    );
+    let accepted = fixture
+        .controller
+        .submit("session-a", &body)
+        .expect("accepted");
+    let subscription = fixture
+        .controller
+        .subscribe("session-a", &accepted.run_id, Some(0))
+        .expect("subscribe");
+    let (_events, terminal) = terminal_events(subscription);
+    assert_eq!(terminal["state"], "succeeded");
+    assert_eq!(terminal["trace"]["status"], "invalid");
+    assert!(terminal["trace"]["events"].is_null());
+}
+
+#[test]
+fn truncated_trace_is_marked_without_claiming_complete_coverage() {
+    let analysis = golden("control-flow.json");
+    let run = std::fs::read_to_string(
+        repo_root().join("tests/golden/trace-v2/control-flow.truncated.run.json"),
+    )
+    .expect("run golden");
+    let trace = std::fs::read_to_string(
+        repo_root().join("tests/golden/trace-v2/control-flow.truncated.trace.json"),
+    )
+    .expect("trace golden");
+    let fixture = fixture_with(
+        "exec-trace-truncated",
+        "examples/control-flow",
+        &analysis,
+        &run,
+        Some(&trace),
+        ExecutionConfig::default().with_timeout(10),
+    );
+    let body = request_body(
+        &analysis,
+        serde_json::json!({"kind": "entry"}),
+        "pure",
+        serde_json::json!({}),
+        "req-trace-truncated",
+    );
+    let accepted = fixture
+        .controller
+        .submit("session-a", &body)
+        .expect("accepted");
+    let subscription = fixture
+        .controller
+        .subscribe("session-a", &accepted.run_id, Some(0))
+        .expect("subscribe");
+    let (_events, terminal) = terminal_events(subscription);
+    assert_eq!(terminal["state"], "succeeded");
+    assert_eq!(terminal["trace"]["status"], "verified");
+    assert_eq!(terminal["trace"]["truncated"]["reason"], "event_budget");
+    assert_eq!(terminal["trace"]["truncated"]["limit"], 5);
+}

@@ -255,6 +255,30 @@ function localHostOnly(url) {
     check("run panel visible", await page.locator("#mq-run-panel").isVisible());
     check("run chips anchored", (await page.locator(".mq-run-chip").count()) > 0);
     check(
+      "observed chips carry trace provenance",
+      (await page.locator('.mq-run-chip[data-annotation-source="trace"]').count()) > 0
+    );
+    check(
+      "static statement anchors carry analysis provenance",
+      (await page.locator('[data-annotation-source="analysis"]').count()) > 0
+    );
+    check(
+      "at most one grouped chip per anchor",
+      (await page.locator(".mq-run-chip").count()) ===
+        (await page.locator(".mq-run-chip").evaluateAll((nodes) => {
+          const seen = new Set();
+          let unique = 0;
+          nodes.forEach((node) => {
+            const key = node.parentElement ? node.parentElement.dataset.sourceId : null;
+            if (key && !seen.has(key)) {
+              seen.add(key);
+              unique += 1;
+            }
+          });
+          return unique;
+        }))
+    );
+    check(
       "trace event list rendered",
       (await page.locator("#mq-run-events li").count()) > 0
     );
@@ -269,6 +293,11 @@ function localHostOnly(url) {
     );
     if (screenshotDir) {
       await page.screenshot({ path: path.join(screenshotDir, "control-flow-run.png") });
+      await page.click('.mq-dock-btn[data-action="settings"]');
+      await page.click('#mq-dialog-settings [data-action="theme"]');
+      await page.screenshot({ path: path.join(screenshotDir, "control-flow-run-dark.png") });
+      await page.click('.mq-dock-btn[data-action="settings"]');
+      await page.click('#mq-dialog-settings [data-action="theme"]');
     }
     // Clear run hides the display and keeps the project untouched.
     await page.click('.mq-dock-btn[data-action="clear"]');

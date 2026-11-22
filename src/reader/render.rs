@@ -1123,7 +1123,7 @@ fn render_inline(
                 );
                 let _ = write!(
                     html,
-                    " class=\"mq-anchor\" data-source-id=\"{id}\" data-statement-kind=\"{kind}\" title=\"静态语句：{label}\"",
+                    " class=\"mq-anchor\" data-annotation-source=\"analysis\" data-source-id=\"{id}\" data-statement-kind=\"{kind}\" title=\"静态语句：{label}\"",
                     id = escape_attr(&id),
                     kind = statement.kind.data_value(),
                     label = statement.kind.label()
@@ -1151,7 +1151,7 @@ fn render_inline(
                 );
                 let _ = write!(
                     html,
-                    " class=\"mq-anchor\" data-source-id=\"{id}\" data-statement-kind=\"{kind}\" title=\"静态语句：{label}\"",
+                    " class=\"mq-anchor\" data-annotation-source=\"analysis\" data-source-id=\"{id}\" data-statement-kind=\"{kind}\" title=\"静态语句：{label}\"",
                     id = escape_attr(&id),
                     kind = statement.kind.data_value(),
                     label = statement.kind.label()
@@ -1179,7 +1179,7 @@ fn render_inline(
                 );
                 let _ = write!(
                     html,
-                    " class=\"mq-anchor\" data-source-id=\"{id}\" data-statement-kind=\"{kind}\" title=\"静态语句：{label}\"",
+                    " class=\"mq-anchor\" data-annotation-source=\"analysis\" data-source-id=\"{id}\" data-statement-kind=\"{kind}\" title=\"静态语句：{label}\"",
                     id = escape_attr(&id),
                     kind = statement.kind.data_value(),
                     label = statement.kind.label()
