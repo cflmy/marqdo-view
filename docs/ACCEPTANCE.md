@@ -1,5 +1,11 @@
 # 验收状态（RFC-VIEW-0001 §18）
 
+> **历史证据说明（2026-11-22）**：本文件的 PASS 是 **RFC-VIEW-0001 时期**
+> 的验收结论，用作已实现能力的证据来源，**不是 RFC-VIEW-0002 的发布门禁**。
+> 0002 要求 SSE、7 路由、单函数调用、project grants、0.2.0 发行包与新的浏览器
+> 矩阵；这些将在 PR-04～PR-06 重新验收并更新本文件（见 `docs/CONFORMANCE.md`）。
+
+
 > 结论：首个 Beta 的 **P0 门禁全部 PASS**（由真实冻结 CLI + 真实 Chromium 生成，
 > 见 `docs/evidence/2c7c4f31e7a388d3fcfa717a77067e696ed13854/manifest.json`）。
 > P1 视觉/交互门禁大部分 PASS，**U-01 像素级人工比对与 U-04 动态曲线侧注未完成/未实现**，

@@ -4,7 +4,7 @@
 
 | 轴 | 本 View 值 | 说明 |
 |---|---|---|
-| View 产品版本 | `0.1.0` | 独立 SemVer，与 CLI 不共用 |
+| View 产品版本 | `0.1.0`（目标 `0.2.0`，RFC-VIEW-0002 PR-01 升级） | 独立 SemVer，与 CLI 不共用 |
 | `marqdo` 产品范围 | `>=3.0.0-beta.1,<4.0.0` | 安装与分发时由 CLI 强制校验 |
 | CLI Tool Protocol | `1` | `tool.json` 清单/整包摘要/分发 |
 | Analysis | `2` | 未知 major 直接拒绝，不回退 |

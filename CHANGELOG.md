@@ -6,6 +6,20 @@ Protocol axes (Tool v1, Analysis v2, Trace v2) are versioned separately.
 
 ## [Unreleased]
 
+### Changed (RFC-VIEW-0002 PR-00)
+
+- Adopted `docs/architecture/RFC-VIEW-0002.md` as the sole implementation
+  baseline for execution, scope, SSE, UI routes and release gates; RFC-0001 is
+  archived as historical design (ADR-0007).
+- Moved specs to `docs/architecture/` and decisions to `docs/decisions/`.
+- Added `docs/audits/legacy-view.md` (static legacy evidence with
+  `KEEP_ASSET/REIMPLEMENT/DROP/UNKNOWN` decisions and `LEGACY_RUNTIME_UNVERIFIED`
+  declaration), `docs/audits/protocol-contract-0002.md` (frozen CLI black-box
+  contract), `docs/CONFORMANCE.md` (living RFC-VIEW-0002 matrix) and refreshed
+  `docs/STATUS.md` with the remaining 0002 gaps.
+- No source behaviour changed in this step; the tracked 0001 implementation is
+  unchanged and still passes its tests while PR-02..PR-06 migration proceeds.
+
 ### Added
 
 - PR-00: legacy View static audit (`docs/audits/legacy-render-paths.md`), visual

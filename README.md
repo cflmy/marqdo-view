@@ -5,11 +5,16 @@ Marqdo View 是一个独立的可执行文档阅读器：以**原始 Markdown �
 附着回原文，而不是把文档翻译成另一套语言。
 
 - 状态（唯一现状来源）：[`docs/STATUS.md`](docs/STATUS.md)
-- 验收结果与证据：[`docs/ACCEPTANCE.md`](docs/ACCEPTANCE.md)
-- 架构规范：[`docs/RFC-VIEW-0001.md`](docs/RFC-VIEW-0001.md)
-- 旧 View 静态审计：[`docs/audits/legacy-render-paths.md`](docs/audits/legacy-render-paths.md)
-- 协议一致性：[`docs/audits/protocol-conformance.md`](docs/audits/protocol-conformance.md)
+- **实施规范（当前）**：[`docs/architecture/RFC-VIEW-0002.md`](docs/architecture/RFC-VIEW-0002.md)
+- 0002 合规矩阵：[`docs/CONFORMANCE.md`](docs/CONFORMANCE.md)
+- 历史基础设计：[`docs/architecture/RFC-VIEW-0001.md`](docs/architecture/RFC-VIEW-0001.md)
+- 旧 View 静态审计：[`docs/audits/legacy-view.md`](docs/audits/legacy-view.md)
+- 冻结 CLI 合同审计：[`docs/audits/protocol-contract-0002.md`](docs/audits/protocol-contract-0002.md)
 - 兼容性：[`COMPATIBILITY.md`](COMPATIBILITY.md) / 变更：[`CHANGELOG.md`](CHANGELOG.md)
+- 决策记录：[`docs/decisions/`](docs/decisions/)
+
+> **当前开发状态**：仓库正按 RFC-VIEW-0002 迭代（PR-00～PR-06）。下方能力表与
+> 限制按实际实现更新；未完成项以 `docs/STATUS.md` 为准，不宣称 0002 已完成。
 
 ## 能力
 
@@ -18,11 +23,12 @@ Marqdo View 是一个独立的可执行文档阅读器：以**原始 Markdown �
 | 原始 Markdown + GFM 阅读、源码态、文档态 | ✅ |
 | Analysis v2 静态语义（函数/Unit/签名/诊断/导入/引用/资源） | ✅ 严格校验，span 无效则降级 |
 | 本机 Live 阅读（默认 `127.0.0.1`，只读 API） | ✅ |
-| 用户确认后运行 + 真实 Trace v2 可视化（`pure` 模式） | ✅ 需要页面内确认 + CSRF |
+| 用户确认后运行 + 真实 Trace v2 可视化（`pure` 模式） | ✅（0001 同步模型；0002 的 SSE 异步闭环开发中） |
 | 纯只读静态导出（离线 `file://`、manifest/哈希、原子发布） | ✅ |
+| 单函数参数表单 + 受控 `project` fs grants | 🚧 RFC-VIEW-0002 PR-03/04 |
+| SSE 状态推送 / 取消 / 断线重放（禁止轮询） | 🚧 RFC-VIEW-0002 PR-04（MVP 阻塞项） |
 | 逐语句变量值 / 参数值 / 内存快照 | ❌ UNSUPPORTED（协议不提供，绝不伪造） |
 | 知识“已证明” / Prove / Lint / 调试器 | ❌ 非目标/等待独立协议 |
-| `project`/`strict` 运行、SSE、多运行历史 | ❌ 未实现（首版仅 `pure`） |
 
 ## 安装
 

@@ -1,81 +1,99 @@
 # marqdo-view 现状（STATUS）
 
-> 唯一现状来源。设计/规范见 RFC 与 ADR；本文只记录**实际完成、证据与限制**。
-> 最后更新：2026-11-22（PR-06 完成）
+> 唯一现状来源。规范见 `docs/architecture/RFC-VIEW-0002.md`；本文只记录
+> **实际完成、证据与限制**。最后更新：2026-11-22（RFC-VIEW-0002 PR-00 完成）
 
 ## 版本与基线
 
 | 项 | 值 |
 |---|---|
-| View 版本 | `0.1.0` |
+| View 产品版本 | `0.1.0`（目标 `0.2.0`，PR-01 升级） |
+| 实施规范 | `docs/architecture/RFC-VIEW-0002.md`（2026-11-22） |
 | 目标 CLI 产品范围 | `>=3.0.0-beta.1,<4.0.0` |
-| 冻结 CLI 二进制 | 发布归档 `marqdo-3.0.0-beta.1-x86_64-unknown-linux-gnu.tar.gz` 中的 `marqdo` |
-| 冻结 CLI SHA-256 | `062cb56e226bee55c21d238e195920caa985e62bb3877ba7b07abcc04dc0fe3f` |
+| 冻结 CLI 二进制 SHA-256 | `062cb56e226bee55c21d238e195920caa985e62bb3877ba7b07abcc04dc0fe3f` |
 | CLI 源码 SHA | `2c7c4f31e7a388d3fcfa717a77067e696ed13854`（tag `v3.0.0-beta.1`） |
-| 协议 | Tool v1 / Analysis v2 / Trace v2 / markdown profile `marqdo.md.v1` |
-| 目标平台 | Linux x86_64 glibc（正式）；其他平台未验证 |
-| 视觉基准 | `docs/design/reference-old-view-reader.png`（1664×920） |
-| 验收证据 | `docs/evidence/<CLI-SHA>/manifest.json`（由 `tools/acceptance.sh` 真实命令生成） |
+| 协议 | Tool v1 / Analysis v2 / Trace v2 / `marqdo.md.v1` |
+| 目标平台 | Linux x86_64 glibc（正式）；其他平台不支持/未验证 |
+| 视觉基准 | `docs/design/reference-old-view-reader.png`（**2048×1133**） |
 
-## 分阶段进度
+## RFC-VIEW-0002 里程碑
 
 | 阶段 | 状态 | 证据 |
 |---|---|---|
-| PR-00 基线与旧 View 静态取证 | **完成** | `docs/audits/legacy-render-paths.md`、`docs/design/*`、ADR-0001/0002 |
-| PR-01 Tool v1 安装闭环 | **完成** | `tool.json`、`tools/package.sh`、`tools/install-smoke.sh`、`tests/core_contract.rs`、`tests/no_coupling.rs` |
-| PR-02 DocumentModel + Analysis v2 浏览 | **完成** | `src/document.rs`、`src/semantic.rs`、`src/presentation.rs`、`src/render.rs`、`src/server.rs`、冻结 Analysis golden |
-| PR-03 Reader 视觉重建 | **完成（像素级人工比对未执行）** | 单一 `assets/reader.css`/`reader.js`；真实 Chromium 7 宽度/无 JS/打印/运行 PASS；`docs/evidence/PR-03/` |
-| PR-04 Trace v2 运行可视化 | **完成** | `src/trace.rs`、CSRF/确认运行 API、真实 Trace golden、`tests/trace_contract.rs`、ADR-0004 |
-| PR-05 Live 安全 + 静态导出 | **完成** | `src/export.rs`、`tools/test-export.sh`、`tools/test-security.sh`、`tests/export.rs`、ADR-0005 |
-| PR-06 冻结 CLI 端到端验收 | **完成（CI 远端未运行）** | `tools/acceptance.sh` 全部 PASS；`docs/evidence/<CLI-SHA>/manifest.json`；`docs/ACCEPTANCE.md`；ADR-0006 |
+| PR-00 基线、旧 View 取证、冻结 CLI 合同 | **完成** | `docs/audits/legacy-view.md`、`docs/audits/protocol-contract-0002.md`、`docs/decisions/0007` |
+| PR-01 Tool v1 打包/安装/调度、0.2.0、scripts/、CI | 待开始 | — |
+| PR-02 Reader/Analysis 只读面与目标目录结构 | 待开始（现有 0001 实现可迁移） | `src/document.rs`、`src/semantic.rs`、`src/render.rs`、`src/server.rs` |
+| PR-03 执行层：request/process/controller、pure + project grants | 待开始（现有同步 `pure` 执行可迁移） | `src/core_client.rs`、`src/app.rs` |
+| PR-04 SSE 任务生命周期、取消、7 路由、会话 Cookie/CSRF | **未实现（MVP 阻塞项）** | — |
+| PR-05 Trace 绑定/原文标注/浏览器回归 | 待开始（现有 Trace 校验可迁移） | `src/trace.rs` |
+| PR-06 静态导出/发布包/文档闭环 | 待开始（现有导出可迁移） | `src/export.rs` |
 
-## 能力现状
+## 继承自 0001 的可用资产（不等于 0002 验收通过）
 
-| 能力 | 状态 |
+以下能力已实现并有测试/证据，但需在 0002 架构下迁移、补路由/SSE 与重新验收：
+
+| 能力 | 现状 |
 |---|---|
-| 原始 Markdown 阅读（GFM 表/任务列表/引用/围栏/数学原文） | 已实现 |
-| 文档态 / 源码态（原文逐行，含标记） | 已实现 |
-| Analysis v2 静态语义（Unit/Function/Signature/诊断/导入/引用/资源） | 已实现，严格校验 + 无效 span 降级 |
+| 原始 Markdown/GFM 阅读、源码态、搜索/设置/打印 | 已实现（单一 `assets/reader.css`/`assets/reader.js`） |
+| Analysis v2 严格校验、函数/Unit/签名/诊断/导入/引用/资源投影 | 已实现（无效 span 降级） |
 | 单一 `ReaderRenderer`，Live/Export 共用 | 已实现（门禁测试） |
-| Live 只读 API（`/`、`/file`、`/assets`、`/api/document`、`/api/health`） | 已实现 |
-| 显式确认运行 + Trace v2 可视化（`pure` 模式） | 已实现（CSRF/Origin/单活动/超时） |
-| 静态离线导出（纯只读、manifest/哈希、原子发布） | 已实现 |
-| 搜索/导航/设置/打印/无 JS/响应式 | 已实现（真实浏览器验收） |
-| `view verify`（CLI/Analysis/source 绑定，无执行） | 已实现 |
-| 逐语句变量值 / 参数实际值 / 内存快照 | **UNSUPPORTED**（Trace v2 不提供，绝不伪造） |
-| 知识“已证明” / Prove / Knowledge / Lint | **UNSUPPORTED**（等待独立协议） |
-| 调试器/断点/单步、Notebook、旧 2.x 语法 | **不实现**（非目标） |
-| `project`/`strict` 运行与 grants 授权界面 | **未实现**（首版仅 `pure`，拒绝其他模式） |
-| SSE 流式输出、多运行历史、取消运行 | **未实现**（运行完成后整页重载） |
-| SVG 曲线侧注 | **未实现**（使用内联 keyed chip，U-04 PARTIAL） |
-| 像素级视觉比对 | **UNVERIFIED**（人工复核待办，U-01） |
-| 远端 CI 实际运行 | **UNVERIFIED**（`.woodpecker.yml` 已提供；本地可复现证据已生成） |
+| 显式确认后同步运行 `pure` + Trace v2 校验与展示 | 已实现，但**不是 0002 的异步 SSE 闭环** |
+| 静态离线导出（无执行、manifest/哈希、原子发布） | 已实现，待按 0002 重新验收 |
+| Tool v1 打包/安装/分发、冻结 CLI SHA 前后一致 | 已实现，待迁移至 `scripts/` 与 0.2.0 |
+| HTTP 安全（Host/Origin/CSRF/路径 containment/CSP） | 部分实现；缺**会话 Cookie**模型与 7 路由合同 |
+| 真实 Chromium 视觉/交互/无 JS/打印 | 已有证据（0001 时期），待按 0002 宽度矩阵重跑 |
 
-## 验收证据
+## 与 RFC-VIEW-0002 的已知差距（全部必须关闭）
 
-- 一键：`MARQDO_BIN=/abs/path/marqdo tools/acceptance.sh`
-- 全链路结果：`fmt/clippy/test/build/bundle/archive_install/view_help/verify/export/browse/real_run/export_suite/security_suite/browser/core_sha` 全部 PASS。
-- 冻结核心 SHA-256 在验收前后完全相同（`062cb56e…`），View 从未重编译/链接 CLI。
-- 安装来自 `.tar.gz` 发布归档解包到临时目录；不读取 CLI 源码或旧仓库运行代码。
-- 浏览器：Chromium Headless Shell 131（Playwright 1.49），7 个宽度、无外部请求、无 console 错误、无 JS 可读、打印、恶意 fixture、显式运行。
-- 详见 `docs/ACCEPTANCE.md` 与 `docs/evidence/`。
+1. **SSE 执行闭环缺失**：当前是 POST 同步运行后整页重载；0002 要求
+   `POST /api/runs` → 202 → `GET /api/runs/{id}/events` SSE（无轮询）→
+   accepted/running/终态；断线 `Last-Event-ID` 重放、128 事件环形缓冲、终态 TTL。
+2. **路由未收敛**：现为 `/api/run`、`/api/clear-run`、`/api/document`、
+   `/api/health`；0002 只允许
+   `GET /`、`GET /file`、`GET /assets/...`、`GET /api/documents`、
+   `POST /api/runs`、`GET /api/runs/{id}/events`、`POST /api/runs/{id}/cancel`。
+3. **无单函数调用表单**：函数目前只有跳转列表；缺基于 Analysis 签名的参数填写、
+   命令预览、`--arg` 常量表达式提交。
+4. **无 project grants**：0002 要求受控 fs read/write glob（明确二次确认），
+   其它 net/process/env/plugin 一律拒绝并引导 CLI。
+5. **无运行会话 Cookie**：CSRF 目前是进程级 token；0002 要求
+   `HttpOnly; SameSite=Strict` 随机会话 Cookie + 每会话 CSRF，且 SSE 按会话隔离。
+6. **无取消/单任务状态机/重复请求去重**：缺 `cancel_requested`、唯一终态、
+   `client_request_id` 幂等/409、409 run.busy。
+7. **执行预算未按 0002**：默认 30s（最大 120s）、`--fuel 1000000`、
+   `--max-output 1048576`、`--trace-max-events 10000`、`--trace-max-bytes 4194304`、
+   JSON/Trace/日志 4 MiB 有界读取与 `view.output_limit` 未实现。
+8. **目录/测试/脚本/示例未按 0002 §5.3**：缺 `src/protocol`、`src/reader`、
+   `src/execution`、`src/server`、`tests/{contract,integration,security,browser,
+   fixtures,golden}`、`scripts/`、`examples/{welcome,branch-loop,function-params,
+   knowledge-only,unsafe-side-effect}.mq.md`、`.github/workflows/ci.yml`。
+9. **版本与文档**：View 仍为 0.1.0；README/COMPATIBILITY/ACCEPTANCE 仍以 0001
+   为口径，需在 PR-06 前全部更新。
+10. **视觉回归矩阵**：0002 要求 2048×1133 源参考与 1664×920/1440×900/1024×768/
+    768×1024/390×844 宽度；现有截图集合不完整。
 
-## 已知限制与偏差
+## 明确 UNSUPPORTED / 非目标（不得伪造）
 
-- 测试按 crate 根级集成测试文件组织，而非 RFC 建议的子目录树；职责与门禁不变（ADR-0006）。
-- 运行完成后整页重载；不实现 SSE/取消/历史。
-- 静态导出每个文档执行一次 `check`（非执行），无增量导出。
-- 首版运行仅 `pure`；`project`/`strict` grants 需要未来独立授权 UI。
-- 平台：仅 Linux x86_64 glibc 正式验证；macOS/Windows 未验证。
-- 视觉：几何/颜色/响应式/无外部资源自动化 PASS，但像素级人工比对未执行。
+- 逐语句变量值、参数实际值、内存快照/地址寄存器：Trace v2 不提供，永远显示
+  “不支持”，不得用 `value` 代替。
+- 知识“已证明”/Prove、Lint、Knowledge 编译：独立仓库/未来版本化报告。
+- Notebook/Run All/持久内核、断点/单步/调用栈/时间旅行、Session/journal/snapshot。
+- AI/Agent/LLM Token 流、插件市场/热插拔、数据库/账号/多租户。
+- 第二套 Markdown AST/解释器/`inspect --ir` 解析：FORBIDDEN。
+- Windows/macOS 发行、`strict` 模式按钮、net/process/env/foreign 授权 UI：首版不做。
+
+## 复现与证据
+
+- 冻结 CLI 合同与实测：`docs/audits/protocol-contract-0002.md`
+- 旧 View 取证：`docs/audits/legacy-view.md`（静态；运行时 `LEGACY_RUNTIME_UNVERIFIED`）
+- 0002 条款映射：`docs/CONFORMANCE.md`
+- 验收（0001 时期，历史）：`docs/ACCEPTANCE.md`、`docs/evidence/`
+- 0001 时期一键验收脚本：`tools/acceptance.sh`（PR-01 后迁移为 `scripts/` 口径）
 
 ## 复现文档
 
-- 一分钟使用：`README.md`
-- 规范：`docs/RFC-VIEW-0001.md`
+- 使用/安装：`README.md`
+- 规范：`docs/architecture/RFC-VIEW-0002.md`（当前）、`RFC-VIEW-0001.md`（历史）
 - 兼容性：`COMPATIBILITY.md`
 - 变更：`CHANGELOG.md`
-- 旧 View 审计：`docs/audits/legacy-render-paths.md`
-- 协议一致性：`docs/audits/protocol-conformance.md`
-- 验收：`docs/ACCEPTANCE.md`
-- 决策：`docs/ADR/0001..0006`
+- 决策：`docs/decisions/0001..0007`
