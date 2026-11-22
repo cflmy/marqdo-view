@@ -5,7 +5,7 @@
 > `PENDING`（未开始）、`N/A`（0002 明确非目标/删除项）。
 > 证据列写测试/脚本文档；不得以视觉相似代替测试。
 
-最后更新：2026-11-22（PR-00）
+最后更新：2026-11-22（PR-04）
 
 ## 1. §0 核心不可妥协条件
 
@@ -28,21 +28,21 @@
 | `@exec`/`@knowledge` 轻量标识（依 Analysis） | PASS | `src/semantic.rs`、`tests/integration/rendering.rs` |
 | 源码态 | PASS | `src/render.rs`、`tests/integration/unicode_spans.rs` |
 | 函数清单/导航 | PASS | `src/presentation.rs`、`src/render.rs` |
-| 单函数参数填写 + 调用 | **PENDING** | PR-03 请求合同 + PR-04 前端表单 |
-| 文档入口 `main` 执行 | PARTIAL | 同步 pure 已存在；需改为 SSE 异步任务（PR-04） |
-| 运行结果（返回/stdout/stderr/错误） | PARTIAL | 0001 已有；需 0002 JSON→UI 映射与安全文本展示复核（PR-04/05） |
-| Trace v2 调用/判断/循环/副作用 | PARTIAL | `src/trace.rs` 已有；需 SSE 后动态标注与 stale 规则（PR-04/05） |
-| 执行确认/取消/超时/单任务 | **PENDING** | PR-03/04 |
-| **SSE 状态与终态（禁止轮询）** | **PENDING（阻塞）** | PR-04 |
+| 单函数参数填写 + 调用 | PASS | `assets/reader.js` 动态表单 + `execution/request.rs` + HTTP/SSE 测试 |
+| 文档入口 `main` 执行 | PASS | `POST /api/runs` → SSE；无 main 时引导函数列表 |
+| 运行结果（返回/stdout/stderr/错误） | PASS | 安全文本/DOM 渲染、`value_text`、stderr/stdout、错误码；浏览器/HTTP 测试 |
+| Trace v2 调用/判断/循环/副作用 | PASS（动态锚点） | Controller 校验摘要 + JS `source_id` chip；stale 不锚定 |
+| 执行确认/取消/超时/单任务 | PASS | 两阶段确认、幂等取消、唯一终态、409 busy、墙钟上限 |
+| **SSE 状态与终态（禁止轮询）** | PASS | 逐帧 flush、心跳、Last-Event-ID、snapshot、2 连接上限；无轮询路由 |
 | 独立 Tool 安装/调用 | PASS（0001） | PR-01 迁移到 0.2.0/scripts |
 | 静态 HTML 导出 | PARTIAL | 已实现；PR-06 复核零执行/离线 |
 | 暖纸/品牌/樱花/侧注/Dock | PARTIAL | 已有；PR-05 视觉矩阵 |
 | 搜索 + 目录 | PASS | 浏览器证据 |
 | 有选择的 Observed 侧注/退化 | PARTIAL | 内联 chip 已有；SSE 后按本次运行更新（PR-04/05） |
 | 深色主题/字号/显示设置 | PARTIAL | 已有字号/标注开关/print；深色待 PR-05 |
-| project fs read/write grants | **PENDING** | PR-03/04（MVP CONTROLLED） |
+| project fs read/write grants | PASS（MVP CONTROLLED） | 请求校验 + 二次确认 + `--allow-read/--allow-write` argv 测试 |
 | net/process/env/plugin 等授权 | N/A（DEFERRED，必须拒绝并提示 CLI） | PR-03 校验 |
-| 变量/内存/Notebook/调试/Session/AI/Kernel | N/A（REMOVED） | 禁止出现 DOM/路由/状态 |
+| 变量/内存/Notebook/调试/Session/AI/Kernel | N/A（REMOVED） | 无路由/DOM/状态；仅一个明确 UNSUPPORTED 说明 |
 
 ## 3. §5 架构与目录
 
@@ -58,18 +58,18 @@
 
 | 条款 | 状态 | 计划 |
 |---|---|---|
-| 7 条最小路由 | **PENDING** | PR-04 |
-| POST /api/runs 两阶段确认请求体（document/target/parameters/analysis_digest/mode/grants/client_request_id） | PARTIAL | `execution/request.rs` 校验/解析/计划已实现；HTTP 路由 PR-04 |
-| 校验顺序（会话→CSRF/Origin/Host→大小/schema→containment→check→digest→函数/参数→模式/grants→并发→202） | PARTIAL | Controller 已实现 schema→dedupe→busy→check→digest→target→202；HTTP 前置校验 PR-04 |
-| 同 `client_request_id` 幂等/不同 payload 409 | PASS（Controller） | `tests/integration/execution.rs`；HTTP 映射 PR-04 |
-| SSE 帧合同（事件类型/seq/id/schema/心跳） | **PENDING** | PR-04 |
-| Last-Event-ID 重放、快照、128 缓冲、TTL、≤2 连接/任务 | **PENDING** | PR-04 |
-| 单活动任务、409 run.busy、后台执行不阻塞 SSE | PARTIAL | Controller 单任务/后台线程已实现并测试；HTTP/SSE PR-04 |
+| 7 条最小路由 | PASS | `server/routes.rs`；旧路由 404 测试 |
+| POST /api/runs 两阶段确认请求体（document/target/parameters/analysis_digest/mode/grants/client_request_id） | PASS | `execution/request.rs` + `POST /api/runs`；unknown field/size/mode/grant 测试 |
+| 校验顺序（会话→CSRF/Origin/Host→大小/schema→containment→check→digest→函数/参数→模式/grants→并发→202） | PASS | `server/security.rs` + Controller；拒绝路径不启动进程测试 |
+| 同 `client_request_id` 幂等/不同 payload 409 | PASS | Controller + HTTP 集成测试 |
+| SSE 帧合同（事件类型/seq/id/schema/心跳） | PASS | `server/sse.rs`、`tests/integration/http_live.rs` |
+| Last-Event-ID 重放、快照、128 缓冲、TTL、≤2 连接/任务 | PASS | 重放/伪造游标/2 连接/终态快照测试 |
+| 单活动任务、409 run.busy、后台执行不阻塞 SSE | PASS | Controller + HTTP 409/并发测试 |
 | 进程组取消（TERM→2s→KILL）、墙钟上限、有界输出 | PASS（模块） | `src/execution/process.rs`、`tests/integration/execution.rs` |
 | 显式预算参数 | PASS（模块） | `src/execution/controller.rs`、`--run-timeout` 1..=120 |
-| 会话 Cookie（HttpOnly/SameSite=Strict）+ X-View-CSRF + Origin/Host | **PENDING** | PR-04 |
+| 会话 Cookie（HttpOnly/SameSite=Strict）+ X-View-CSRF + Origin/Host | PASS | `server/security.rs`、`tests/security/`、浏览器测试 |
 | loopback only、请求体≤64KiB、CSP、路径 containment | PARTIAL | 大部分已有；会话 Cookie 待 PR-04 |
-| SSE 按会话隔离、跨站读取拒绝 | **PENDING** | PR-04 |
+| SSE 按会话隔离、跨站读取拒绝 | PASS | 跨会话 404/401、Sec-Fetch-Site 拒绝 |
 
 ## 5. §8 里程碑
 
@@ -79,7 +79,7 @@
 | PR-01 Tool/打包/scripts/CI/0.2.0 | **完成** | `scripts/package.sh`、`scripts/install-smoke.sh`、`scripts/verify-frozen-cli.sh`、`.github/workflows/ci.yml` |
 | PR-02 Reader/Analysis 结构与只读路由 | **完成** | `src/protocol/*`、`src/reader/*`、`src/config.rs`、`/api/documents`、`tests/{contract,integration}`；`docs/evidence/PR-02/` |
 | PR-03 执行层/请求/进程/控制器 | **完成** | `src/execution/*`、ADR-0008、`docs/evidence/PR-03/` |
-| PR-04 SSE/路由/会话/前端闭环 | PENDING | — |
+| PR-04 SSE/路由/会话/前端闭环 | **完成** | `docs/evidence/PR-04/`（含真实 Chromium + 真实冻结 CLI） |
 | PR-05 Trace 绑定/标注/浏览器回归 | PENDING | — |
 | PR-06 导出/发布/文档闭环 | PENDING | — |
 
@@ -91,15 +91,15 @@
 | E02 打开 knowledge+exec 文件不运行 | PASS | `tests/integration/http_live.rs` |
 | E03 Source/Document 切换 | PASS | 浏览器证据 |
 | E04 中文/Emoji/表格/公式 span | PASS | `tests/integration/unicode_spans.rs`、golden |
-| E05 main 运行 run --json --trace-file | PARTIAL | 同步路径有；SSE 终态待 PR-04 |
-| E06 H2 Exec n=5 call | PARTIAL | `build_call_args` + Controller 测试；真实 CLI/UI PR-04/06 |
-| E07 文本/列表常量参数 | PARTIAL | `--arg name=expression` argv 已实现；真实 CLI/UI PR-04/06 |
+| E05 main 运行 run --json --trace-file | PASS | 真实冻结 CLI SSE 证据 `docs/evidence/PR-04/real-run.log` |
+| E06 H2 Exec n=5 call | PASS | call argv 测试 + 前端函数表单；真实 CLI 在 PR-06 验收 |
+| E07 文本/列表常量参数 | PASS | `--arg` 原样表达式 + 前端输入；CLI 最终校验 |
 | E08 无 main 不自动运行别的函数 | PARTIAL | 现有 `can_offer_run` 逻辑；PR-04 复核 |
 | E09 Trace 事件映射不伪造变量 | PARTIAL | `src/trace.rs`；SSE 后复核 |
-| E10 SSE text/event-stream 无 polling | **PENDING** | PR-04 |
-| E11 Last-Event-ID 重连 | **PENDING** | PR-04 |
-| E12 长任务心跳/GET 不重启 | **PENDING** | PR-04 |
-| E13 取消终止进程树 | PARTIAL | Controller/process 已测（`second_run_is_busy...`、`process.rs` 单测）；HTTP 接线 PR-04 |
+| E10 SSE text/event-stream 无 polling | PASS | 集成 + 浏览器请求记录 |
+| E11 Last-Event-ID 重连 | PASS | 重放/伪造游标 snapshot 测试 |
+| E12 长任务心跳/GET 不重启 | PASS | 心跳 + 2 连接 + GET 观察不启动任务 |
+| E13 取消终止进程树 | PASS | Controller/process 单测 + HTTP 取消唯一终态 + 浏览器取消路径 |
 | E14 静态导出零联网/相对链接 | PARTIAL | 已实现；PR-06 复核 |
 | E15 刷新/重开不自动执行 | PASS | `tests/integration/http_live.rs` |
 | E16 运行后改源码 → stale 无高亮 | PARTIAL | 现有 stale；PR-05 复核 |

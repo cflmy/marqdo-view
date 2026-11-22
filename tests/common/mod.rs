@@ -1,4 +1,4 @@
-//! Shared test helpers for integration tests.
+//! Shared test helpers for integration and security suites.
 //!
 //! Fake cores are real executables (never mocked Rust traits at the process
 //! boundary) so argv, exit codes, stderr and temp artifacts are all exercised.
@@ -236,3 +236,5 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
     }
     out
 }
+
+pub mod http;

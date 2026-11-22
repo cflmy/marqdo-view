@@ -284,6 +284,11 @@ impl ExecutionController {
         let started = Instant::now();
         let outcome = self.run_core(&job, &plan);
         let cancel_requested = job.cancel.load(Ordering::SeqCst);
+        eprintln!(
+            "JOB_DEBUG id={} run_core elapsed={:?} cancel={cancel_requested}",
+            job.run_id,
+            started.elapsed()
+        );
         let terminal = self.build_terminal(&plan, &static_doc, started, outcome, cancel_requested);
         let Ok(mut inner) = job.inner.lock() else {
             return;
@@ -308,6 +313,12 @@ impl ExecutionController {
                 );
             }
         }
+        eprintln!(
+            "JOB_DEBUG id={} terminal state={:?} total={:?}",
+            job.run_id,
+            state,
+            started.elapsed()
+        );
         inner.terminal_at = Some(Instant::now());
         drop(inner);
 
@@ -548,6 +559,7 @@ impl ExecutionController {
             detail: "job lock poisoned".to_string(),
         })?;
         let state_now = inner.log.last_state();
+        eprintln!("CANCEL_DEBUG id={} last_state={state_now:?}", job.run_id);
         if state_now.is_terminal() {
             return Ok(state_now);
         }
@@ -902,10 +914,27 @@ fn build_trace_summary(
         }
     };
     let projection = verified.projection;
+    let statements = static_doc.verified.projection.all_statements();
     let events = projection
         .events
         .iter()
         .map(|event| {
+            let source_id = if stale {
+                None
+            } else {
+                event.anchor_span.and_then(|span| {
+                    statements
+                        .iter()
+                        .find(|(_, statement)| statement.span == span)
+                        .map(|(_, statement)| {
+                            crate::protocol::analysis_v2::source_id(
+                                &static_doc.verified.projection.module_id,
+                                span,
+                                &format!("statement-{}", statement.kind.data_value()),
+                            )
+                        })
+                })
+            };
             serde_json::json!({
                 "seq": event.seq,
                 "kind": event.kind_label(),
@@ -916,6 +945,7 @@ fn build_trace_summary(
                     event.anchor_span.map(|span| serde_json::json!({"start": span.start, "end": span.end}))
                         .unwrap_or(serde_json::Value::Null)
                 },
+                "source_id": source_id,
                 "detail": event.detail,
                 "operation": event.operation,
                 "duration_micros": event.duration_micros,

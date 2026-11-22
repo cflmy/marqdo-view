@@ -24,9 +24,9 @@
 | PR-01 Tool v1 打包/安装/调度、0.2.0、scripts/、CI | **完成** | `scripts/package.sh`、`scripts/install-smoke.sh`、`scripts/verify-frozen-cli.sh`、`.github/workflows/ci.yml`；冻结 CLI `tool install`/`view --help`/篡改拒绝实测 |
 | PR-02 Reader/Analysis 只读面与目标目录结构 | **完成** | `src/protocol/*`、`src/reader/*`、`src/config.rs`、`tests/{contract,integration}/`、`/api/documents`；证据 `docs/evidence/PR-02/` |
 | PR-03 执行层：request/process/controller、pure + project grants | **完成** | `src/execution/{request,process,controller,events}.rs`、`--run-timeout`、ADR-0008、`tests/integration/execution.rs`；证据 `docs/evidence/PR-03/` |
-| PR-04 SSE 任务生命周期、取消、7 路由、会话 Cookie/CSRF | **未实现（MVP 阻塞项）** | — |
-| PR-05 Trace 绑定/原文标注/浏览器回归 | 待开始（现有 Trace 校验可迁移） | `src/trace.rs` |
-| PR-06 静态导出/发布包/文档闭环 | 待开始（现有导出可迁移） | `src/export.rs` |
+| PR-04 SSE 任务生命周期、取消、7 路由、会话 Cookie/CSRF | **完成** | `src/server/{mod,routes,security,sse}.rs`、`assets/reader.js` SSE/表单、`tests/integration/http_live.rs`、`tests/security/`、真实 Chromium + 真实冻结 CLI SSE 证据 `docs/evidence/PR-04/` |
+| PR-05 Trace 绑定/原文标注/浏览器回归 | 待开始（SSE 后动态标注/宽度矩阵已基本具备） | `src/execution/controller.rs` Trace 摘要、浏览器证据 |
+| PR-06 静态导出/发布包/文档闭环 | 待开始 | `src/export.rs`、`scripts/acceptance.sh`、`docs/ACCEPTANCE.md` |
 
 ## 继承自 0001 的可用资产（不等于 0002 验收通过）
 
@@ -37,44 +37,30 @@
 | 原始 Markdown/GFM 阅读、源码态、搜索/设置/打印 | 已实现（单一 `assets/reader.css`/`assets/reader.js`） |
 | Analysis v2 严格校验、函数/Unit/签名/诊断/导入/引用/资源投影 | 已实现（无效 span 降级） |
 | 单一 `ReaderRenderer`，Live/Export 共用 | 已实现（`src/reader/render.rs`，门禁测试） |
-| 显式确认后同步运行 `pure` + Trace v2 校验与展示 | 旧同步路径仍在（过渡）；新的异步 Controller/SSE 就绪于 PR-03/04 |
+| 显式确认 + SSE 异步执行 + Trace v2 | 已实现（7 路由、单任务、取消、断线重放） |
 | 静态离线导出（无执行、manifest/哈希、原子发布） | 已实现，待按 0002 重新验收 |
 | Tool v1 打包/安装/分发、冻结 CLI SHA 前后一致 | 已实现，待迁移至 `scripts/` 与 0.2.0 |
 | HTTP 安全（Host/Origin/CSRF/路径 containment/CSP） | 部分实现；缺**会话 Cookie**模型与 7 路由合同 |
 | 真实 Chromium 视觉/交互/无 JS/打印 | 已有证据（0001 时期），待按 0002 宽度矩阵重跑 |
 
-## 与 RFC-VIEW-0002 的已知差距（全部必须关闭）
+## 与 RFC-VIEW-0002 的已知差距（剩余项）
 
-1. **SSE 执行闭环缺失**：当前是 POST 同步运行后整页重载；0002 要求
-   `POST /api/runs` → 202 → `GET /api/runs/{id}/events` SSE（无轮询）→
-   accepted/running/终态；断线 `Last-Event-ID` 重放、128 事件环形缓冲、终态 TTL。
-2. **路由未收敛**：现为 `/api/run`、`/api/clear-run`、`/api/document`、
-   `/api/health`；0002 只允许
-   `GET /`、`GET /file`、`GET /assets/...`、`GET /api/documents`、
-   `POST /api/runs`、`GET /api/runs/{id}/events`、`POST /api/runs/{id}/cancel`。
-3. **无单函数调用表单**：函数目前只有跳转列表；缺基于 Analysis 签名的参数填写、
-   命令预览、`--arg` 常量表达式提交。
-4. **无 project grants**：0002 要求受控 fs read/write glob（明确二次确认），
-   其它 net/process/env/plugin 一律拒绝并引导 CLI。
-5. **无运行会话 Cookie**：CSRF 目前是进程级 token；0002 要求
-   `HttpOnly; SameSite=Strict` 随机会话 Cookie + 每会话 CSRF，且 SSE 按会话隔离
-   （PR-04）。
-6. **HTTP/SSE 传输未接**：Controller 已实现单任务状态机、取消、去重、
-   `client_request_id` 幂等/409 与 `409 run.busy`（`src/execution/controller.rs`），
-   但 `POST /api/runs`、`GET .../events`、`POST .../cancel` 与前端尚未切换（PR-04）。
-7. **执行预算**：Controller 已显式发送 `--timeout`（默认 30s/最大 120s）、
-   `--fuel 1000000`、`--max-output 1048576`、`--trace-max-events 10000`、
-   `--trace-max-bytes 4194304`，并做 4 MiB JSON/Trace 有界读取与
-   `view.output_limit`；HTTP 层仍需映射为终态事件（PR-04）。
-8. **目录/测试/示例仍有缺口**：`src/protocol`/`src/reader`/`src/config.rs`/
-   `tests/{contract,integration}`/`scripts/`/`.github/workflows/ci.yml` 已就位；
-   仍缺 `src/execution/*`、`src/server/{mod,routes,security,sse}.rs`、
-   `tests/security/` 套件、`examples/{welcome,branch-loop,function-params,
-   knowledge-only,unsafe-side-effect}.mq.md`、`docs/design` 0002 宽度截图矩阵。
-9. **文档口径**：README/COMPATIBILITY/ACCEPTANCE 仍含 0001 时期表述，需在
-   PR-06 前全部更新为 0002 口径。
-10. **视觉回归矩阵**：0002 要求 2048×1133 源参考与 1664×920/1440×900/1024×768/
-    768×1024/390×844 宽度；现有截图集合不完整。
+PR-00～PR-04 已关闭 SSE、7 路由、单函数调用表单、受控 project grants、
+会话 Cookie/CSRF、取消/去重/单任务、执行预算与有界输出、目标目录/测试树/
+`scripts/`/CI/浏览器宽度矩阵。**剩余**：
+
+1. **PR-05**：Trace 事件到原文的锚点/侧注在 SSE 后已由前端按 `source_id`
+   渲染 keyed chip；仍需固化 stale/截断/无 Trace 的浏览器回归与最终视觉矩阵
+   证据（含深色/打印/断网/无 JS）。
+2. **PR-06**：`examples/{welcome,branch-loop,function-params,knowledge-only,
+   unsafe-side-effect}.mq.md` 需按 RFC §13.3 创建并用冻结 CLI 实际 check/call
+   记录；静态导出需按 0002 重新跑离线/零执行验收；更新 ACCEPTANCE/README/
+   COMPATIBILITY/CHANGELOG 为 0002 口径并生成最终 evidence manifest。
+3. 0002 §9.2 N 系列须逐项在最终验收报告中登记（当前 HTTP/SSE/安全套件已覆盖
+   大部分：N01/N02/N03/N04/N05/N06/N07/N09/N10/N11/N12/N13/N14/N15/N16/N17/
+   N19/N21/N22 有对应测试；N18/N20 在 PR-06 冻结 CLI/导出套件中登记）。
+4. 视觉/可达性的人工像素级比对与完整 screen-reader 走查仍标 `UNVERIFIED`，
+   自动化几何/颜色/无外部资源/响应式证据已存在（`docs/evidence/PR-04/`）。
 
 ## 明确 UNSUPPORTED / 非目标（不得伪造）
 

@@ -46,6 +46,8 @@ pub enum ViewError {
     RunInvalid { detail: String },
     /// The entry document has no resolvable `main`; View never substitutes one.
     NoEntryFunction { detail: String },
+    /// A page/SSE/POST requires a valid local session cookie.
+    SessionRequired { detail: String },
     /// Another explicit run is already active; View allows one at a time.
     RunBusy { detail: String },
     /// The same client request id was reused with a different payload.
@@ -85,6 +87,7 @@ impl ViewError {
             ViewError::CoreTimeout { .. } => "view.core_timeout",
             ViewError::RunInvalid { .. } => "view.run_invalid",
             ViewError::NoEntryFunction { .. } => "view.no_entry_function",
+            ViewError::SessionRequired { .. } => "view.session_required",
             ViewError::RunBusy { .. } => "view.run_busy",
             ViewError::RunConflict { .. } => "view.run_conflict",
             ViewError::RunNotFound { .. } => "view.run_not_found",
@@ -107,6 +110,7 @@ impl ViewError {
             | ViewError::Unsupported { .. }
             | ViewError::RunInvalid { .. }
             | ViewError::NoEntryFunction { .. }
+            | ViewError::SessionRequired { .. }
             | ViewError::RunBusy { .. }
             | ViewError::RunConflict { .. }
             | ViewError::RunNotFound { .. }
@@ -152,6 +156,7 @@ impl ViewError {
             "view.core_timeout" => "冻结核心执行超时，已终止。",
             "view.run_invalid" => "运行请求未通过校验（目标、参数、模式或授权不合法）。",
             "view.no_entry_function" => "文档没有可调用的 main；请改选一个 H2 Exec 函数。",
+            "view.session_required" => "缺少或过期的本地会话；请先打开阅读页面。",
             "view.run_busy" => "已有一次运行正在进行；本版本每个 View 服务只允许一个任务。",
             "view.run_conflict" => "同一客户端请求 ID 携带了不同内容，拒绝执行。",
             "view.run_not_found" => "运行任务不存在、已过期或不属于当前会话。",
@@ -204,6 +209,7 @@ impl ViewError {
             | ViewError::CoreTimeout { detail }
             | ViewError::RunInvalid { detail }
             | ViewError::NoEntryFunction { detail }
+            | ViewError::SessionRequired { detail }
             | ViewError::RunBusy { detail }
             | ViewError::RunConflict { detail }
             | ViewError::RunNotFound { detail }

@@ -123,6 +123,19 @@ pub enum OutlineKind {
 }
 
 impl PresentationModel {
+    /// True when the entry module exposes a resolvable `main` (canonical or
+    /// unique local name). The dock Run button never substitutes another
+    /// function for a missing entry function (RFC-VIEW-0002 §2.4).
+    pub fn has_entry_main(&self) -> bool {
+        let Some(semantic) = self.semantic.as_ref() else {
+            return false;
+        };
+        semantic.functions.iter().any(|function| {
+            let canonical = canonical_function_name(&function.id, &semantic.module_id);
+            canonical == "main" || function.local_name == "main"
+        })
+    }
+
     pub fn run_state(&self) -> RunDisplayState {
         match &self.run {
             Some(run) => run.state,
@@ -163,6 +176,14 @@ impl PresentationModel {
 /// depends on rendered text, so duplicate headings cannot collide.
 pub fn anchor_for_span(start: u64, end: u64) -> String {
     format!("mq-h-{start:x}-{end:x}")
+}
+
+/// Analysis v2 function ids are `<module id>::<canonical name>`.
+fn canonical_function_name(function_id: &str, module_id: &str) -> String {
+    function_id
+        .strip_prefix(&format!("{module_id}::"))
+        .unwrap_or(function_id)
+        .to_string()
 }
 
 #[cfg(test)]

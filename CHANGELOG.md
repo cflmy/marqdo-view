@@ -6,6 +6,30 @@ Protocol axes (Tool v1, Analysis v2, Trace v2) are versioned separately.
 
 ## [Unreleased]
 
+### Added (RFC-VIEW-0002 PR-04)
+
+- `src/server/{mod,routes,security,sse}.rs`: the fixed 7-route Live API with one
+  explicit execution entry. Removed `/api/health`, `/api/document`,
+  `/api/run` and `/api/clear-run`.
+- SSE transport writes the `text/event-stream` response directly to the socket
+  and flushes every frame/heartbeat (tiny_http's chunked writer would delay
+  frames); heartbeats, `Last-Event-ID` replay, authoritative snapshots, 128-event
+  ring, terminal close and a max of two observers per run.
+- Per-session `HttpOnly; SameSite=Strict` cookie + per-session CSRF token
+  (`X-View-CSRF`), exact same-origin `Origin`, loopback `Host` validation,
+  `Sec-Fetch-Site` cross-site rejection, JSON-only bounded run POSTs (64 KiB).
+- Reader front-end now runs through one POST + EventSource: target form built
+  from Analysis signatures, text-only command preview, pure/project mode with
+  explicit fs read/write globs and second confirmation, cancel button, live
+  result/stdout/stderr/Trace panel, keyed source anchors (skipped when stale),
+  and no status polling. Run shell is hidden until an explicit run.
+- New `tests/security/` suite (cookies/CSRF/CORS/symlink/Markdown/SSE session
+  isolation) and rewritten HTTP/SSE integration tests; browser suite updated for
+  EventSource, dark theme and the RFC width matrix (incl. 2048x1133).
+- ADR-0009 records the SSE transport, session model and route decisions; evidence
+  in `docs/evidence/PR-04/` includes real Chromium logs/screenshots and a real
+  frozen-CLI run (285 Trace v2 events).
+
 ### Added (RFC-VIEW-0002 PR-03)
 
 - Execution layer: `src/execution/{request,process,controller,events}.rs`.

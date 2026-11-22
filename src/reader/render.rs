@@ -71,6 +71,10 @@ pub struct RenderContext {
     pub run_available: bool,
     /// Static exports may hide semantic/run annotations without changing prose.
     pub annotations: bool,
+    /// View wall-clock limit shown in the explicit run form (seconds).
+    pub run_timeout_secs: u64,
+    /// Whether a frozen Core was negotiated (an explicit run form can exist).
+    pub core_available: bool,
 }
 
 impl RenderContext {
@@ -81,6 +85,8 @@ impl RenderContext {
             csrf_token: None,
             run_available: false,
             annotations: true,
+            run_timeout_secs: 30,
+            core_available: false,
         }
     }
 
@@ -91,6 +97,8 @@ impl RenderContext {
             csrf_token: None,
             run_available: false,
             annotations: true,
+            run_timeout_secs: 0,
+            core_available: false,
         }
     }
 
@@ -136,6 +144,13 @@ impl ReaderRenderer {
         );
         let _ = document_href;
         let mut html = String::with_capacity(16 * 1024 + model.document.source.len());
+        let relative_path = model.document.identity.relative_path.clone();
+        let analysis_digest = model
+            .semantic
+            .as_ref()
+            .map(|semantic| semantic.analysis_digest.clone())
+            .unwrap_or_default();
+        let has_main = model.has_entry_main();
         let page_title = if navigation.site_title.is_empty() {
             model.title.clone()
         } else {
@@ -156,7 +171,7 @@ impl ReaderRenderer {
 <link rel="stylesheet" href="{css}"/>
 <script defer src="{js}"></script>
 </head>
-<body class="mq-reader" data-mode="document" data-theme="light" data-annotations="{annotations}" data-size="normal" data-source-status="{status}" data-run-state="{run_state}" data-run-available="{run_available}" data-live="{live}">
+<body class="mq-reader" data-mode="document" data-theme="light" data-annotations="{annotations}" data-size="normal" data-source-status="{status}" data-run-state="{run_state}" data-run-available="{run_available}" data-has-main="{has_main}" data-core-available="{core_available}" data-document="{document}" data-analysis-digest="{analysis_digest}" data-run-timeout="{run_timeout}" data-live="{live}">
 <a class="mq-skip" href="#mq-main">跳到正文</a>
 "##,
             presentation_version = model.version,
@@ -170,6 +185,11 @@ impl ReaderRenderer {
             annotations = if ctx.annotations { "on" } else { "off" },
             run_state = model.run_state().data_value(),
             run_available = if ctx.run_available { "true" } else { "false" },
+            has_main = if has_main { "true" } else { "false" },
+            core_available = if ctx.core_available { "true" } else { "false" },
+            document = escape_attr(&relative_path),
+            analysis_digest = escape_attr(&analysis_digest),
+            run_timeout = ctx.run_timeout_secs,
             live = if ctx.live { "true" } else { "false" },
         );
 
@@ -182,9 +202,13 @@ impl ReaderRenderer {
         }
         self.render_document_meta(&mut html, model);
         self.render_diagnostics(&mut html, model);
-        self.render_functions(&mut html, model);
+        self.render_functions(&mut html, model, ctx);
         self.render_document(&mut html, model, ctx);
-        self.render_run_panel(&mut html, model, ctx);
+        if ctx.live {
+            self.render_live_run_shell(&mut html, ctx);
+        } else {
+            self.render_run_panel(&mut html, model, ctx);
+        }
         self.render_source_pane(&mut html, model, ctx);
         self.render_footer(&mut html, model);
         let _ = write!(html, "</main>\n");
@@ -361,7 +385,7 @@ impl ReaderRenderer {
         html.push_str("</ol>\n</details>\n");
     }
 
-    fn render_functions(&self, html: &mut String, model: &PresentationModel) {
+    fn render_functions(&self, html: &mut String, model: &PresentationModel, ctx: &RenderContext) {
         if model.outline.is_empty() {
             return;
         }
@@ -375,12 +399,33 @@ impl ReaderRenderer {
             count = functions.len()
         );
         for entry in functions {
+            let function = model.semantic.as_ref().and_then(|semantic| {
+                semantic.functions.iter().find(|function| {
+                    anchor_for_span(function.heading_span.start, function.heading_span.end)
+                        == entry.anchor
+                })
+            });
+            let (function_id, params, callable) = match function {
+                Some(function) => (function.id.clone(), function_params_json(function), true),
+                None => (String::new(), "[]".to_string(), false),
+            };
+            let call_button = if callable && ctx.core_available {
+                format!(
+                    "<button type=\"button\" class=\"mq-fn-call\" data-action=\"call-function\" data-function-id=\"{id}\" data-function-label=\"{label}\" data-params=\"{params}\">调用</button>",
+                    id = escape_attr(&function_id),
+                    label = escape_attr(&entry.label),
+                    params = escape_attr(&params)
+                )
+            } else {
+                String::new()
+            };
             let _ = write!(
                 html,
-                "<li><a href=\"#{anchor}\" data-goto-anchor=\"{anchor}\">{label}</a><span class=\"mq-fn-sig\">{detail}</span></li>\n",
+                "<li><a href=\"#{anchor}\" data-goto-anchor=\"{anchor}\">{label}</a><span class=\"mq-fn-sig\">{detail}</span>{call_button}</li>\n",
                 anchor = escape_attr(&entry.anchor),
                 label = escape_text(&entry.label),
-                detail = escape_text(&entry.detail)
+                detail = escape_text(&entry.detail),
+                call_button = call_button
             );
         }
         html.push_str("</ul>\n</details>\n");
@@ -457,8 +502,32 @@ impl ReaderRenderer {
         );
     }
 
+    /// Empty, accessible run panel that the single reader script fills from
+    /// SSE events. It is never populated by the server for a live page: no run
+    /// exists until the user explicitly submits one (RFC-VIEW-0002 §7.1).
+    fn render_live_run_shell(&self, html: &mut String, _ctx: &RenderContext) {
+        html.push_str(
+            r##"<section class="mq-run-panel" id="mq-run-panel" data-run-state="idle" aria-labelledby="mq-run-title" hidden>
+  <h2 id="mq-run-title">本次运行</h2>
+  <p id="mq-run-status" class="mq-run-status" role="status" aria-live="polite">尚未运行。点击 Dock 的“运行”执行 main，或在函数面板选择函数。</p>
+  <div id="mq-run-actions" class="mq-run-actions" hidden>
+    <button type="button" class="mq-secondary" data-action="cancel-run">取消运行</button>
+  </div>
+  <div id="mq-run-summary"></div>
+  <pre id="mq-run-stdout" class="mq-stdout" aria-label="程序标准输出" hidden></pre>
+  <pre id="mq-run-stderr" class="mq-stdout mq-stderr" aria-label="程序标准错误" hidden></pre>
+  <details id="mq-run-trace-wrap" class="mq-run-events-wrap" hidden>
+    <summary>真实 Trace v2 事件</summary>
+    <ol id="mq-run-events" class="mq-run-events"></ol>
+  </details>
+  <p id="mq-run-note" class="mq-colophon">结果只来自本次显式运行的 CLI --json 与经摘要校验的 Trace v2；不提供参数实际值、逐语句变量或内存快照。</p>
+</section>
+"##,
+        );
+    }
+
     fn render_dock(&self, html: &mut String, ctx: &RenderContext) {
-        let run_disabled = if ctx.run_available {
+        let run_disabled = if ctx.core_available {
             ""
         } else {
             " data-disabled=\"true\""
@@ -544,8 +613,8 @@ impl ReaderRenderer {
 "##,
             csrf = csrf,
             files = self.render_file_list(model, ctx),
-            run_dialog = if ctx.run_available {
-                render_run_confirm_dialog(model)
+            run_dialog = if ctx.core_available {
+                render_run_form_dialog(model, ctx)
             } else {
                 String::new()
             },
@@ -1346,32 +1415,48 @@ fn render_run_chips(html: &mut String, model: &PresentationModel, statement_span
     );
 }
 
-fn render_run_confirm_dialog(model: &PresentationModel) -> String {
-    let function = model
-        .semantic
-        .as_ref()
-        .and_then(|semantic| {
-            semantic
-                .functions
-                .iter()
-                .find(|function| function.local_name == "main")
-        })
-        .map(|function| function.local_name.clone())
-        .unwrap_or_else(|| "main".to_string());
+fn function_params_json(function: &crate::protocol::analysis_v2::SemanticFunction) -> String {
+    serde_json::json!(function
+        .signature
+        .params
+        .iter()
+        .map(|param| serde_json::json!({
+            "name": param.name,
+            "type": param.ty,
+            "required": param.required,
+            "default": param.default,
+        }))
+        .collect::<Vec<_>>())
+    .to_string()
+}
+
+fn render_run_form_dialog(model: &PresentationModel, ctx: &RenderContext) -> String {
+    let path = &model.document.identity.relative_path;
     format!(
-        r##"<dialog class="mq-dialog" id="mq-dialog-run-confirm" aria-labelledby="mq-run-confirm-title" data-path="{path}">
-  <div class="mq-dialog-head"><h2 id="mq-run-confirm-title">确认运行本文档</h2><button type="button" class="mq-icon-btn mq-close" data-action="close-dialog" aria-label="取消运行">×</button></div>
-  <p>即将通过冻结核心执行入口函数 <code>{function}</code>，沙箱模式 <code>pure</code>（无文件、网络、环境变量、进程权限）。</p>
-  <p>等价命令：<code>marqdo run {path} --mode pure --json --trace-file &lt;临时文件&gt;</code></p>
-  <p>运行会在你的机器上真实执行文档中的 <code>@exec</code> 代码。Trace v2 不记录参数实际值、文件内容或敏感数据；View 不继承项目声明的 capabilities。</p>
-  <p class="mq-colophon">打开、刷新、搜索、导出都不会触发运行；只有本确认按钮会。</p>
+        r##"<dialog class="mq-dialog mq-run-dialog" id="mq-dialog-run" aria-labelledby="mq-run-dialog-title" data-path="{path}" data-timeout="{timeout}">
+  <div class="mq-dialog-head"><h2 id="mq-run-dialog-title">显式运行</h2><button type="button" class="mq-icon-btn mq-close" data-action="close-dialog" aria-label="取消运行">×</button></div>
+  <p class="mq-run-target"><span id="mq-run-target-label">入口 main</span> · <span id="mq-run-target-mode">pure</span></p>
+  <div id="mq-run-params" class="mq-run-params"></div>
+  <fieldset class="mq-run-mode">
+    <legend>执行模式</legend>
+    <label><input type="radio" name="mq-mode" value="pure" checked/> pure（默认：无文件/网络/环境/进程权限）</label>
+    <label><input type="radio" name="mq-mode" value="project"/> project（受控项目权限，需逐项确认）</label>
+  </fieldset>
+  <div id="mq-run-grants" class="mq-run-grants" hidden>
+    <p class="mq-run-warning" role="note">project 模式不是 OS 沙箱。只允许相对项目根的 fs read/write glob；网络、进程、环境、插件等权限不在首版 UI 中，必须改用终端 CLI。</p>
+    <label>允许读取（read glob，每行一个）<textarea id="mq-grant-read" rows="2" spellcheck="false" placeholder="data/**"></textarea></label>
+    <label>允许写入（write glob，每行一个）<textarea id="mq-grant-write" rows="2" spellcheck="false" placeholder="out/*.txt"></textarea></label>
+  </div>
+  <p class="mq-colophon">等价命令（点击“确认执行”后才会运行；<code>&lt;参数值&gt;</code> 由下方输入原样作为常量表达式提交）：</p>
+  <pre class="mq-run-command" id="mq-run-command" aria-label="命令预览"></pre>
+  <p class="mq-colophon">墙钟上限 {timeout} 秒；结果通过 SSE 推送，不轮询。打开/刷新/导出不会执行。</p>
   <div class="mq-dialog-actions">
     <button type="button" class="mq-secondary" data-action="close-dialog">取消</button>
-    <button type="button" class="mq-primary" data-action="run-confirm">确认运行（pure）</button>
+    <button type="button" class="mq-primary" data-action="run-confirm">确认执行</button>
   </div>
 </dialog>
 "##,
-        function = escape_text(&function),
-        path = escape_text(&model.document.identity.relative_path)
+        path = escape_attr(path),
+        timeout = ctx.run_timeout_secs
     )
 }

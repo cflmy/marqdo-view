@@ -85,7 +85,7 @@ for _ in $(seq 1 100); do
   [[ -n "$browse_url" ]] && break
   sleep 0.1
 done
-if [[ -n "$browse_url" ]] && curl -sf "${browse_url}api/health" | grep -q '"ok": true'; then
+if [[ -n "$browse_url" ]] && curl -sf "${browse_url}api/documents" | grep -q '"schema": "marqdo.view-documents"'; then
   record browse PASS
 else
   record browse FAIL
@@ -108,39 +108,7 @@ for _ in $(seq 1 100); do
   sleep 0.1
 done
 if [[ -n "$run_url" ]]; then
-  if python3 - "$run_url" <<'PY'
-import json
-import re
-import sys
-import urllib.request
-
-url = sys.argv[1]
-
-def get(path):
-    with urllib.request.urlopen(url.rstrip("/") + path, timeout=30) as response:
-        return response.read().decode("utf-8")
-
-page = get("/")
-match = re.search(r'name="mq-csrf-token" content="([0-9a-f]+)"', page)
-assert match, "csrf token missing"
-token = match.group(1)
-body = json.dumps({"path": "index.mq.md", "mode": "pure", "confirm": True}).encode()
-request = urllib.request.Request(
-    url.rstrip("/") + "/api/run",
-    data=body,
-    headers={"Content-Type": "application/json", "X-MQ-CSRF": token},
-    method="POST",
-)
-with urllib.request.urlopen(request, timeout=120) as response:
-    result = json.loads(response.read().decode("utf-8"))
-assert result["ok"] is True, result
-assert result["state"] == "succeeded", result
-run_page = get(result["redirect"])
-assert 'id="mq-run-panel"' in run_page, "run panel missing"
-assert 'data-run-state="succeeded"' in run_page, "succeeded state missing"
-assert "mq-run-chip" in run_page, "trace chips missing"
-print("explicit real run: PASS (state=%s events=%s)" % (result["state"], result["events"]))
-PY
+  if python3 "$repo_root/scripts/acceptance-run.py" "$run_url"
   then
     record real_run PASS
   else

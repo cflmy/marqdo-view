@@ -13,12 +13,10 @@ use crate::reader::model::{
 };
 use crate::reader::source::{sha256_hex, Project, SafeRelativePath};
 
-use crate::core_client::{
-    CheckOptions, CheckResponse, CoreClient, RawCheckDiagnostic, RunOptions, SandboxMode,
-};
+use crate::core_client::{CheckOptions, CheckResponse, CoreClient, RawCheckDiagnostic};
 use crate::error::{ViewError, ViewResult};
 use crate::protocol::analysis_v2;
-use crate::protocol::trace_v2::{self, TraceVerificationInput};
+use crate::protocol::trace_v2;
 use crate::reader::model::{anchor_for_span, PRESENTATION_VERSION};
 
 /// Input to the one builder. `analysis` is already protocol/byte verified.
@@ -326,72 +324,6 @@ impl DocumentService {
             run: attached_run.as_ref(),
         }))
     }
-
-    /// Execute one document through the public Core `run` channel after the
-    /// caller has obtained explicit user confirmation and a CSRF token. Never
-    /// called from page loads or exports.
-    pub fn run_document(&self, relative: &SafeRelativePath) -> ViewResult<ExecutedRun> {
-        let client = self.core.as_ref().ok_or_else(|| ViewError::RunDenied {
-            detail: "没有可用的冻结核心（MARQDO_BIN），运行被拒绝".to_string(),
-        })?;
-        let source_bytes = self.project.read_source(relative)?;
-        let source_digest = crate::reader::source::sha256_hex(&source_bytes);
-        let source = String::from_utf8(source_bytes).map_err(|err| ViewError::Io {
-            detail: format!("{relative} is not valid UTF-8: {err}"),
-        })?;
-        let source_index = crate::reader::source::SourceIndex::new(&source);
-
-        let run = client.run(
-            &self.project,
-            relative,
-            &RunOptions {
-                mode: SandboxMode::Pure,
-                view_timeout: Some(std::time::Duration::from_secs(120)),
-                timeout_seconds: Some(90),
-                ..Default::default()
-            },
-        )?;
-        let trace_bytes = run
-            .trace_bytes
-            .clone()
-            .ok_or_else(|| ViewError::RunDenied {
-                detail: "Core 未写出 Trace v2 文件，运行结果不可绑定".to_string(),
-            })?;
-
-        // Re-check after the run so the digest binds to the exact Analysis of
-        // the source that was executed and is still current.
-        let response = client.check(&self.project, relative, &CheckOptions::default())?;
-        let check = response.analysis.ok_or_else(|| ViewError::AnalysisFailed {
-            detail: "运行后的静态检查失败，无法绑定 Trace".to_string(),
-        })?;
-        let verified = analysis_v2::verify_analysis(
-            &check.analysis_bytes,
-            &source,
-            &source_index,
-            relative.as_str(),
-        )?;
-        let verified_run = trace_v2::verify_trace(TraceVerificationInput {
-            trace_bytes: &trace_bytes,
-            analysis_bytes: &check.analysis_bytes,
-            semantic: &verified.projection,
-            modules: &verified.projection.modules,
-            source: &source,
-            source_index: &source_index,
-            run_json: &run.json,
-            exit_code: run.exit_code,
-        })?;
-        Ok(ExecutedRun {
-            verified: verified_run,
-            source_digest,
-            analysis_digest: check.analysis_digest,
-        })
-    }
-}
-
-pub struct ExecutedRun {
-    pub verified: VerifiedRun,
-    pub source_digest: String,
-    pub analysis_digest: String,
 }
 
 fn generic_core_note(err: &ViewError) -> String {

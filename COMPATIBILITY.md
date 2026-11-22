@@ -29,13 +29,13 @@ Beta 版 CLI 必须使用 prerelease 范围（`>=3.0.0-beta.1,<4.0.0`）；`>=3.
 | Analysis v2 静态语义（函数/Unit/诊断/引用/资源） | **已实现**（PR-02） |
 | 文档态 / 源码态切换 | **已实现**（PR-02） |
 | 暖纸 Reader 视觉（单一 CSS/JS） | 计划 PR-03 |
-| 用户显式触发运行 + Trace v2 事件可视化 | **已实现**（PR-04，仅 `pure` 模式，需页面内确认 + CSRF） |
-| Live 本机安全 API | **已实现**（PR-02 只读 + PR-04 run + PR-05 并发/公开错误/导出） |
+| 用户显式触发运行 + SSE + Trace v2 事件可视化 | **已实现**（0002 PR-04；`pure`/受控 `project`，显式确认 + 会话 CSRF） |
+| Live 本机安全 API（7 路由） | **已实现**（0002 PR-04；Cookie/CSRF/Origin/CSP/单任务/SSE） |
 | 静态离线导出（纯只读） | **已实现**（PR-05，同一渲染器） |
 | 逐语句变量值 / 参数实际值 / 内存快照 | **UNSUPPORTED**（Trace v2 不提供，绝不伪造） |
 | 知识“已证明”状态 | **UNSUPPORTED**（需要独立 Prove 协议与证书） |
-| `project`/`strict` 运行与 grants 授权 | **未实现**（首版仅 `pure`；0002 的受控 project grants 在 PR-03/04） |
-| SSE 状态推送 / 取消运行 / 事件重放 | **未实现**（RFC-VIEW-0002 PR-04 阻塞项；当前运行后整页重载） |
+| `project` 运行与 fs grants | **已实现（受控）**：仅相对项目根 read/write glob，显式二次确认；其它权限拒绝 |
+| SSE 状态推送 / 取消运行 / 事件重放 | **已实现**（逐帧 flush、心跳、Last-Event-ID、2 连接上限、无轮询） |
 | SVG 曲线侧注 | **未实现**（运行事件用内联 keyed chip，U-04 PARTIAL） |
 | 调试器/断点/单步 | **不实现**（首版非目标） |
 | Knowledge/Prove/Lint 引擎 | **不实现**（独立仓库/未来可选信息层） |

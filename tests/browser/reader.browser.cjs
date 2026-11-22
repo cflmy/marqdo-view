@@ -166,15 +166,28 @@ function localHostOnly(url) {
     check("GFM table rendered", (await page.locator(".mq-document table").count()) >= 1);
   }
 
+  // Simple theme switch (RFC §1.2 MVP SMALL) persists and stays readable.
+  await page.click('.mq-dock-btn[data-action="settings"]');
+  await page.click('#mq-dialog-settings [data-action="theme"]');
+  check("dark theme applied", (await page.getAttribute("body", "data-theme")) === "dark");
+  await page.reload({ waitUntil: "networkidle" });
+  check(
+    "theme preference persisted",
+    (await page.getAttribute("body", "data-theme")) === "dark"
+  );
+  await page.click('.mq-dock-btn[data-action="settings"]');
+  await page.click('#mq-dialog-settings [data-action="theme"]');
+  check("paper theme restored", (await page.getAttribute("body", "data-theme")) === "light");
+
   // Responsive geometry: no horizontal overflow; dock inside viewport.
+  // RFC-VIEW-0002 §9.3 visual matrix: the source reference is 2048x1133.
   const widths = [
-    [390, 844],
-    [600, 800],
-    [900, 768],
-    [1280, 800],
+    [2048, 1133],
     [1664, 920],
-    [1920, 1080],
-    [2560, 1440],
+    [1440, 900],
+    [1024, 768],
+    [768, 1024],
+    [390, 844],
   ];
   for (const [width, height] of widths) {
     await page.setViewportSize({ width, height });
@@ -206,7 +219,11 @@ function localHostOnly(url) {
   await nojsPage.goto(base, { waitUntil: "load" });
   const nojsText = await nojsPage.locator(".mq-document").innerText();
   check("no-JS document remains readable", nojsText.trim().length > 20);
-  check("no-JS has no fake run panel", (await nojsPage.locator("#mq-run-panel").count()) === 0);
+  check(
+    "no-JS exposes no active run UI",
+    !(await nojsPage.locator("#mq-run-panel").isVisible()) &&
+      (await nojsPage.locator('.mq-dock-btn[data-action="run"]').count()) === 1
+  );
   await nojs.close();
 
   // Print hides chrome but keeps prose.
@@ -219,31 +236,44 @@ function localHostOnly(url) {
 
   // Explicit run flow, only against the control-flow example.
   if (projectName === "control-flow") {
+    const runRequests = [];
+    page.on("request", (request) => {
+      if (request.url().includes("/api/runs")) runRequests.push(request.url());
+    });
     await page.click('.mq-dock-btn[data-action="run"]');
-    check("run confirm dialog opens", await page.locator("#mq-dialog-run-confirm").isVisible());
-    const dialogText = await page.locator("#mq-dialog-run-confirm").innerText();
-    check("confirm mentions pure mode", dialogText.includes("pure"));
+    check("run dialog opens", await page.locator("#mq-dialog-run").isVisible());
+    const dialogText = await page.locator("#mq-dialog-run").innerText();
+    check("run dialog mentions pure mode", dialogText.includes("pure"));
+    check(
+      "run dialog previews the command",
+      (await page.locator("#mq-run-command").innerText()).includes("marqdo run")
+    );
     await page.click('[data-action="run-confirm"]');
-    await page.waitForURL(/run=/, { timeout: 30000 });
-    await page.waitForLoadState("networkidle");
-    check("run state succeeded", (await page.getAttribute("body", "data-run-state")) === "succeeded");
-    check("run panel rendered", await page.locator("#mq-run-panel").isVisible());
+    await page.waitForSelector('body[data-run-state="succeeded"]', { timeout: 30000 });
+    // SSE delivered the terminal state without a page reload.
+    check("run state succeeded via SSE", (await page.getAttribute("body", "data-run-state")) === "succeeded");
+    check("run panel visible", await page.locator("#mq-run-panel").isVisible());
     check("run chips anchored", (await page.locator(".mq-run-chip").count()) > 0);
     check(
       "trace event list rendered",
-      (await page.locator(".mq-run-events li").count()) > 0
+      (await page.locator("#mq-run-events li").count()) > 0
     );
     check(
       "stdout rendered escaped",
-      (await page.locator(".mq-stdout").first().innerText()).includes("0")
+      (await page.locator("#mq-run-stdout").innerText()).includes("0")
+    );
+    check(
+      "no polling API was used",
+      runRequests.every((url) => !url.includes("status")),
+      runRequests.join(", ")
     );
     if (screenshotDir) {
       await page.screenshot({ path: path.join(screenshotDir, "control-flow-run.png") });
     }
-    // Clear run removes the display and the URL marker.
-    await page.click('[data-action="clear-run"]');
-    await page.waitForURL((url) => !url.searchParams.has("run"), { timeout: 15000 });
-    check("clear run removes panel", (await page.locator("#mq-run-panel").count()) === 0);
+    // Clear run hides the display and keeps the project untouched.
+    await page.click('.mq-dock-btn[data-action="clear"]');
+    check("clear hides run panel", !(await page.locator("#mq-run-panel").isVisible()));
+    check("page was never reloaded by the run", (await page.title()).includes("Marqdo"));
   }
 
   await browser.close();
