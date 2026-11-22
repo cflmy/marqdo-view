@@ -1,0 +1,36 @@
+# marqdo-view 现状（STATUS）
+
+> 唯一现状来源。其他文档描述设计；本文件只记录**实际完成、证据与限制**。
+> 最后更新：2026-11-22（PR-00 完成）
+
+## 版本与基线
+
+| 项 | 值 |
+|---|---|
+| View 版本 | `0.1.0`（开发中） |
+| 目标 CLI 产品范围 | `>=3.0.0-beta.1,<4.0.0` |
+| 冻结 CLI 二进制 | `/root/work/marqdo-cli/dist/marqdo-3.0.0-beta.1-x86_64-unknown-linux-gnu/marqdo` |
+| 冻结 CLI SHA-256 | `062cb56e226bee55c21d238e195920caa985e62bb3877ba7b07abcc04dc0fe3f` |
+| CLI 源码 SHA | `2c7c4f31e7a388d3fcfa717a77067e696ed13854`（tag `v3.0.0-beta.1`） |
+| 协议 | Tool v1 / Analysis v2 / Trace v2 / markdown profile `marqdo.md.v1` |
+| 目标平台 | Linux x86_64 glibc（正式）；其他平台未验证 |
+| 视觉基准 | `docs/design/reference-old-view-reader.png`（1664×920） |
+
+## 分阶段进度
+
+| 阶段 | 状态 | 证据 |
+|---|---|---|
+| PR-00 基线与旧 View 取证 | **完成** | `docs/audits/legacy-render-paths.md`、`docs/design/visual-tokens.md`、`docs/design/state-matrix.md`、ADR-0001/0002 |
+| PR-01 Tool v1 安装闭环 | 未开始 | — |
+| PR-02 DocumentModel + Analysis v2 浏览 | 未开始 | — |
+| PR-03 Reader 视觉重建 | 未开始 | — |
+| PR-04 Trace v2 运行可视化 | 未开始 | — |
+| PR-05 Live 安全 + 静态导出 | 未开始 | — |
+| PR-06 冻结 CLI 端到端验收 | 未开始 | — |
+
+## 证据与限制
+
+- 旧 View 运行时状态：`LEGACY_RUNTIME_UNVERIFIED`（旧仓库无预编译产物，且任务禁止修改/编译旧仓库；只做只读静态审计）。
+- 本仓库尚未包含可运行实现；在 PR-01 之前 `marqdo view` 不存在。
+- 已核对旧视觉资产许可（旧仓库 Apache-2.0）：logo/blossom/feather 可复用，KaTeX 不引入。
+- 已知非目标：变量运行值、内存快照、调试器、Prove/Knowledge/Lint 引擎（均标 `UNSUPPORTED`）。

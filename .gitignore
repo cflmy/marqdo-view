@@ -1,0 +1,7 @@
+/target/
+/dist/
+/tests/.cache/
+/tests/browser/node_modules/
+/tests/browser/artifacts/
+*.swp
+.DS_Store
