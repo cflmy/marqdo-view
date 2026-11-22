@@ -137,7 +137,15 @@ fn explicit_run_streams_sse_accepted_running_and_terminal_with_verified_trace() 
         .unwrap()
         .contains("text/event-stream"));
     assert!(reader.header("Cache-Control").unwrap().contains("no-store"));
+    assert_eq!(
+        reader.header("Transfer-Encoding").as_deref(),
+        Some("chunked")
+    );
     let frames = collect_until_terminal(&mut reader);
+    assert!(
+        reader.next_frame().is_none(),
+        "terminal frame completes the HTTP response"
+    );
     assert!(!frames.is_empty());
     let mut ids = frames
         .iter()

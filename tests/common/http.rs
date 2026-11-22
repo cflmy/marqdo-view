@@ -222,7 +222,6 @@ pub struct SseFrame {
 
 pub struct SseReader {
     reader: BufReader<TcpStream>,
-    pending: String,
     pub headers: String,
     pub status: u16,
 }
@@ -253,7 +252,6 @@ impl SseReader {
             .unwrap_or(0);
         SseReader {
             reader,
-            pending: String::new(),
             headers: head,
             status,
         }
@@ -270,44 +268,44 @@ impl SseReader {
         })
     }
 
-    /// Next frame/heartbeat; `None` on stream end or read failure.
+    /// Next frame/heartbeat. None requires a complete HTTP end-of-body marker.
     pub fn next_frame(&mut self) -> Option<SseFrame> {
-        loop {
-            let mut line = String::new();
-            match self.reader.read_line(&mut line) {
-                Ok(0) => return None,
-                Ok(_) => {}
-                Err(_) => return None,
-            }
-            let trimmed = line.trim_end_matches(['\r', '\n']);
-            if trimmed.is_empty() {
-                if self.pending.is_empty() {
-                    continue;
-                }
-                let frame = std::mem::take(&mut self.pending);
-                let mut event = "message".to_string();
-                let mut id = None;
-                let mut data_lines: Vec<String> = Vec::new();
-                for line in frame.lines() {
-                    if let Some(value) = line.strip_prefix("event: ") {
-                        event = value.trim().to_string();
-                    } else if let Some(value) = line.strip_prefix("id: ") {
-                        id = value.trim().parse::<u64>().ok();
-                    } else if let Some(value) = line.strip_prefix("data: ") {
-                        data_lines.push(value.to_string());
-                    } else if line.starts_with(':') {
-                        event = "heartbeat".to_string();
-                    }
-                }
-                let data = if data_lines.is_empty() {
-                    None
-                } else {
-                    serde_json::from_str(&data_lines.join("\n")).ok()
-                };
-                return Some(SseFrame { event, id, data });
-            }
-            self.pending.push_str(&line);
+        let mut size = String::new();
+        self.reader
+            .read_line(&mut size)
+            .expect("read SSE chunk length");
+        let size = usize::from_str_radix(size.trim(), 16).expect("hex SSE chunk length");
+        let mut bytes = vec![0; size];
+        self.reader.read_exact(&mut bytes).expect("read SSE chunk");
+        let mut crlf = [0; 2];
+        self.reader
+            .read_exact(&mut crlf)
+            .expect("read SSE chunk delimiter");
+        assert_eq!(&crlf, b"\r\n");
+        if size == 0 {
+            return None;
         }
+        let frame = String::from_utf8(bytes).expect("UTF-8 SSE frame");
+        let mut event = "message".to_string();
+        let mut id = None;
+        let mut data_lines = Vec::new();
+        for line in frame.lines() {
+            if let Some(value) = line.strip_prefix("event: ") {
+                event = value.trim().to_string();
+            } else if let Some(value) = line.strip_prefix("id: ") {
+                id = value.trim().parse::<u64>().ok();
+            } else if let Some(value) = line.strip_prefix("data: ") {
+                data_lines.push(value.to_string());
+            } else if line.starts_with(':') {
+                event = "heartbeat".to_string();
+            }
+        }
+        let data = if data_lines.is_empty() {
+            None
+        } else {
+            serde_json::from_str(&data_lines.join("\n")).ok()
+        };
+        Some(SseFrame { event, id, data })
     }
 }
 

@@ -2,7 +2,9 @@
 //!
 //! We write the HTTP response directly to the socket (via tiny_http's writer)
 //! instead of going through its buffered chunked writer: SSE requires each
-//! frame and heartbeat to be flushed immediately, not when a buffer fills.
+//! frame and heartbeat to be flushed immediately. Write an HTTP chunk per
+//! frame and end the HTTP message at the terminal event, independently of
+//! the underlying keep-alive connection.
 //! This module only transports already-sequenced events; it never queries the
 //! Core, starts work or implements a polling loop (RFC-VIEW-0002 §6.4/§6.5).
 
@@ -30,10 +32,6 @@ pub fn heartbeat_interval() -> Duration {
 /// it. Each frame is flushed immediately; the stream closes after the single
 /// terminal event so the browser never re-runs anything.
 pub fn respond(request: Request, subscription: SseSubscription) -> ViewResult<()> {
-    let run_id = subscription.run_id.clone();
-    let replay = subscription.replay.clone();
-    let terminal = subscription.terminal;
-    let receiver = subscription.receiver;
     let mut writer = request.into_writer();
 
     let head = concat!(
@@ -43,20 +41,23 @@ pub fn respond(request: Request, subscription: SseSubscription) -> ViewResult<()
         "X-Accel-Buffering: no\r\n",
         "X-Content-Type-Options: nosniff\r\n",
         "Referrer-Policy: no-referrer\r\n",
-        "Connection: close\r\n",
+        "Transfer-Encoding: chunked\r\n",
         "\r\n"
     );
-    if write_frame(&mut writer, head.as_bytes()).is_err() {
+    if writer
+        .write_all(head.as_bytes())
+        .and_then(|_| writer.flush())
+        .is_err()
+    {
         return Ok(());
     }
-    for frame in &replay {
-        if write_frame(&mut writer, frame.as_bytes()).is_err() {
+    for frame in subscription.replay {
+        if write_chunk(&mut writer, frame.as_bytes()).is_err() {
             return Ok(());
         }
     }
-    let _ = run_id;
-    if terminal {
-        let _ = writer.flush();
+    if subscription.terminal {
+        let _ = finish_stream(&mut writer);
         return Ok(());
     }
 
@@ -65,31 +66,31 @@ pub fn respond(request: Request, subscription: SseSubscription) -> ViewResult<()
     loop {
         let now = Instant::now();
         let timeout = next_heartbeat.saturating_duration_since(now);
-        match receiver.recv_timeout(timeout) {
+        match subscription.receiver.recv_timeout(timeout) {
             Ok(event) => {
                 let is_terminal = event.state.is_terminal();
                 let frame = event.to_sse(&subscription.run_id);
-                if write_frame(&mut writer, frame.as_bytes()).is_err() {
+                if write_chunk(&mut writer, frame.as_bytes()).is_err() {
                     return Ok(());
                 }
                 if is_terminal {
-                    let _ = writer.flush();
+                    let _ = finish_stream(&mut writer);
                     return Ok(());
                 }
             }
             Err(RecvTimeoutError::Timeout) => {
-                if write_frame(&mut writer, HEARTBEAT_FRAME.as_bytes()).is_err() {
+                if write_chunk(&mut writer, HEARTBEAT_FRAME.as_bytes()).is_err() {
                     return Ok(());
                 }
                 next_heartbeat = Instant::now() + heartbeat;
             }
             Err(RecvTimeoutError::Disconnected) => {
-                let _ = writer.flush();
+                let _ = finish_stream(&mut writer);
                 return Ok(());
             }
         }
         if Instant::now() >= next_heartbeat {
-            if write_frame(&mut writer, HEARTBEAT_FRAME.as_bytes()).is_err() {
+            if write_chunk(&mut writer, HEARTBEAT_FRAME.as_bytes()).is_err() {
                 return Ok(());
             }
             next_heartbeat = Instant::now() + heartbeat;
@@ -97,8 +98,15 @@ pub fn respond(request: Request, subscription: SseSubscription) -> ViewResult<()
     }
 }
 
-fn write_frame(writer: &mut Box<dyn Write + Send + 'static>, frame: &[u8]) -> std::io::Result<()> {
+fn write_chunk(writer: &mut dyn Write, frame: &[u8]) -> std::io::Result<()> {
+    write!(writer, "{:x}\r\n", frame.len())?;
     writer.write_all(frame)?;
+    writer.write_all(b"\r\n")?;
+    writer.flush()
+}
+
+fn finish_stream(writer: &mut dyn Write) -> std::io::Result<()> {
+    writer.write_all(b"0\r\n\r\n")?;
     writer.flush()
 }
 

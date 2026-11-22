@@ -84,3 +84,10 @@ event: ... / id: N / data: {...}
 仅选择“直接写 socket”作为传输细节——属于 RFC 允许的实现自由，不改变协议。
 测试覆盖：HTTP/SSE 集成、真实 Chromium EventSource、跨会话/跨站拒绝、取消唯一
 终态、心跳、2 连接上限与 Last-Event-ID 重放（见 `docs/evidence/PR-04/`）。
+
+## Issue #2 验收补充
+
+每个 SSE 事件和心跳各占一个 HTTP/1.1 chunk，写完立即 flush。
+实时订阅和终态重放完成后都写入零长度 chunk，结束 HTTP 响应。
+底层连接可以继续承载其他请求。事件 ID、重放和任务生命周期沿用
+View Run Events v1。本地 HTTP 回归测试明确读取终态与结束标记。
