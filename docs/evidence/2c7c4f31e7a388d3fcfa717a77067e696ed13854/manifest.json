@@ -1,0 +1,43 @@
+{
+  "analysis_protocol": 2,
+  "archive_sha256": "b482d26c7098178de520aad14d5ac9b7160265eaf9c98666b3e9785a3ddbeafc",
+  "cli_binary_sha256_after": "062cb56e226bee55c21d238e195920caa985e62bb3877ba7b07abcc04dc0fe3f",
+  "cli_binary_sha256_before": "062cb56e226bee55c21d238e195920caa985e62bb3877ba7b07abcc04dc0fe3f",
+  "cli_source_sha": "2c7c4f31e7a388d3fcfa717a77067e696ed13854",
+  "commands": {
+    "notes": "Generated from real command exit statuses; install/verify/export/run use the frozen CLI archive copied to an isolated tool home.",
+    "script": "tools/acceptance.sh"
+  },
+  "gates": {
+    "archive_install": "PASS",
+    "browse": "PASS",
+    "browser": "PASS",
+    "build": "PASS",
+    "bundle": "PASS",
+    "clippy": "PASS",
+    "core_sha": "PASS",
+    "export": "PASS",
+    "export_suite": "PASS",
+    "fmt": "PASS",
+    "real_run": "PASS",
+    "security_suite": "PASS",
+    "test": "PASS",
+    "tool_list": "PASS",
+    "verify": "PASS",
+    "view_help": "PASS"
+  },
+  "generated_at_utc": "2026-11-22T04:07:21.776009+00:00",
+  "schema": "marqdo.view-conformance",
+  "schema_version": 1,
+  "target": "x86_64-unknown-linux-gnu",
+  "tests": {
+    "browser": "PASS",
+    "contract": "PASS",
+    "export": "PASS",
+    "security": "PASS"
+  },
+  "tool_protocol": 1,
+  "trace_protocol": 2,
+  "view_binary_sha256": "97772ffefeb8df1f3dfbfe04c5112517ba3657497df4717ab85c6b026daf6bba",
+  "view_source_sha": "d641ca58ac77c69a15a98c8a1233ae6dbd83017f"
+}
