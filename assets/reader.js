@@ -288,11 +288,20 @@
         openDialog("mq-dialog-about");
         break;
       case "run":
-        // Until the explicit-run flow is implemented, never pretend to run.
-        showUnsupported(
-          "运行文档",
-          "首版运行入口需要显式的风险评估与 CSRF 会话确认；在实现前该按钮不会执行任何文档。"
-        );
+        if (reader.dataset.runAvailable === "true") {
+          openDialog("mq-dialog-run-confirm");
+        } else {
+          showUnsupported(
+            "运行文档",
+            "当前页面没有可用的冻结核心或可执行入口；View 不会在缺少确认的情况下执行任何文档。"
+          );
+        }
+        break;
+      case "run-confirm":
+        confirmRun();
+        break;
+      case "clear-run":
+        clearRun();
         break;
       case "clear":
         var panel = $("#mq-run-panel");
@@ -302,6 +311,93 @@
       default:
         break;
     }
+  }
+
+  function csrfToken() {
+    var meta = document.querySelector('meta[name="mq-csrf-token"]');
+    return meta ? meta.getAttribute("content") : "";
+  }
+
+  function setRunBusy(busy) {
+    var button = document.querySelector('.mq-dock-btn[data-action="run"]');
+    if (!button) return;
+    if (busy) {
+      button.setAttribute("aria-busy", "true");
+      button.dataset.busy = "true";
+      button.disabled = true;
+      reader.dataset.runState = "running";
+    } else {
+      button.removeAttribute("aria-busy");
+      delete button.dataset.busy;
+      button.disabled = false;
+    }
+  }
+
+  function confirmRun() {
+    var dialog = $("#mq-dialog-run-confirm");
+    var path = dialog ? dialog.dataset.path : "";
+    var token = csrfToken();
+    if (!path || !token) {
+      toast("缺少运行上下文或 CSRF 令牌，已拒绝运行");
+      return;
+    }
+    setRunBusy(true);
+    fetch("/api/run", {
+      method: "POST",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "X-MQ-CSRF": token
+      },
+      body: JSON.stringify({ path: path, mode: "pure", confirm: true })
+    })
+      .then(function (response) {
+        return response.json().then(function (data) {
+          return { ok: response.ok, data: data };
+        });
+      })
+      .then(function (result) {
+        if (!result.ok || !result.data || !result.data.ok) {
+          setRunBusy(false);
+          var reason = result.data && result.data.message
+            ? result.data.message
+            : "运行被拒绝或失败";
+          toast("运行未完成：" + reason);
+          return;
+        }
+        try {
+          window.sessionStorage.setItem(
+            "marqdo.view.scroll",
+            String(window.scrollY || 0)
+          );
+        } catch (error) {
+          /* storage is optional */
+        }
+        window.location.assign(result.data.redirect);
+      })
+      .catch(function (error) {
+        setRunBusy(false);
+        toast("运行请求失败：" + error.message);
+      });
+  }
+
+  function clearRun() {
+    closeAllDialogs();
+    try {
+      var url = new URL(window.location.href);
+      if (url.searchParams.has("run")) {
+        url.searchParams.delete("run");
+        window.location.assign(url.toString());
+        return;
+      }
+    } catch (error) {
+      /* fall through */
+    }
+    var panel = $("#mq-run-panel");
+    if (panel) panel.hidden = true;
+    toast("已清理本地展示状态（源文件与缓存未修改）");
   }
 
   document.addEventListener("click", function (event) {
@@ -368,6 +464,22 @@
     }
   } catch (error) {
     setMode("document");
+  }
+
+  // Restore reading position after a run reload, without faking any result.
+  try {
+    var scroll = window.sessionStorage.getItem("marqdo.view.scroll");
+    if (scroll && new URLSearchParams(window.location.search).has("run")) {
+      window.sessionStorage.removeItem("marqdo.view.scroll");
+      var target = parseInt(scroll, 10);
+      if (!isNaN(target)) {
+        window.requestAnimationFrame(function () {
+          window.scrollTo(0, target);
+        });
+      }
+    }
+  } catch (error) {
+    /* storage is optional */
   }
 
   // Keep dock buttons visible above the last line on small screens.

@@ -1,0 +1,83 @@
+{
+  "events": [
+    {
+      "detail": null,
+      "function_id": "root:control-flow@0.1.0::index.mq.md::演示.main",
+      "kind": "call.enter",
+      "module_id": "root:control-flow@0.1.0::index.mq.md",
+      "seq": 0,
+      "span": null
+    },
+    {
+      "detail": "continue",
+      "function_id": "root:control-flow@0.1.0::index.mq.md::演示.main",
+      "kind": "loop.iteration",
+      "module_id": "root:control-flow@0.1.0::index.mq.md",
+      "seq": 1,
+      "span": {
+        "end": 197,
+        "start": 182
+      }
+    },
+    {
+      "detail": "false",
+      "function_id": "root:control-flow@0.1.0::index.mq.md::演示.main",
+      "kind": "branch.eval",
+      "module_id": "root:control-flow@0.1.0::index.mq.md",
+      "seq": 2,
+      "span": {
+        "end": 211,
+        "start": 199
+      }
+    },
+    {
+      "detail": "true",
+      "function_id": "root:control-flow@0.1.0::index.mq.md::演示.main",
+      "kind": "branch.eval",
+      "module_id": "root:control-flow@0.1.0::index.mq.md",
+      "seq": 3,
+      "span": {
+        "end": 211,
+        "start": 199
+      }
+    },
+    {
+      "detail": null,
+      "function_id": "std:marqdo-stdlib@0.1.0#5407d3665ba2fe105820d0f1af5efaafa10c277a69eb819c3225719813c8c713::io.mq.md::io.写值",
+      "kind": "call.enter",
+      "module_id": "root:control-flow@0.1.0::index.mq.md",
+      "seq": 4,
+      "span": {
+        "end": 247,
+        "start": 239
+      }
+    },
+    {
+      "detail": "event_budget",
+      "kind": "trace.truncated",
+      "module_id": null,
+      "seq": 5,
+      "span": null
+    }
+  ],
+  "limits": {
+    "max_bytes": 33554432,
+    "max_events": 5
+  },
+  "run": {
+    "entry": "root:control-flow@0.1.0::index.mq.md::main",
+    "id": "6-1795317753027990146",
+    "status": "ok"
+  },
+  "schema": "marqdo.trace",
+  "schema_version": 2,
+  "source": {
+    "analysis_digest": "sha256:e2aca5a1a0c9fa073a21b5af7deb8ef493ac981b97c788b721347c24c94f48ab",
+    "root_id": "root:control-flow@0.1.0"
+  },
+  "truncated": {
+    "limit": 5,
+    "reason": "event_budget",
+    "written": 5
+  }
+}

@@ -1,0 +1,112 @@
+{
+  "command": "run",
+  "diagnostics": [],
+  "stderr": "",
+  "stdout": "0\n0\n2\n",
+  "success": true,
+  "trace": [
+    {
+      "duration_micros": 17,
+      "module": "std:marqdo-stdlib@0.1.0#5407d3665ba2fe105820d0f1af5efaafa10c277a69eb819c3225719813c8c713::io/stream.mq.md",
+      "op": "resource.open",
+      "result": "ok",
+      "seq": 66,
+      "span": {
+        "end": 1581,
+        "start": 1538
+      }
+    },
+    {
+      "duration_micros": 2,
+      "module": "std:marqdo-stdlib@0.1.0#5407d3665ba2fe105820d0f1af5efaafa10c277a69eb819c3225719813c8c713::io/stream.mq.md",
+      "op": "resource.write",
+      "result": "kind=stdio count=2",
+      "seq": 70,
+      "span": {
+        "end": 730,
+        "start": 678
+      }
+    },
+    {
+      "duration_micros": 1,
+      "module": "std:marqdo-stdlib@0.1.0#5407d3665ba2fe105820d0f1af5efaafa10c277a69eb819c3225719813c8c713::io/stream.mq.md",
+      "op": "resource.close",
+      "result": "flushed_bytes=0",
+      "seq": 85,
+      "span": {
+        "end": 1666,
+        "start": 1647
+      }
+    },
+    {
+      "duration_micros": 2,
+      "module": "std:marqdo-stdlib@0.1.0#5407d3665ba2fe105820d0f1af5efaafa10c277a69eb819c3225719813c8c713::io/stream.mq.md",
+      "op": "resource.open",
+      "result": "ok",
+      "seq": 160,
+      "span": {
+        "end": 1581,
+        "start": 1538
+      }
+    },
+    {
+      "duration_micros": 0,
+      "module": "std:marqdo-stdlib@0.1.0#5407d3665ba2fe105820d0f1af5efaafa10c277a69eb819c3225719813c8c713::io/stream.mq.md",
+      "op": "resource.write",
+      "result": "kind=stdio count=2",
+      "seq": 164,
+      "span": {
+        "end": 730,
+        "start": 678
+      }
+    },
+    {
+      "duration_micros": 0,
+      "module": "std:marqdo-stdlib@0.1.0#5407d3665ba2fe105820d0f1af5efaafa10c277a69eb819c3225719813c8c713::io/stream.mq.md",
+      "op": "resource.close",
+      "result": "flushed_bytes=0",
+      "seq": 179,
+      "span": {
+        "end": 1666,
+        "start": 1647
+      }
+    },
+    {
+      "duration_micros": 0,
+      "module": "std:marqdo-stdlib@0.1.0#5407d3665ba2fe105820d0f1af5efaafa10c277a69eb819c3225719813c8c713::io/stream.mq.md",
+      "op": "resource.open",
+      "result": "ok",
+      "seq": 253,
+      "span": {
+        "end": 1581,
+        "start": 1538
+      }
+    },
+    {
+      "duration_micros": 0,
+      "module": "std:marqdo-stdlib@0.1.0#5407d3665ba2fe105820d0f1af5efaafa10c277a69eb819c3225719813c8c713::io/stream.mq.md",
+      "op": "resource.write",
+      "result": "kind=stdio count=2",
+      "seq": 257,
+      "span": {
+        "end": 730,
+        "start": 678
+      }
+    },
+    {
+      "duration_micros": 0,
+      "module": "std:marqdo-stdlib@0.1.0#5407d3665ba2fe105820d0f1af5efaafa10c277a69eb819c3225719813c8c713::io/stream.mq.md",
+      "op": "resource.close",
+      "result": "flushed_bytes=0",
+      "seq": 272,
+      "span": {
+        "end": 1666,
+        "start": 1647
+      }
+    }
+  ],
+  "value": {
+    "decimal": "3",
+    "type": "int"
+  }
+}

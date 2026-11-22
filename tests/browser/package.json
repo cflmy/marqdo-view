@@ -1,0 +1,12 @@
+{
+  "name": "marqdo-view-browser-tests",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Playwright browser acceptance tests for marqdo-view",
+  "scripts": {
+    "test": "node reader.browser.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.49.0"
+  }
+}

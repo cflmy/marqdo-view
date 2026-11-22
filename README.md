@@ -10,7 +10,7 @@ Marqdo View 是一个独立的可执行文档阅读器：以**原始 Markdown �
 
 ## 当前状态
 
-**开发中。** PR-00（基线/取证/设计基准）、PR-01（Tool Protocol v1 + verify）、PR-02（DocumentModel/Analysis v2 只读浏览 + 单一渲染器 + 本机 Live 阅读）已完成。`marqdo view [PATH]` 当前提供本机只读浏览；`export` 与显式运行入口按 PR-05/PR-04 顺序交付。任何未完成能力都在 `docs/STATUS.md` 与 CHANGELOG 明确标注，不以占位功能冒充已实现。
+**开发中。** PR-00（基线/取证/设计基准）、PR-01（Tool Protocol v1 + verify）、PR-02（DocumentModel/Analysis v2 只读浏览 + 单一渲染器 + 本机 Live 阅读）与 PR-04（显式确认后运行 + Trace v2 可视化）已完成。`marqdo view [PATH]` 提供本机只读浏览；在 Live 页面点击“运行”并确认后，才会调用冻结核心执行 `pure` 模式并展示真实 Trace；`export` 按 PR-05 交付。任何未完成能力都在 `docs/STATUS.md` 与 CHANGELOG 明确标注，不以占位功能冒充已实现。
 
 ## 架构约束（摘要）
 

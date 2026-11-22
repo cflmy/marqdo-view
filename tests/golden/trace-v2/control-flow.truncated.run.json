@@ -1,0 +1,12 @@
+{
+  "command": "run",
+  "diagnostics": [],
+  "stderr": "",
+  "stdout": "0\n0\n2\n",
+  "success": true,
+  "trace": [],
+  "value": {
+    "decimal": "3",
+    "type": "int"
+  }
+}

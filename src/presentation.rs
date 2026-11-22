@@ -7,6 +7,7 @@
 use crate::document::{DocumentIdentity, DocumentModel};
 use crate::project::{Project, SafeRelativePath, ViewConfig};
 use crate::semantic::{CoreDiagnostic, SemanticProjection, ViewWarning};
+use crate::trace::{RunDisplayState, RunProjection};
 
 /// Private View presentation-model version. Not a public protocol.
 pub const PRESENTATION_VERSION: u32 = 1;
@@ -101,6 +102,8 @@ pub struct PresentationModel {
     pub outline: Vec<OutlineEntry>,
     /// Frozen core product version used for this page, when one was consulted.
     pub core_version: Option<String>,
+    /// Present only after an explicit user-triggered run whose trace verified.
+    pub run: Option<RunProjection>,
 }
 
 #[derive(Debug, Clone)]
@@ -119,6 +122,29 @@ pub enum OutlineKind {
 }
 
 impl PresentationModel {
+    pub fn run_state(&self) -> RunDisplayState {
+        match &self.run {
+            Some(run) => run.state,
+            None => RunDisplayState::NotRun,
+        }
+    }
+
+    /// True when a run button may be offered (explicit confirmation still
+    /// required). Never true for exports or without a verified core.
+    pub fn can_offer_run(&self) -> bool {
+        self.source_status.semantics_usable()
+            && self
+                .semantic
+                .as_ref()
+                .map(|semantic| {
+                    semantic
+                        .functions
+                        .iter()
+                        .any(|function| function.local_name == "main")
+                })
+                .unwrap_or(false)
+    }
+
     pub fn functions(&self) -> impl Iterator<Item = &OutlineEntry> {
         self.outline
             .iter()
@@ -141,6 +167,7 @@ pub struct BuildInput<'a> {
     pub diagnostics: Vec<CoreDiagnostic>,
     pub navigation: Navigation,
     pub core_version: Option<String>,
+    pub run: Option<&'a crate::trace::VerifiedRun>,
 }
 
 pub fn build(input: BuildInput<'_>) -> PresentationModel {
@@ -152,6 +179,7 @@ pub fn build(input: BuildInput<'_>) -> PresentationModel {
         mut diagnostics,
         navigation,
         core_version,
+        run,
     } = input;
 
     let semantic = analysis.map(|verified| verified.projection.clone());
@@ -190,6 +218,7 @@ pub fn build(input: BuildInput<'_>) -> PresentationModel {
         navigation,
         outline,
         core_version,
+        run: run.map(|verified| verified.projection.clone()),
     }
 }
 

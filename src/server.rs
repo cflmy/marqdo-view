@@ -12,12 +12,15 @@ use crate::presentation::PresentationModel;
 use crate::project::SafeRelativePath;
 use crate::render::{ReaderRenderer, RenderContext};
 use crate::source_map::sha256_hex;
+use crate::trace::VerifiedRun;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
 
 const MAX_URL_BYTES: usize = 2048;
 const MAX_QUERY_BYTES: usize = 4096;
+const MAX_BODY_BYTES: usize = 16 * 1024;
 
 pub fn serve(ctx: AppContext, opts: &RuntimeOpts) -> ViewResult<i32> {
     let address = format!("{}:{}", opts.host, opts.port);
@@ -62,6 +65,9 @@ pub fn serve(ctx: AppContext, opts: &RuntimeOpts) -> ViewResult<i32> {
         renderer: ReaderRenderer::new(),
         cache: Mutex::new(HashMap::new()),
         allowed_hosts: allowed_hosts(port),
+        running: AtomicBool::new(false),
+        run_cache: Mutex::new(HashMap::new()),
+        run_seq: AtomicU64::new(1),
     });
 
     loop {
@@ -87,6 +93,16 @@ struct ServerState {
     renderer: ReaderRenderer,
     cache: Mutex<HashMap<String, CacheEntry>>,
     allowed_hosts: Vec<String>,
+    /// One active run per View session.
+    running: AtomicBool,
+    run_cache: Mutex<HashMap<String, CachedRun>>,
+    run_seq: AtomicU64,
+}
+
+#[derive(Clone)]
+struct CachedRun {
+    relative: String,
+    verified: VerifiedRun,
 }
 
 struct CacheEntry {
@@ -97,6 +113,28 @@ struct CacheEntry {
 impl ServerState {
     /// Load one document, reusing a cached model only while the exact source
     /// bytes are unchanged (no path-only cache identity, RFC §6.5).
+    /// Load a page and attach a cached run when the URL names one. The run is
+    /// re-bound against freshly checked Analysis inside `load_with_run`.
+    fn load_for_page(
+        &self,
+        relative: &SafeRelativePath,
+        run_id: Option<&str>,
+    ) -> ViewResult<PresentationModel> {
+        if let Some(run_id) = run_id {
+            let cached = self
+                .run_cache
+                .lock()
+                .ok()
+                .and_then(|cache| cache.get(run_id).cloned());
+            if let Some(cached) = cached {
+                if cached.relative == relative.as_str() {
+                    return self.ctx.load_with_run(relative, Some(&cached.verified));
+                }
+            }
+        }
+        self.load(relative)
+    }
+
     fn load(&self, relative: &SafeRelativePath) -> ViewResult<PresentationModel> {
         let digest = self.ctx.project().source_digest(relative)?;
         if let Ok(cache) = self.cache.lock() {
@@ -124,26 +162,8 @@ impl ServerState {
 
 fn handle(state: &ServerState, request: Request) -> ViewResult<()> {
     let method = request.method().clone();
-    if !matches!(method, Method::Get | Method::Head) {
-        return respond_text(
-            request,
-            StatusCode(405),
-            "text/plain; charset=utf-8",
-            "method not allowed\n".as_bytes().to_vec(),
-            CacheKind::NoStore,
-        );
-    }
     let is_head = method == Method::Head;
-
-    if !host_is_allowed(&request, &state.allowed_hosts) {
-        return respond_text(
-            request,
-            StatusCode(400),
-            "text/plain; charset=utf-8",
-            "invalid Host header\n".as_bytes().to_vec(),
-            CacheKind::NoStore,
-        );
-    }
+    let is_get = method == Method::Get;
 
     let raw_url = request.url().to_string();
     if raw_url.len() > MAX_URL_BYTES {
@@ -166,14 +186,48 @@ fn handle(state: &ServerState, request: Request) -> ViewResult<()> {
         );
     }
 
+    if !host_is_allowed(&request, &state.allowed_hosts) {
+        return respond_text(
+            request,
+            StatusCode(400),
+            "text/plain; charset=utf-8",
+            "invalid Host header\n".as_bytes().to_vec(),
+            CacheKind::NoStore,
+        );
+    }
+
+    if method == Method::Post {
+        return match path_part {
+            "/api/run" => handle_run_post(state, request),
+            "/api/clear-run" => handle_clear_run_post(state, request),
+            _ => respond_text(
+                request,
+                StatusCode(405),
+                "text/plain; charset=utf-8",
+                "method not allowed\n".as_bytes().to_vec(),
+                CacheKind::NoStore,
+            ),
+        };
+    }
+    if !is_get && !is_head {
+        return respond_text(
+            request,
+            StatusCode(405),
+            "text/plain; charset=utf-8",
+            "method not allowed\n".as_bytes().to_vec(),
+            CacheKind::NoStore,
+        );
+    }
+
     if let Some(hashed_name) = path_part.strip_prefix("/assets/") {
         return serve_asset(request, hashed_name, is_head);
     }
 
+    let run_id = query_param(query, "run");
     match path_part {
         "/" | "/index.html" => {
             let entry = state.ctx.project().entry().relative.clone();
-            match state.load(&entry) {
+            match state.load_for_page(&entry, run_id.as_deref()) {
                 Ok(model) => serve_page(state, request, &model, is_head),
                 Err(err) => serve_error_page(request, &err, is_head),
             }
@@ -218,7 +272,7 @@ fn handle(state: &ServerState, request: Request) -> ViewResult<()> {
                     CacheKind::NoStore,
                 );
             }
-            match state.load(&relative) {
+            match state.load_for_page(&relative, run_id.as_deref()) {
                 Ok(model) => serve_page(state, request, &model, is_head),
                 Err(err) => serve_error_page(request, &err, is_head),
             }
@@ -234,7 +288,7 @@ fn handle(state: &ServerState, request: Request) -> ViewResult<()> {
                 }
                 None => state.ctx.project().entry().relative.clone(),
             };
-            match state.load(&relative) {
+            match state.load_for_page(&relative, query_param(query, "run").as_deref()) {
                 Ok(model) => serve_document_json(request, &model),
                 Err(err) => respond_json_error(request, StatusCode(500), &err),
             }
@@ -263,7 +317,7 @@ fn handle(state: &ServerState, request: Request) -> ViewResult<()> {
                     "trace": crate::version::TRACE_PROTOCOL,
                 },
                 "documents": documents,
-                "run_api": false,
+                "run_api": true,
             });
             respond_json(request, StatusCode(200), &health)
         }
@@ -277,6 +331,330 @@ fn handle(state: &ServerState, request: Request) -> ViewResult<()> {
     }
 }
 
+fn handle_run_post(state: &ServerState, mut request: Request) -> ViewResult<()> {
+    if !origin_is_allowed(&request, state) {
+        return respond_json_error(
+            request,
+            StatusCode(403),
+            &ViewError::RunDenied {
+                detail: "跨站来源被拒绝（Origin 校验失败）".to_string(),
+            },
+        );
+    }
+    if !content_type_is_json(&request) {
+        return respond_text(
+            request,
+            StatusCode(415),
+            "text/plain; charset=utf-8",
+            "expected application/json\n".as_bytes().to_vec(),
+            CacheKind::NoStore,
+        );
+    }
+    let Some(token) = header_value(&request, "X-MQ-CSRF") else {
+        return respond_json_error(
+            request,
+            StatusCode(403),
+            &ViewError::RunDenied {
+                detail: "缺少 CSRF 令牌，运行被拒绝".to_string(),
+            },
+        );
+    };
+    if !constant_time_eq(token.as_bytes(), state.csrf_token.as_bytes()) {
+        return respond_json_error(
+            request,
+            StatusCode(403),
+            &ViewError::RunDenied {
+                detail: "CSRF 令牌无效，运行被拒绝".to_string(),
+            },
+        );
+    }
+    let body = match read_body(&mut request, MAX_BODY_BYTES) {
+        Ok(body) => body,
+        Err(err) => return respond_json_error(request, StatusCode(413), &err),
+    };
+    #[derive(serde::Deserialize)]
+    struct RunRequest {
+        #[serde(default)]
+        path: Option<String>,
+        #[serde(default)]
+        mode: Option<String>,
+        #[serde(default)]
+        confirm: Option<bool>,
+    }
+    let parsed: RunRequest = match serde_json::from_slice(&body) {
+        Ok(parsed) => parsed,
+        Err(err) => {
+            return respond_json_error(
+                request,
+                StatusCode(400),
+                &ViewError::RunDenied {
+                    detail: format!("运行请求不是合法 JSON: {err}"),
+                },
+            )
+        }
+    };
+    if parsed.confirm != Some(true) {
+        return respond_json_error(
+            request,
+            StatusCode(400),
+            &ViewError::RunDenied {
+                detail: "缺少显式用户确认，拒绝运行".to_string(),
+            },
+        );
+    }
+    if let Some(mode) = parsed.mode.as_deref() {
+        if mode != "pure" {
+            return respond_json_error(
+                request,
+                StatusCode(403),
+                &ViewError::RunDenied {
+                    detail: format!(
+                        "当前版本只允许最低权限 pure 模式（收到 {mode:?}）；project/strict grants 需要单独的授权界面"
+                    ),
+                },
+            );
+        }
+    }
+    let relative = match parsed.path.as_deref() {
+        Some(path) => match SafeRelativePath::parse(path) {
+            Ok(relative) => relative,
+            Err(err) => return respond_json_error(request, StatusCode(403), &err),
+        },
+        None => state.ctx.project().entry().relative.clone(),
+    };
+    if state.ctx.project().read_source(&relative).is_err() {
+        return respond_text(
+            request,
+            StatusCode(404),
+            "text/plain; charset=utf-8",
+            "document not found\n".as_bytes().to_vec(),
+            CacheKind::NoStore,
+        );
+    }
+    if state.running.swap(true, Ordering::SeqCst) {
+        return respond_json_error(
+            request,
+            StatusCode(409),
+            &ViewError::RunDenied {
+                detail: "已有一次运行正在进行；首版每个 View 会话只允许一个活动运行".to_string(),
+            },
+        );
+    }
+    let guard = RunningGuard(&state.running);
+    let outcome = state.ctx.run_document(&relative);
+    drop(guard);
+    let executed = match outcome {
+        Ok(executed) => executed,
+        Err(err) => {
+            return respond_json_error(request, run_error_status(&err), &err);
+        }
+    };
+    let seq = state.run_seq.fetch_add(1, Ordering::Relaxed);
+    let sanitized = executed
+        .verified
+        .projection
+        .run_id
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' {
+                ch
+            } else {
+                '-'
+            }
+        })
+        .take(40)
+        .collect::<String>();
+    let run_id = format!("{seq}-{sanitized}");
+    let entry = state.ctx.project().entry().relative.clone();
+    let redirect = if relative == entry {
+        format!("/?run={run_id}")
+    } else {
+        format!("/file?path={}&run={run_id}", encode_path(relative.as_str()))
+    };
+    let cached = CachedRun {
+        relative: relative.as_str().to_string(),
+        verified: executed.verified,
+    };
+    if let Ok(mut cache) = state.run_cache.lock() {
+        if cache.len() >= 8 {
+            let oldest = cache
+                .keys()
+                .min_by_key(|key| {
+                    key.split('-')
+                        .next()
+                        .and_then(|seq| seq.parse::<u64>().ok())
+                        .unwrap_or(u64::MAX)
+                })
+                .cloned();
+            if let Some(oldest) = oldest {
+                cache.remove(&oldest);
+            }
+        }
+        cache.insert(run_id.clone(), cached.clone());
+    }
+    let projection = &cached.verified.projection;
+    let response = serde_json::json!({
+        "ok": true,
+        "run_id": run_id,
+        "redirect": redirect,
+        "state": projection.state.data_value(),
+        "label": projection.state.label(),
+        "run_status": projection.run_status,
+        "exit_code": projection.exit_code,
+        "events": projection.counts.total(),
+        "entry_events": projection.entry_event_count,
+        "truncated": projection.truncated.as_ref().map(|truncated| truncated.label()),
+        "note": "本响应只来自冻结核心 run --json 与 Trace v2；参数值/内存/证明状态不提供。",
+    });
+    respond_json(request, StatusCode(200), &response)
+}
+
+fn handle_clear_run_post(state: &ServerState, mut request: Request) -> ViewResult<()> {
+    if !origin_is_allowed(&request, state) {
+        return respond_json_error(
+            request,
+            StatusCode(403),
+            &ViewError::RunDenied {
+                detail: "跨站来源被拒绝（Origin 校验失败）".to_string(),
+            },
+        );
+    }
+    if !content_type_is_json(&request) {
+        return respond_text(
+            request,
+            StatusCode(415),
+            "text/plain; charset=utf-8",
+            "expected application/json\n".as_bytes().to_vec(),
+            CacheKind::NoStore,
+        );
+    }
+    let Some(token) = header_value(&request, "X-MQ-CSRF") else {
+        return respond_json_error(
+            request,
+            StatusCode(403),
+            &ViewError::RunDenied {
+                detail: "缺少 CSRF 令牌，清理缓存被拒绝".to_string(),
+            },
+        );
+    };
+    if !constant_time_eq(token.as_bytes(), state.csrf_token.as_bytes()) {
+        return respond_json_error(
+            request,
+            StatusCode(403),
+            &ViewError::RunDenied {
+                detail: "CSRF 令牌无效，清理缓存被拒绝".to_string(),
+            },
+        );
+    }
+    let body = match read_body(&mut request, MAX_BODY_BYTES) {
+        Ok(body) => body,
+        Err(err) => return respond_json_error(request, StatusCode(413), &err),
+    };
+    #[derive(serde::Deserialize)]
+    struct ClearRequest {
+        #[serde(default)]
+        run_id: Option<String>,
+    }
+    let parsed: ClearRequest =
+        serde_json::from_slice(&body).unwrap_or(ClearRequest { run_id: None });
+    if let Some(run_id) = parsed.run_id {
+        if let Ok(mut cache) = state.run_cache.lock() {
+            cache.remove(&run_id);
+        }
+    }
+    respond_json(
+        request,
+        StatusCode(200),
+        &serde_json::json!({ "ok": true, "note": "仅清理本 View 会话的运行展示缓存；未修改项目文件。" }),
+    )
+}
+
+struct RunningGuard<'a>(&'a AtomicBool);
+
+impl Drop for RunningGuard<'_> {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::SeqCst);
+    }
+}
+
+fn run_error_status(err: &ViewError) -> StatusCode {
+    match err.code() {
+        "view.run_denied" => StatusCode(403),
+        "view.trace_stale" => StatusCode(409),
+        "view.core_timeout" => StatusCode(504),
+        "view.protocol_incompatible" => StatusCode(502),
+        _ => StatusCode(500),
+    }
+}
+
+fn read_body(request: &mut Request, max: usize) -> Result<Vec<u8>, ViewError> {
+    use std::io::Read as _;
+    let mut body = Vec::new();
+    let mut reader = request.as_reader().take(max as u64 + 1);
+    reader.read_to_end(&mut body).map_err(|err| ViewError::Io {
+        detail: format!("read request body: {err}"),
+    })?;
+    if body.len() > max {
+        return Err(ViewError::ResourceLimit {
+            detail: format!("request body above {max} bytes"),
+        });
+    }
+    Ok(body)
+}
+
+fn header_value(request: &Request, name: &'static str) -> Option<String> {
+    request
+        .headers()
+        .iter()
+        .find(|header| header.field.equiv(name))
+        .map(|header| header.value.as_str().to_string())
+}
+
+fn content_type_is_json(request: &Request) -> bool {
+    header_value(request, "Content-Type")
+        .map(|value| value.to_ascii_lowercase().starts_with("application/json"))
+        .unwrap_or(false)
+}
+
+fn origin_is_allowed(request: &Request, state: &ServerState) -> bool {
+    let Some(origin) = header_value(request, "Origin") else {
+        // Non-browser clients and same-origin `fetch` may omit Origin; the
+        // CSRF token is still mandatory in every case.
+        return true;
+    };
+    let origin = origin.trim_end_matches('/').to_ascii_lowercase();
+    state.allowed_hosts.iter().any(|host| {
+        let http = format!("http://{}", host.to_ascii_lowercase());
+        origin == http
+    })
+}
+
+fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
+    if left.len() != right.len() {
+        return false;
+    }
+    let mut diff = 0u8;
+    for (a, b) in left.iter().zip(right.iter()) {
+        diff |= a ^ b;
+    }
+    diff == 0
+}
+
+fn encode_path(raw: &str) -> String {
+    let mut out = String::with_capacity(raw.len());
+    for byte in raw.as_bytes() {
+        let unreserved =
+            byte.is_ascii_alphanumeric() || matches!(*byte, b'-' | b'_' | b'.' | b'~' | b'/');
+        if unreserved {
+            out.push(*byte as char);
+        } else {
+            use std::fmt::Write as _;
+            let _ = write!(out, "%{byte:02X}");
+        }
+    }
+    out
+}
+
 fn serve_page(
     state: &ServerState,
     request: Request,
@@ -287,7 +665,7 @@ fn serve_page(
         links: crate::render::LinkPolicy::LocalServer,
         live: true,
         csrf_token: Some(state.csrf_token.clone()),
-        run_available: false,
+        run_available: state.ctx.core().is_some() && model.can_offer_run(),
     };
     let page = state.renderer.render(model, &ctx);
     respond_html(request, page.html.into_bytes(), is_head)
@@ -338,7 +716,19 @@ fn serve_document_json(request: Request, model: &PresentationModel) -> ViewResul
             "documents": model.navigation.documents.iter().map(|doc| doc.as_str()).collect::<Vec<_>>(),
             "welcome": model.navigation.welcome,
         },
-        "note": "Read-only PresentationModel summary; the document was not executed.",
+        "run": model.run.as_ref().map(|run| serde_json::json!({
+            "state": run.state.data_value(),
+            "label": run.state.label(),
+            "run_id": run.run_id,
+            "run_status": run.run_status,
+            "exit_code": run.exit_code,
+            "event_count": run.counts.total(),
+            "entry_event_count": run.entry_event_count,
+            "truncated": run.truncated.as_ref().map(|truncated| truncated.label()),
+            "has_result_value": run.result_value.is_some(),
+        })),
+        "can_offer_run": model.can_offer_run(),
+        "note": "Read-only PresentationModel summary; this page load never executes the document.",
     });
     respond_json(request, StatusCode(200), &doc)
 }

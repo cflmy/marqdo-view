@@ -145,7 +145,7 @@ impl ReaderRenderer {
 <link rel="stylesheet" href="{css}"/>
 <script defer src="{js}"></script>
 </head>
-<body class="mq-reader" data-mode="document" data-annotations="on" data-size="normal" data-source-status="{status}" data-run-state="not-run" data-live="{live}">
+<body class="mq-reader" data-mode="document" data-annotations="on" data-size="normal" data-source-status="{status}" data-run-state="{run_state}" data-run-available="{run_available}" data-live="{live}">
 <a class="mq-skip" href="#mq-main">跳到正文</a>
 "##,
             presentation_version = model.version,
@@ -156,6 +156,8 @@ impl ReaderRenderer {
             css = escape_attr(&format!("{asset_prefix}{css_name}")),
             js = escape_attr(&format!("{asset_prefix}{js_name}")),
             status = model.source_status.data_value(),
+            run_state = model.run_state().data_value(),
+            run_available = if ctx.run_available { "true" } else { "false" },
             live = if ctx.live { "true" } else { "false" },
         );
 
@@ -170,6 +172,7 @@ impl ReaderRenderer {
         self.render_diagnostics(&mut html, model);
         self.render_functions(&mut html, model);
         self.render_document(&mut html, model, ctx);
+        self.render_run_panel(&mut html, model, ctx);
         self.render_source_pane(&mut html, model, ctx);
         self.render_footer(&mut html, model);
         let _ = write!(html, "</main>\n");
@@ -265,6 +268,14 @@ impl ReaderRenderer {
             status_value = status.data_value(),
             label = escape_text(status.label()),
         );
+        if let Some(run) = &model.run {
+            let _ = write!(
+                html,
+                "<span class=\"mq-status mq-run-status\" data-run-state=\"{}\">本次：{}</span>\n",
+                run.state.data_value(),
+                escape_text(run.state_label())
+            );
+        }
         if let Some(projection) = &model.semantic {
             if !projection.imports.is_empty() {
                 html.push_str("<ul class=\"mq-shares\" aria-label=\"导入的模块\">\n");
@@ -511,6 +522,7 @@ impl ReaderRenderer {
   <div class="mq-dialog-head"><h2 id="mq-unsupported-title">当前版本不支持</h2><button type="button" class="mq-icon-btn mq-close" data-action="close-dialog" aria-label="关闭说明">×</button></div>
   <div id="mq-unsupported-body"></div>
 </dialog>
+{run_dialog}
 <dialog class="mq-dialog" id="mq-dialog-about" aria-labelledby="mq-about-title">
   <div class="mq-dialog-head"><h2 id="mq-about-title">关于 Marqdo View</h2><button type="button" class="mq-icon-btn mq-close" data-action="close-dialog" aria-label="关闭关于">×</button></div>
   <p>版本 {view_version} · Tool Protocol v1 · Analysis v2 · Trace v2。</p>
@@ -520,9 +532,124 @@ impl ReaderRenderer {
 "##,
             csrf = csrf,
             files = self.render_file_list(model, ctx),
+            run_dialog = if ctx.run_available {
+                render_run_confirm_dialog(model)
+            } else {
+                String::new()
+            },
             view_version = env!("CARGO_PKG_VERSION"),
             core = escape_text(model.core_version.as_deref().unwrap_or("未检测到可用核心")),
         );
+    }
+
+    fn render_run_panel(&self, html: &mut String, model: &PresentationModel, _ctx: &RenderContext) {
+        let Some(run) = &model.run else {
+            return;
+        };
+        let counts = &run.counts;
+        let _ = write!(
+            html,
+            r##"<section class="mq-run-panel" id="mq-run-panel" data-run-state="{state}" data-run-id="{run_id}" aria-labelledby="mq-run-title">
+  <h2 id="mq-run-title">本次运行 · {label}</h2>
+  <p class="mq-colophon">入口 {entry} · 模式 pure · 退出码 {exit_code} · 事件 {total}（本文 {entry_count} / 其他模块 {other_count}）</p>
+"##,
+            state = run.state.data_value(),
+            run_id = escape_attr(&run.run_id),
+            label = escape_text(run.state_label()),
+            entry = escape_text(run.entry.as_deref().unwrap_or("(未知入口)")),
+            exit_code = run.exit_code,
+            total = counts.total(),
+            entry_count = run.entry_event_count,
+            other_count = run.other_event_count,
+        );
+        if let Some(truncated) = &run.truncated {
+            let _ = write!(
+                html,
+                "<p class=\"mq-run-warning\" role=\"note\">Trace 被截断：{}</p>\n",
+                escape_text(&truncated.label())
+            );
+        }
+        if let Some(code) = &run.error_code {
+            let _ = write!(
+                html,
+                "<p class=\"mq-run-error\">Core 错误码：<code>{}</code></p>\n",
+                escape_text(code)
+            );
+        }
+        for warning in &run.warnings {
+            let _ = write!(
+                html,
+                "<p class=\"mq-run-warning\" role=\"note\">{}</p>\n",
+                escape_text(warning)
+            );
+        }
+        if let Some(value) = &run.result_value {
+            let _ = write!(
+                html,
+                "<p class=\"mq-run-result\">Core 本次返回值（公开 JSON）：<code>{}</code> <span class=\"mq-colophon\">类型 {}</span></p>\n",
+                escape_text(&value.display),
+                escape_text(&value.ty)
+            );
+        }
+        if !run.stdout.is_empty() {
+            let _ = write!(
+                html,
+                "<pre class=\"mq-stdout\" aria-label=\"程序标准输出\">{}</pre>\n",
+                escape_text(&run.stdout)
+            );
+        }
+        if !run.stderr.is_empty() {
+            let _ = write!(
+                html,
+                "<pre class=\"mq-stdout mq-stderr\" aria-label=\"程序标准错误\">{}</pre>\n",
+                escape_text(&run.stderr)
+            );
+        }
+        if !run.events.is_empty() {
+            html.push_str("<details class=\"mq-run-events-wrap\" open><summary>真实 Trace v2 事件</summary>\n<ol class=\"mq-run-events\">\n");
+            for event in run.events.iter().take(200) {
+                let location = match event.span {
+                    Some(span) => {
+                        let (line, column) =
+                            model.document.source_index.line_col(span.start as usize);
+                        format!("第 {line} 行第 {column} 列")
+                    }
+                    None => {
+                        let module = event
+                            .module_id
+                            .as_deref()
+                            .and_then(|module| module.rsplit("::").next())
+                            .unwrap_or("(无模块)");
+                        module.to_string()
+                    }
+                };
+                let detail = event.detail.as_deref().unwrap_or("");
+                let operation = event
+                    .operation
+                    .as_deref()
+                    .map(|operation| format!(" · {operation}"))
+                    .unwrap_or_default();
+                let _ = write!(
+                    html,
+                    "<li data-seq=\"{seq}\"><span class=\"mq-event-kind\">{kind}</span><span class=\"mq-event-loc\">{location}</span> {detail}{operation}</li>\n",
+                    seq = event.seq,
+                    kind = escape_text(event.kind_label()),
+                    location = escape_text(&location),
+                    detail = escape_text(detail),
+                    operation = escape_text(&operation)
+                );
+            }
+            html.push_str("</ol>\n");
+            if run.events.len() > 200 {
+                let _ = write!(
+                    html,
+                    "<p class=\"mq-colophon\">仅显示前 200 条（共 {} 条）；完整数据保留在本地会话缓存中。</p>\n",
+                    run.events.len()
+                );
+            }
+            html.push_str("</details>\n");
+        }
+        html.push_str("<div class=\"mq-run-actions\"><button type=\"button\" class=\"mq-menu-action\" data-action=\"clear-run\">清理本次结果展示</button></div>\n</section>\n");
     }
 
     fn render_file_list(&self, model: &PresentationModel, ctx: &RenderContext) -> String {
@@ -920,6 +1047,9 @@ fn render_inline(
             html.push('>');
             html.push_str(&escape_text(literal));
             html.push_str("</code>");
+            if let Some((_, statement)) = anchor {
+                render_run_chips(html, model, statement.span);
+            }
         }
         Inline::Strong { span, children } => {
             let anchor = projection.and_then(|projection| projection.statement_for_inline(*span));
@@ -941,6 +1071,9 @@ fn render_inline(
             html.push('>');
             render_inlines(html, children, model, ctx, current, assets_placeholder());
             html.push_str("</strong>");
+            if let Some((_, statement)) = anchor {
+                render_run_chips(html, model, statement.span);
+            }
         }
         Inline::Emph { span, children } => {
             let anchor = projection.and_then(|projection| projection.statement_for_inline(*span));
@@ -962,6 +1095,9 @@ fn render_inline(
             html.push('>');
             render_inlines(html, children, model, ctx, current, assets_placeholder());
             html.push_str("</em>");
+            if let Some((_, statement)) = anchor {
+                render_run_chips(html, model, statement.span);
+            }
         }
         Inline::Strikethrough { children, .. } => {
             html.push_str("<del>");
@@ -1159,4 +1295,57 @@ fn resolve_link(raw: &str, current: &SafeRelativePath, policy: &LinkPolicy) -> O
         return None;
     }
     Some(url.to_string())
+}
+
+fn render_run_chips(html: &mut String, model: &PresentationModel, statement_span: SourceSpan) {
+    let Some(run) = &model.run else {
+        return;
+    };
+    let Some(summary) = run.anchor_summary(statement_span) else {
+        return;
+    };
+    let suffix = if summary.count > 1 {
+        format!(" ×{}", summary.count)
+    } else {
+        String::new()
+    };
+    let _ = write!(
+        html,
+        "<span class=\"mq-run-chip\" data-run-seq=\"{seq}\" data-run-kind=\"{kinds}\" title=\"真实 Trace 事件：{count} 条（{kinds}）\">{detail}{suffix}</span>",
+        seq = summary.last_seq,
+        kinds = escape_attr(&summary.kinds.join(",")),
+        count = summary.count,
+        detail = escape_text(&summary.detail),
+        suffix = escape_text(&suffix)
+    );
+}
+
+fn render_run_confirm_dialog(model: &PresentationModel) -> String {
+    let function = model
+        .semantic
+        .as_ref()
+        .and_then(|semantic| {
+            semantic
+                .functions
+                .iter()
+                .find(|function| function.local_name == "main")
+        })
+        .map(|function| function.local_name.clone())
+        .unwrap_or_else(|| "main".to_string());
+    format!(
+        r##"<dialog class="mq-dialog" id="mq-dialog-run-confirm" aria-labelledby="mq-run-confirm-title" data-path="{path}">
+  <div class="mq-dialog-head"><h2 id="mq-run-confirm-title">确认运行本文档</h2><button type="button" class="mq-icon-btn mq-close" data-action="close-dialog" aria-label="取消运行">×</button></div>
+  <p>即将通过冻结核心执行入口函数 <code>{function}</code>，沙箱模式 <code>pure</code>（无文件、网络、环境变量、进程权限）。</p>
+  <p>等价命令：<code>marqdo run {path} --mode pure --json --trace-file &lt;临时文件&gt;</code></p>
+  <p>运行会在你的机器上真实执行文档中的 <code>@exec</code> 代码。Trace v2 不记录参数实际值、文件内容或敏感数据；View 不继承项目声明的 capabilities。</p>
+  <p class="mq-colophon">打开、刷新、搜索、导出都不会触发运行；只有本确认按钮会。</p>
+  <div class="mq-dialog-actions">
+    <button type="button" class="mq-secondary" data-action="close-dialog">取消</button>
+    <button type="button" class="mq-primary" data-action="run-confirm">确认运行（pure）</button>
+  </div>
+</dialog>
+"##,
+        function = escape_text(&function),
+        path = escape_text(&model.document.identity.relative_path)
+    )
 }

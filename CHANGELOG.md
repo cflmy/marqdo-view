@@ -46,9 +46,26 @@ Protocol axes (Tool v1, Analysis v2, Trace v2) are versioned separately.
 - Tests: rendering contracts, XSS/URL sanitization, Live/Export link parity,
   raw HTTP server security tests, asset integrity, architectural gates.
 
+### Added (PR-04)
+
+- `trace.rs`: Trace v2 validation (schema/product, `analysis_digest`,
+  `root_id`, module references, strictly increasing seq, span bounds) and
+  projection with explicit `NOT_RUN/STATIC_ONLY/RUNNING/SUCCEEDED/FAILED/
+  STALE/TRUNCATED/UNSUPPORTED` states.
+- Explicit-run flow: in-page confirmation, CSRF token + strict Origin check,
+  JSON body limits, one active run per session, `pure`-only mode, process-group
+  timeout, run cache keyed by validated Analysis digest.
+- Server-rendered run panel (stdout/stderr escaped, Core error code, public
+  final value only, event list capped with explicit truncation) and inline
+  run chips anchored to real statement spans; never per-assignment values.
+- Real Trace v2 goldens from the frozen CLI (success, truncated, failed arity)
+  and contract/HTTP tests proving refresh never runs and rejected requests
+  never spawn a process.
+- ADR-0004 for the run/CSRF/cache design.
+
 ### Known limitations
 
-- `export` still returns `view.unsupported` (PR-05); the run control is
-  explicitly disabled (PR-04) and never fakes execution.
-- Variables/memory/proof states remain `UNSUPPORTED`.
-- Browser screenshot/geometry acceptance is scheduled for PR-06.
+- `export` still returns `view.unsupported` (PR-05).
+- `project`/`strict` grant UI, streaming output, cancellation and debugger are
+  not implemented; variables/memory/proof states remain `UNSUPPORTED`.
+- Browser screenshot/geometry acceptance is scheduled for PR-03/PR-06.

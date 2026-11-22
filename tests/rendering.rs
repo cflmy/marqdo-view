@@ -37,6 +37,7 @@ fn example(name: &str) -> (marqdo_view::presentation::PresentationModel, String)
         diagnostics: Vec::new(),
         navigation,
         core_version: Some("3.0.0-beta.1".to_string()),
+        run: None,
     });
     (model, source)
 }
@@ -210,6 +211,7 @@ fn malicious_markdown_cannot_inject_markup_or_scripts() {
         diagnostics: Vec::new(),
         navigation,
         core_version: None,
+        run: None,
     });
     let html = render_live(&model);
     assert!(!html.contains("<script>alert"));

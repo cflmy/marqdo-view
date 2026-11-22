@@ -884,6 +884,96 @@
   }
 }
 
+  .mq-run-chip {
+    display: inline-block;
+    margin: 0 2px 0 6px;
+    padding: 0 7px;
+    border: 1px solid color-mix(in srgb, var(--mq-olive) 35%, var(--mq-line));
+    border-radius: 999px;
+    vertical-align: 0.1em;
+    background: color-mix(in srgb, var(--mq-olive) 8%, var(--mq-surface));
+    font: 11px/1.6 var(--mq-mono);
+    color: var(--mq-olive);
+    white-space: nowrap;
+    cursor: help;
+  }
+  body[data-annotations="off"] .mq-run-chip {
+    display: none;
+  }
+  .mq-run-status[data-run-state="succeeded"] {
+    color: var(--mq-ok);
+  }
+  .mq-run-status[data-run-state="failed"] {
+    color: var(--mq-error);
+  }
+  .mq-run-status[data-run-state="truncated"],
+  .mq-run-status[data-run-state="stale"] {
+    color: var(--mq-warn);
+  }
+  .mq-run-warning {
+    margin: 8px 0;
+    font: 13px/1.6 var(--mq-sans);
+    color: var(--mq-warn);
+  }
+  .mq-run-error {
+    margin: 8px 0;
+    font: 13px/1.6 var(--mq-sans);
+    color: var(--mq-error);
+  }
+  .mq-run-result {
+    margin: 10px 0;
+    font: 14px/1.6 var(--mq-sans);
+  }
+  .mq-run-events-wrap {
+    margin-top: 12px;
+  }
+  .mq-run-events-wrap > summary {
+    cursor: pointer;
+    font: 12px/1.6 var(--mq-sans);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--mq-muted);
+  }
+  .mq-run-events .mq-event-loc {
+    display: inline-block;
+    min-width: 130px;
+    color: var(--mq-muted);
+  }
+  .mq-run-actions {
+    margin-top: 14px;
+  }
+  .mq-menu-action {
+    padding: 7px 14px;
+    border: 1px solid var(--mq-line-strong);
+    border-radius: 999px;
+    background: var(--mq-surface-2);
+    font: 12px/1.5 var(--mq-sans);
+    color: var(--mq-ink);
+    cursor: pointer;
+  }
+  .mq-dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 18px;
+  }
+  .mq-dialog-actions .mq-primary,
+  .mq-dialog-actions .mq-secondary {
+    padding: 9px 18px;
+    border-radius: 999px;
+    font: 13px/1.5 var(--mq-sans);
+    cursor: pointer;
+  }
+  .mq-dialog-actions .mq-primary {
+    border: 1px solid var(--mq-gold);
+    background: var(--mq-gold);
+    color: #fffdf8;
+  }
+  .mq-dialog-actions .mq-secondary {
+    border: 1px solid var(--mq-line-strong);
+    background: var(--mq-surface-2);
+    color: var(--mq-ink);
+  }
 @layer overlays {
   /* source pane: exact bytes as preformatted text with line numbers */
   .mq-source {

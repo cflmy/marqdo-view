@@ -18,6 +18,7 @@ pub mod render;
 pub mod semantic;
 pub mod server;
 pub mod source_map;
+pub mod trace;
 pub mod version;
 
 pub use cli::Cli;
