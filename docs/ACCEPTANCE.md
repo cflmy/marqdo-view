@@ -138,7 +138,7 @@ MARQDO_BIN=... scripts/test-browser.sh   # 真实 Chromium
 
 ## 7. Issue #2 复验（2026-11-22）
 
-实现提交 `88f49f9fd918004e1dd94062b854343585ba4927` 使用 Gitea 官方
+实现提交 `34de5a34d9cd8488ae4d753aff7d27b9c95379f3` 使用 Gitea 官方
 `v3.0.0-beta.1` Linux x86_64 归档进行验收。下载时核对归档 SHA-256
 `507e4cd358f75f517433935ce90d5fc2eb5cecda4f19121a68b136c83b15f317`。
 二进制 SHA-256 在验收前后一致。版本、源码与工件身份见
@@ -152,10 +152,13 @@ MARQDO_BIN=... scripts/test-browser.sh   # 真实 Chromium
   `Int(10)`，文本和列表表单得到真实的 Unicode 返回值。
 - 会话、取消、限额、Trace 绑定和过期降级通过现有回归。安装包篡改
   和错误 CLI 摘要的拒绝路径也纳入一键验收。
+- 冷装环境发现官方归档没有 `stdlib/`。验收示例使用发布二进制的 stdout、Memory
+  与文件资源原语。重新从禁网容器采集 Analysis/Trace 金样，控制流生成
+  27 条真实事件，stdout 为三行 `0`、`0`、`2`，返回 `Int(3)`。
 - 在仅挂载两个归档和样例的禁网 Ubuntu 24.04 容器中验证 glibc 2.39、
   Tool 安装与卸载、静态校验、离线导出和真实调用。容器内无 Cargo。
 - 对照旧参考图复看 2048×1133 的欢迎页，保留暖纸、樱花、品牌和 Dock，
   导航为文档、函数、运行。辅助技术覆盖为浏览器键盘和控件可访问名称测试。
 
-View 归档 SHA-256 为 `c8727d91ac1ab28808bc6983225c5ff68f9e471aa94eb177b9beaf65ffb49804`。
+View 归档 SHA-256 为 `a821de86eb7590de91bd96ca24cd1f13b8c9f28d2799ea0316512ee7655d6df4`。
 CI 使用 `scripts/frozen-beta.sh` 获取发行资产并调用相同的验收入口。
