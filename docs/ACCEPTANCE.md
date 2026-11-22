@@ -1,6 +1,6 @@
 # 验收状态（RFC-VIEW-0002 §9 / §10）
 
-> 结论：**RFC-VIEW-0002 PR-00～PR-06 的 BETA-CANDIDATE 强制门禁通过**。
+> 最新 issue #2 复验见 §7。以下为 PR-00～PR-06 的初次验收记录。
 > 证据来自真实冻结 CLI（`marqdo 3.0.0-beta.1`）+ 真实进程 HTTP/SSE 测试 +
 > 真实 Chromium 131；生成命令为 `MARQDO_BIN=… scripts/acceptance.sh`。
 > 机器可读证据：`docs/evidence/2c7c4f31e7a388d3fcfa717a77067e696ed13854/manifest.json`
@@ -134,3 +134,28 @@ MARQDO_BIN=... scripts/test-browser.sh   # 真实 Chromium
 - 平台：Linux x86_64 正式；Windows/macOS 不支持声明。
 - `.github/workflows/ci.yml` 已提供，但**远端 CI 未在本环境实际运行**；上述证据
   均来自本地可复现命令与真实进程/浏览器。
+
+
+## 7. Issue #2 复验（2026-11-22）
+
+实现提交 `88f49f9fd918004e1dd94062b854343585ba4927` 使用 Gitea 官方
+`v3.0.0-beta.1` Linux x86_64 归档进行验收。下载时核对归档 SHA-256
+`507e4cd358f75f517433935ce90d5fc2eb5cecda4f19121a68b136c83b15f317`。
+二进制 SHA-256 在验收前后一致。版本、源码与工件身份见
+[机器验收清单](evidence/issue-2/manifest.json)。
+
+- Rust 1.100.0 的格式、Clippy、158 项测试与 release 构建均通过。
+  锁定的 Comrak 依赖要求 Rust 1.89 起，CI 使用 Rust 1.89.0。
+- Chromium 131 通过四个项目的交互和响应式检查。浏览器消费已安装工具
+  的真实 SSE，断线后按原 `Last-Event-ID` 重连，全程只提交一次运行。
+  无 `main` 进入函数清单，必填项缺失不提交，`double(5)` 得到
+  `Int(10)`，文本和列表表单得到真实的 Unicode 返回值。
+- 会话、取消、限额、Trace 绑定和过期降级通过现有回归。安装包篡改
+  和错误 CLI 摘要的拒绝路径也纳入一键验收。
+- 在仅挂载两个归档和样例的禁网 Ubuntu 24.04 容器中验证 glibc 2.39、
+  Tool 安装与卸载、静态校验、离线导出和真实调用。容器内无 Cargo。
+- 对照旧参考图复看 2048×1133 的欢迎页，保留暖纸、樱花、品牌和 Dock，
+  导航为文档、函数、运行。辅助技术覆盖为浏览器键盘和控件可访问名称测试。
+
+View 归档 SHA-256 为 `c8727d91ac1ab28808bc6983225c5ff68f9e471aa94eb177b9beaf65ffb49804`。
+CI 使用 `scripts/frozen-beta.sh` 获取发行资产并调用相同的验收入口。

@@ -1,0 +1,50 @@
+{
+  "analysis_protocol": 2,
+  "archive_sha256": "c8727d91ac1ab28808bc6983225c5ff68f9e471aa94eb177b9beaf65ffb49804",
+  "cli_binary_sha256_after": "062cb56e226bee55c21d238e195920caa985e62bb3877ba7b07abcc04dc0fe3f",
+  "cli_binary_sha256_before": "062cb56e226bee55c21d238e195920caa985e62bb3877ba7b07abcc04dc0fe3f",
+  "cli_source_sha": "2c7c4f31e7a388d3fcfa717a77067e696ed13854",
+  "commands": {
+    "notes": "Generated from real command exit statuses; install/verify/export/run use the frozen CLI archive copied to an isolated tool home.",
+    "script": "scripts/acceptance.sh"
+  },
+  "gates": {
+    "archive_install": "PASS",
+    "browse": "PASS",
+    "browser": "PASS",
+    "build": "PASS",
+    "bundle": "PASS",
+    "clippy": "PASS",
+    "core_sha": "PASS",
+    "examples_check": "PASS",
+    "export": "PASS",
+    "export_suite": "PASS",
+    "fmt": "PASS",
+    "no_exec_suite": "PASS",
+    "real_run": "PASS",
+    "security_suite": "PASS",
+    "test": "PASS",
+    "tool_list": "PASS",
+    "tool_remove": "PASS",
+    "tool_tamper_refused": "PASS",
+    "verify": "PASS",
+    "view_help": "PASS",
+    "wrong_cli_refused": "PASS"
+  },
+  "generated_at_utc": "2026-11-22T13:06:19.325726+00:00",
+  "schema": "marqdo.view-conformance",
+  "schema_version": 1,
+  "target": "x86_64-unknown-linux-gnu",
+  "tests": {
+    "browser": "PASS",
+    "contract": "PASS",
+    "examples": "PASS",
+    "export": "PASS",
+    "no_exec": "PASS",
+    "security": "PASS"
+  },
+  "tool_protocol": 1,
+  "trace_protocol": 2,
+  "view_binary_sha256": "a7921f5e659d3baed714699038eaef9b34bd5537ffc8796636db82e42066180f",
+  "view_source_sha": "88f49f9fd918004e1dd94062b854343585ba4927"
+}

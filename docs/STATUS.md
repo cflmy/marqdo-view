@@ -1,7 +1,7 @@
 # marqdo-view 现状（STATUS）
 
 > 唯一现状来源。规范见 `docs/architecture/RFC-VIEW-0002.md`；本文只记录
-> **实际完成、证据与限制**。最后更新：2026-11-22（PR-00～PR-06 完成）
+> **实际完成、证据与限制**。最后更新：2026-11-22（Issue #2 复验）
 
 ## 版本与基线
 
@@ -15,7 +15,7 @@
 | 协议 | Tool v1 / Analysis v2 / Trace v2 / `marqdo.md.v1` |
 | 目标平台 | Linux x86_64 glibc（正式）；其他平台不支持/未验证 |
 | 视觉基准 | `docs/design/reference-old-view-reader.png`（**2048×1133**） |
-| 验收状态 | `docs/ACCEPTANCE.md`（§10 门禁全部 PASS）；机器证据见 `docs/evidence/<CLI-SHA>/manifest.json` |
+| 验收状态 | `docs/ACCEPTANCE.md`；最新本地复验证据见 `docs/evidence/issue-2/manifest.json` |
 
 ## RFC-VIEW-0002 里程碑（全部完成）
 
@@ -80,7 +80,7 @@
 - SSE 只推送 View 生命周期与终态数据，不承诺逐字 stdout/Token 流（RFC §6.1）。
 - 观测侧注采用内联分组 chip，而非 SVG 曲线；按 RFC §4.4 允许降级（ADR-0010）。
 - 像素级人工视觉比对与完整 screen-reader 走查仍为 `UNVERIFIED`；自动化证据充分。
-- 远端 CI 配置已提供，但本环境未实际运行远端 CI；证据来自本地真实命令。
+- 本地验收与远端 CI 使用同一入口 `scripts/acceptance.sh`；远端状态以 PR 检查为准。
 - 平台：Linux x86_64 glibc 正式验证；其他平台不声明支持。
 
 ## 复现文档
