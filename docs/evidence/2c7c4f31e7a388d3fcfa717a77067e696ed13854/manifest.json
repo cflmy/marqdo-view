@@ -1,6 +1,6 @@
 {
   "analysis_protocol": 2,
-  "archive_sha256": "9abd996e1c54b24ef0ec2c7e80c93ca93993ca73cce573f07b922df73a1863f6",
+  "archive_sha256": "a3fb28c8d025f44dee6c06da80c13d3f65b9c62d1f657c04b02ef360ff24fcf5",
   "cli_binary_sha256_after": "062cb56e226bee55c21d238e195920caa985e62bb3877ba7b07abcc04dc0fe3f",
   "cli_binary_sha256_before": "062cb56e226bee55c21d238e195920caa985e62bb3877ba7b07abcc04dc0fe3f",
   "cli_source_sha": "2c7c4f31e7a388d3fcfa717a77067e696ed13854",
@@ -28,7 +28,7 @@
     "verify": "PASS",
     "view_help": "PASS"
   },
-  "generated_at_utc": "2026-11-22T06:48:46.803005+00:00",
+  "generated_at_utc": "2026-11-22T06:55:13.151362+00:00",
   "schema": "marqdo.view-conformance",
   "schema_version": 1,
   "target": "x86_64-unknown-linux-gnu",
@@ -43,5 +43,5 @@
   "tool_protocol": 1,
   "trace_protocol": 2,
   "view_binary_sha256": "eb19f79632457f37ae3573696d7db84d57358627b65e618819ff80f132b0026a",
-  "view_source_sha": "807c24b9523bd3f8ace5b36582b5de905327eecb"
+  "view_source_sha": "0fceb40088e728d481411c36a8d311aa3431b057"
 }

@@ -6,8 +6,10 @@
 - 冻结 CLI：`marqdo 3.0.0-beta.1`，SHA-256
   `062cb56e226bee55c21d238e195920caa985e62bb3877ba7b07abcc04dc0fe3f`
 - 机器证据（最终）：`docs/evidence/2c7c4f31e7a388d3fcfa717a77067e696ed13854/manifest.json`
-  （在本 PR-06 提交上重跑 `scripts/acceptance.sh` 生成；`manifest.pre-commit.json`
-  为文档定稿前同一代码的预跑结果，保留对照）
+  （在 PR-06 提交 `0fceb40` 上重跑 `scripts/acceptance.sh` 生成；
+  View binary `eb19f796…`、archive `a3fb28c8…`、CLI before/after
+  `062cb56e…`；`manifest.pre-commit.json` 为文档定稿前同一代码的预跑结果，
+  保留对照）
 
 ## 1. §13.3 示例（真实 CLI）
 

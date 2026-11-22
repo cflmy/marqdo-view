@@ -14,6 +14,17 @@
 - CLI 源码：tag `v3.0.0-beta.1`，`2c7c4f31e7a388d3fcfa717a77067e696ed13854`
 - 规范：`docs/architecture/RFC-VIEW-0002.md`；矩阵：`docs/CONFORMANCE.md`
 
+## 0. 最终证据身份
+
+| 项 | 值 |
+|---|---|
+| View 代码提交 | `0fceb40088e728d481411c36a8d311aa3431b057`（本证据对应提交；evidence 提交紧随其后） |
+| View 发布二进制 SHA-256 | `eb19f79632457f37ae3573696d7db84d57358627b65e618819ff80f132b0026a` |
+| 发布归档 SHA-256 | `a3fb28c8d025f44dee6c06da80c13d3f65b9c62d1f657c04b02ef360ff24fcf5` |
+| 冻结 CLI SHA-256（前后相同） | `062cb56e226bee55c21d238e195920caa985e62bb3877ba7b07abcc04dc0fe3f` |
+| 生成时间（UTC） | `2026-11-22T06:55:13.151362+00:00` |
+| manifest | `docs/evidence/2c7c4f31e7a388d3fcfa717a77067e696ed13854/manifest.json` |
+
 ## 1. §10 发布门禁（强制）
 
 | # | 门禁 | 结果 | 证据 |
