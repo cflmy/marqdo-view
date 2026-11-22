@@ -99,11 +99,21 @@ run_step export "$MARQDO_BIN" view export examples/control-flow --out "$work/sit
 run_step examples_check env MARQDO_BIN="$MARQDO_BIN" ./scripts/check-examples.sh
 test -f "$work/site/manifest.json"
 
+# Tool dispatch starts View as a child. Keep both in one disposable group.
+server_pid=""
+stop_server() {
+  if [[ -n "$server_pid" ]]; then
+    kill -- "-$server_pid" 2>/dev/null || true
+    wait "$server_pid" 2>/dev/null || true
+    server_pid=""
+  fi
+}
+trap stop_server EXIT
+
 # 3. Live browse smoke (no execution on open)
 browse_log="$work/browse.log"
-"$MARQDO_BIN" view examples/welcome --port 0 --no-open >"$browse_log" 2>&1 &
-browse_pid=$!
-trap 'kill "$browse_pid" 2>/dev/null || true' EXIT
+setsid "$MARQDO_BIN" view examples/welcome --port 0 --no-open >"$browse_log" 2>&1 &
+server_pid=$!
 browse_url=""
 for _ in $(seq 1 100); do
   browse_url="$(grep -o 'http://127.0.0.1:[0-9]*/' "$browse_log" | head -1 || true)"
@@ -117,15 +127,12 @@ else
   cat "$browse_log" >&2
   exit 1
 fi
-kill "$browse_pid" 2>/dev/null || true
-wait "$browse_pid" 2>/dev/null || true
-trap - EXIT
+stop_server
 
 # 4. Explicit real run through the installed tool + CSRF flow
 run_log="$work/run.log"
-"$MARQDO_BIN" view examples/control-flow --port 0 --no-open >"$run_log" 2>&1 &
-run_pid=$!
-trap 'kill "$run_pid" 2>/dev/null || true' EXIT
+setsid "$MARQDO_BIN" view examples/control-flow --port 0 --no-open >"$run_log" 2>&1 &
+server_pid=$!
 run_url=""
 for _ in $(seq 1 100); do
   run_url="$(grep -o 'http://127.0.0.1:[0-9]*/' "$run_log" | head -1 || true)"
@@ -145,9 +152,7 @@ else
   cat "$run_log" >&2
   exit 1
 fi
-kill "$run_pid" 2>/dev/null || true
-wait "$run_pid" 2>/dev/null || true
-trap - EXIT
+stop_server
 
 # 5. project-local verification suites
 run_step export_suite env MARQDO_BIN="$MARQDO_BIN" ./scripts/test-export.sh
@@ -161,7 +166,7 @@ fi
 
 check_tampered_install() {
   local output
-  printf 'x' >> "$tool_home/view/bin/marqdo-view" || return 1
+  printf 'x' >> "$tool_home/view/README.md" || return 1
   if output="$("$MARQDO_BIN" view --version 2>&1)"; then
     echo "error: tampered Tool installation was dispatched" >&2
     return 1

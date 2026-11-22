@@ -39,9 +39,10 @@ fi
 
 server_pid=""
 cleanup() {
-  if [[ -n "$server_pid" ]] && kill -0 "$server_pid" 2>/dev/null; then
-    kill "$server_pid" 2>/dev/null || true
+  if [[ -n "$server_pid" ]]; then
+    kill -- "-$server_pid" 2>/dev/null || true
     wait "$server_pid" 2>/dev/null || true
+    server_pid=""
   fi
 }
 trap cleanup EXIT
@@ -51,7 +52,7 @@ run_suite() {
   local log
   log="$(mktemp "$repo_root/tests/.cache/browser-server.XXXXXX.log")"
   echo "==> browser suite: $project"
-  "${view[@]}" "$project" --port 0 --no-open >"$log" 2>&1 &
+  setsid "${view[@]}" "$project" --port 0 --no-open >"$log" 2>&1 &
   server_pid=$!
   local url=""
   for _ in $(seq 1 100); do
@@ -70,9 +71,11 @@ run_suite() {
     exit 1
   fi
   MQ_URL="$url" MQ_PROJECT="$project" node tests/browser/reader.browser.cjs
-  kill "$server_pid" 2>/dev/null || true
-  wait "$server_pid" 2>/dev/null || true
-  server_pid=""
+  cleanup
+  if curl -fsS --max-time 2 "$url" >/dev/null 2>&1; then
+    echo "error: test server remained active after cleanup" >&2
+    exit 1
+  fi
   rm -f "$log"
 }
 

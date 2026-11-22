@@ -25,7 +25,7 @@ work="$(mktemp -d "$repo_root/dist/no-exec.XXXXXX")"
 pid=""
 cleanup() {
   if [[ -n "$pid" ]]; then
-    kill "$pid" 2>/dev/null || true
+    kill -- "-$pid" 2>/dev/null || true
     wait "$pid" 2>/dev/null || true
   fi
   rm -rf "$work"
@@ -53,7 +53,7 @@ before="$(hash_tree)"
 test ! -e "$sentinel"
 
 echo "==> Live read-only requests"
-"${view[@]}" "$doc" --port 0 --no-open >"$work/server.log" 2>&1 &
+setsid "${view[@]}" "$doc" --port 0 --no-open >"$work/server.log" 2>&1 &
 pid=$!
 url=""
 for _ in $(seq 1 100); do
@@ -69,7 +69,7 @@ curl -fsS -b "$cookie_jar" "${url}api/documents" >/dev/null
 curl -fsS -b "$cookie_jar" "${url}api/documents?path=unsafe-side-effect.mq.md" >/dev/null
 # Reloading the page multiple times must remain side-effect free.
 for _ in $(seq 1 5); do curl -fsS -b "$cookie_jar" "${url}" >/dev/null; done
-kill "$pid" 2>/dev/null || true
+kill -- "-$pid" 2>/dev/null || true
 wait "$pid" 2>/dev/null || true
 pid=""
 
@@ -100,4 +100,4 @@ grep -qx 'explicit run only' "$sentinel"
 
 core_sha_after="$(sha256sum "$MARQDO_BIN" | cut -d' ' -f1)"
 test "$core_sha_before" = "$core_sha_after"
-echo "no-exec: PASS (sources/lock unchanged, no sentinel, no run control in export; core sha unchanged)"
+echo "no-exec: PASS (sources/lock unchanged, no sentinel from read-only operations, explicit write control passed, no run control in export; core sha unchanged)"
