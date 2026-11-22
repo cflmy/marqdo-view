@@ -510,6 +510,35 @@ fn failed_run_reports_core_error_code_without_fake_success() {
 }
 
 #[test]
+fn program_stdout_is_escaped_not_injected_as_markup() {
+    let tmp = std::path::PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(format!(
+        "hostile-stdout-{}-{}.json",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0)
+    ));
+    std::fs::write(
+        &tmp,
+        r#"{"command":"run","success":true,"stdout":"<script>alert(1)</script>","stderr":"<img src=x onerror=alert(2)>","trace":[],"value":{"type":"int","decimal":"3"}}"#,
+    )
+    .unwrap();
+    let server = start_server_with(
+        "examples/control-flow",
+        "tests/golden/analysis-v2/control-flow.json",
+        Some(tmp.to_str().unwrap()),
+        Some("tests/golden/trace-v2/control-flow.trace.json"),
+    );
+    let (_, page) = run_and_get_page(&server);
+    assert!(page.contains("&lt;script&gt;alert(1)&lt;/script&gt;"));
+    assert!(!page.contains("<script>alert(1)"));
+    assert!(!page.contains("onerror=\""));
+    assert!(!page.contains("<img src=x"));
+    let _ = std::fs::remove_file(&tmp);
+}
+
+#[test]
 fn cli_verify_output_contract_still_holds_for_installed_style_invocation() {
     // Regression guard: `view verify` must remain a pure static check.
     let repo_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));

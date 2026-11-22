@@ -93,11 +93,32 @@ Protocol axes (Tool v1, Analysis v2, Trace v2) are versioned separately.
   (`tests/fixtures/security-project`) proving no script execution and no
   external requests; `tests/export.rs` export contracts; ADR-0005.
 
+### Added (PR-06)
+
+- `tools/acceptance.sh`: one-command RFC §18.1 acceptance running the frozen CLI
+  from the release archive in an isolated tool home (fmt/clippy/test/build,
+  bundle, archive install, view help/verify/export, Live browse, explicit
+  CSRF-confirmed real run, export/security/browser suites, CLI SHA check) and
+  generating `docs/evidence/<CLI-SHA>/manifest.json` from real exit statuses.
+- `tools/test-contract.sh`, `.woodpecker.yml` (code/contract/export/browser/
+  release-bundle lanes; remote CI execution not verified).
+- `docs/ACCEPTANCE.md` gate table, `docs/audits/protocol-conformance.md`,
+  ADR-0006 (documented RFC deviations), final README/STATUS/COMPATIBILITY.
+- Unicode/CRLF/duplicate-text goldens and `tests/unicode_spans.rs` (S-04);
+  `tests/presentation_states.rs` degradation matrix (S-05..S-07); hostile
+  stdout escaping test (X-05); keyboard accessibility browser checks (U-03).
+
 ### Known limitations
 
+- First Beta: run is `pure`-only; project/strict grants UI, SSE streaming,
+  cancellation and multi-run history are not implemented.
+- Variables/memory/proof states remain `UNSUPPORTED`; debugger/Notebook are
+  non-goals.
 - No incremental export or multi-project site; one project per invocation.
-- Export still requires a core for semantic status; without it pages are
-  exported as explicitly unverified prose.
+- Pixel-level comparison with the reference screenshot remains manual
+  UNVERIFIED; SVG curve side notes are not implemented (inline keyed chips).
+- Remote CI is not executed in this environment; `.woodpecker.yml` is provided
+  and local acceptance evidence is complete.
 - `project`/`strict` grant UI, streaming output, cancellation and debugger are
   not implemented; variables/memory/proof states remain `UNSUPPORTED`.
 - Pixel-level comparison with the reference screenshot remains a manual

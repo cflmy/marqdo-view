@@ -1,0 +1,68 @@
+# Woodpecker CI for marqdo-view.
+#
+# The contract/export/browser lanes need the frozen marqdo release archive.
+# Provide it through a secret and extract it before the lane runs; the pipeline
+# deliberately never builds the CLI from source.
+when:
+  event: [push, pull_request, manual]
+
+steps:
+  code:
+    image: rust:1.85-bookworm
+    commands:
+      - export PATH="$HOME/.cargo/bin:$PATH"
+      - cargo fmt --all -- --check
+      - cargo clippy --all-targets -- -D warnings
+      - cargo test --locked
+      - cargo build --release --locked
+
+  contract:
+    image: rust:1.85-bookworm
+    depends_on: [code]
+    environment:
+      MARQDO_ARCHIVE:
+        from_secret: marqdo_beta_archive
+    commands:
+      # CI maintainers must provide the official archive at $MARQDO_ARCHIVE or
+      # export MARQDO_BIN from a verified extracted release. Do not rebuild it.
+      - |
+        if [ -z "${MARQDO_ARCHIVE:-}" ]; then
+          echo "MARQDO_ARCHIVE secret missing; contract lane requires the frozen official archive" >&2
+          exit 1
+        fi
+        mkdir -p /tmp/marqdo && tar -xzf "$MARQDO_ARCHIVE" -C /tmp/marqdo
+      - export MARQDO_BIN="$(find /tmp/marqdo -maxdepth 2 -name marqdo -type f | head -1)"
+      - sha256sum "$MARQDO_BIN"
+      - MARQDO_BIN="$MARQDO_BIN" ./tools/test-contract.sh
+      - sha256sum "$MARQDO_BIN"
+
+  export:
+    image: rust:1.85-bookworm
+    depends_on: [code]
+    environment:
+      MARQDO_ARCHIVE:
+        from_secret: marqdo_beta_archive
+    commands:
+      - mkdir -p /tmp/marqdo && tar -xzf "$MARQDO_ARCHIVE" -C /tmp/marqdo
+      - export MARQDO_BIN="$(find /tmp/marqdo -maxdepth 2 -name marqdo -type f | head -1)"
+      - cargo build --release --locked
+      - MARQDO_BIN="$MARQDO_BIN" ./tools/test-export.sh
+
+  browser:
+    image: mcr.microsoft.com/playwright:v1.49.0-noble
+    depends_on: [code]
+    commands:
+      - apt-get update && apt-get install -y --no-install-recommends cargo rustc || true
+      - export PATH="$HOME/.cargo/bin:$PATH"
+      - cargo build --release --locked
+      - (cd tests/browser && npm install --no-audit --no-fund)
+      - MARQDO_BIN="$(find /tmp/marqdo -maxdepth 2 -name marqdo -type f | head -1)" ./tools/test-browser.sh
+
+  release-bundle:
+    image: rust:1.85-bookworm
+    depends_on: [code]
+    commands:
+      - cargo build --release --locked
+      - MARQDO_BIN="" ./tools/package.sh
+      - sha256sum dist/marqdo-view-*.tar.gz
+      - tar -tzf dist/marqdo-view-*.tar.gz | sort

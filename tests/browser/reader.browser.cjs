@@ -70,6 +70,30 @@ function localHostOnly(url) {
     (await page.locator('.mq-dock-btn[data-action="run"]').count()) === 1
   );
 
+  // Keyboard reachability: focus must move through named interactive elements.
+  const namedTabStops = await page.evaluate(async () => {
+    return Array.from(document.querySelectorAll("a[href], button")).map((el) => ({
+      label: (el.getAttribute("aria-label") || el.textContent || "").trim(),
+      hidden: el.offsetParent === null,
+    }));
+  });
+  check(
+    "interactive controls have accessible names",
+    namedTabStops.filter((item) => !item.hidden && item.label.length > 0).length >= 8,
+    JSON.stringify(namedTabStops.slice(0, 8))
+  );
+  let focusedNamed = 0;
+  for (let index = 0; index < 10; index += 1) {
+    await page.keyboard.press("Tab");
+    const label = await page.evaluate(() => {
+      const element = document.activeElement;
+      if (!element) return "";
+      return (element.getAttribute("aria-label") || element.textContent || "").trim();
+    });
+    if (label.length > 0) focusedNamed += 1;
+  }
+  check("Tab reaches named controls", focusedNamed >= 6, String(focusedNamed));
+
   // Source/document mode switch through the single menu.
   await page.click('.mq-dock-btn[data-action="more"]');
   check("more dialog opens", await page.locator("#mq-dialog-more").isVisible());

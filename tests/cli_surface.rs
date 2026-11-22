@@ -74,7 +74,13 @@ fn degradation_without_core_keeps_prose_readable() {
     // invent semantic annotations or a fake run state.
     let project = common::TempProject::new("cli-degrade-no-core");
     project.marqdo_project("# @knowledge 标题\n\n正文 **加粗**。\n");
-    let context = marqdo_view::app::AppContext::open(&project.dir, None).unwrap();
+    // Explicitly point at a missing core so the test is independent of the
+    // caller environment (acceptance scripts export MARQDO_BIN).
+    let context = marqdo_view::app::AppContext::open(
+        &project.dir,
+        Some(std::path::Path::new("/definitely/missing/marqdo-frozen")),
+    )
+    .unwrap();
     let relative = context.project().entry().relative.clone();
     let model = context.load(&relative).unwrap();
     assert_eq!(model.source_status.data_value(), "core-unavailable");
