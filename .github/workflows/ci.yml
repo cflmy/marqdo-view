@@ -1,87 +1,47 @@
 name: ci
 
-# RFC-VIEW-0002 §9.4 / §10. The frozen marqdo release CLI is never built from
-# source here; the workflow fetches the official archive through a repository
-# variable, verifies its SHA-256 and asserts the binary is unchanged afterwards.
 on:
   push:
   pull_request:
   workflow_dispatch:
 
-env:
-  CARGO_TERM_COLOR: always
-  RUST_MIN_STACK: "8388608"
-  # Frozen release identity expected by this View (see docs/STATUS.md).
-  MARQDO_CLI_SHA256: "062cb56e226bee55c21d238e195920caa985e62bb3877ba7b07abcc04dc0fe3f"
-
 jobs:
-  quality:
-    name: fmt / clippy / tests (no CLI needed)
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: "1.85"
-          components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo fmt --all -- --check
-      - run: cargo clippy --all-targets -- -D warnings
-      - run: cargo test --locked
-      - run: cargo build --release --locked
-
   frozen-acceptance:
     name: frozen CLI acceptance (Tool install / SSE / export / browser)
-    runs-on: ubuntu-22.04
-    needs: quality
+    runs-on: ubuntu-24.04
     env:
+      CARGO_TERM_COLOR: always
+      RUST_MIN_STACK: "8388608"
       PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/tests/.cache/pw-browsers
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: "1.85"
+          toolchain: "1.89.0"
+          components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Fetch and verify the frozen marqdo release archive
-        env:
-          MARQDO_CLI_ARCHIVE_URL: ${{ vars.MARQDO_CLI_ARCHIVE_URL }}
+      - name: Fetch the official frozen core and verify its identity
+        shell: bash
         run: |
           set -euo pipefail
-          if [ -z "${MARQDO_CLI_ARCHIVE_URL:-}" ]; then
-            echo "::error::Repository variable MARQDO_CLI_ARCHIVE_URL is required."
-            echo "It must point at the official marqdo 3.0.0-beta.1 Linux x86_64 release archive."
-            exit 1
-          fi
-          curl -fsSL "$MARQDO_CLI_ARCHIVE_URL" -o "$RUNNER_TEMP/marqdo-cli.tar.gz"
-          echo "$MARQDO_CLI_SHA256  $RUNNER_TEMP/marqdo-cli.tar.gz" > "$RUNNER_TEMP/marqdo-archive.sha256"
-          # The recorded SHA is for the released marqdo binary; verify it after extraction.
-          mkdir -p "$RUNNER_TEMP/marqdo"
-          tar -xzf "$RUNNER_TEMP/marqdo-cli.tar.gz" -C "$RUNNER_TEMP/marqdo"
-          MARQDO_BIN="$(find "$RUNNER_TEMP/marqdo" -name marqdo -type f | head -1)"
-          test -n "$MARQDO_BIN"
-          echo "MARQDO_BIN=$MARQDO_BIN" >> "$GITHUB_ENV"
-          scripts/verify-frozen-cli.sh "$MARQDO_BIN" -- \
-            "$MARQDO_BIN" --version
-      - name: Install browser test dependencies
+          frozen="$(scripts/frozen-beta.sh fetch "$RUNNER_TEMP/marqdo-frozen")"
+          echo "MARQDO_BIN=$frozen" >> "$GITHUB_ENV"
+      - name: Install Chromium and run the full acceptance gate
         run: |
-          (cd tests/browser && npm ci)
+          (cd tests/browser && npm ci --no-audit --no-fund)
           (cd tests/browser && npx playwright install --with-deps chromium)
-      - name: One-command acceptance (records docs/evidence manifest)
-        env:
-          CLI_SOURCE_SHA: "2c7c4f31e7a388d3fcfa717a77067e696ed13854"
-        run: |
-          scripts/verify-frozen-cli.sh "$MARQDO_BIN" -- scripts/acceptance.sh
-      - name: Assert frozen CLI identity after the whole run
-        run: |
-          scripts/verify-frozen-cli.sh "$MARQDO_BIN" \
-            -- "$MARQDO_CLI_SHA256" -- "$MARQDO_BIN" --version
+          scripts/acceptance.sh
       - name: Upload acceptance evidence
-        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: acceptance-evidence
-          path: docs/evidence/
-          if-no-files-found: warn
+          name: view-evidence-${{ github.sha }}
+          path: |
+            dist/acceptance/manifest.json
+            dist/marqdo-view-*.tar.gz
+            dist/marqdo-view-*.tar.gz.sha256
+          if-no-files-found: error

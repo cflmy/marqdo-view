@@ -29,10 +29,12 @@ if [[ ! -d "$PLAYWRIGHT_BROWSERS_PATH" ]]; then
   exit 1
 fi
 
-binary="$repo_root/target/release/marqdo-view"
-if [[ ! -x "$binary" ]]; then
-  echo "==> cargo build --release --locked"
-  cargo build --release --locked
+if [[ "${VIEW_USE_INSTALLED_TOOL:-0}" == 1 ]]; then
+  view=("$MARQDO_BIN" view)
+else
+  binary="$repo_root/target/release/marqdo-view"
+  [[ -x "$binary" ]] || cargo build --release --locked
+  view=("$binary")
 fi
 
 server_pid=""
@@ -49,7 +51,7 @@ run_suite() {
   local log
   log="$(mktemp "$repo_root/tests/.cache/browser-server.XXXXXX.log")"
   echo "==> browser suite: $project"
-  "$binary" "$project" --port 0 --no-open >"$log" 2>&1 &
+  "${view[@]}" "$project" --port 0 --no-open >"$log" 2>&1 &
   server_pid=$!
   local url=""
   for _ in $(seq 1 100); do
@@ -77,6 +79,7 @@ run_suite() {
 mkdir -p "$repo_root/tests/.cache" "$MQ_SCREENSHOT_DIR"
 run_suite examples/welcome
 run_suite examples/control-flow
+run_suite examples/function-params.mq.md
 run_suite tests/fixtures/security-project
 
 core_after="$(sha256sum "$MARQDO_BIN" | cut -d' ' -f1)"

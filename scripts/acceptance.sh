@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# RFC-VIEW-0001 §18.1 one-command acceptance.
+# RFC-VIEW-0002 §9.4 one-command acceptance.
 #
 # Usage:
 #   MARQDO_BIN=/abs/path/to/frozen/marqdo scripts/acceptance.sh
 #
 # Optional:
-#   CLI_SOURCE_SHA=<sha>   override the CLI source SHA for the evidence manifest
+#   VIEW_EVIDENCE_OUT=path   override dist/acceptance/manifest.json
 #   SKIP_BROWSER=1         skip Chromium suite (recorded as SKIP, not PASS)
 #
 # The script never modifies or recompiles the frozen CLI; it records its
@@ -17,13 +17,16 @@ cd "$repo_root"
 
 : "${MARQDO_BIN:?set MARQDO_BIN to the frozen marqdo release binary}"
 [[ -x "$MARQDO_BIN" ]] || { echo "error: MARQDO_BIN not executable" >&2; exit 1; }
+MARQDO_BIN="$(realpath "$MARQDO_BIN")"
+export MARQDO_BIN
+"$repo_root/scripts/frozen-beta.sh" verify "$MARQDO_BIN"
 
 work="$repo_root/dist/acceptance"
 rm -rf "$work"
 mkdir -p "$work"
 
 statuses=""
-record() { statuses="${statuses}$1=$2\n"; echo "[acceptance] $1: $2"; }
+record() { statuses+="$1=$2"$'\n'; echo "[acceptance] $1: $2"; }
 
 run_step() {
   local name="$1"
@@ -38,17 +41,28 @@ run_step() {
 }
 
 core_before="$(sha256sum "$MARQDO_BIN" | cut -d' ' -f1)"
-cli_source_sha="${CLI_SOURCE_SHA:-}"
-if [[ -z "$cli_source_sha" && -f "$(dirname "$MARQDO_BIN")/SOURCE_SHA" ]]; then
-  cli_source_sha="$(tr -d '[:space:]' < "$(dirname "$MARQDO_BIN")/SOURCE_SHA")"
-fi
-cli_source_sha="${cli_source_sha:-unknown}"
+cli_source_sha="$(cat "$(dirname "$MARQDO_BIN")/SOURCE_SHA")"
 view_source_sha="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
 
 export PATH="${HOME}/.cargo/bin:${PATH}"
 export CARGO_HOME="${CARGO_HOME:-$repo_root/.cargo-home}"
 
 # 0. code quality / unit / contract tests
+check_wrong_cli() {
+  mkdir -p "$work/wrong-cli"
+  cp "$(dirname "$MARQDO_BIN")/SOURCE_SHA" "$work/wrong-cli/SOURCE_SHA"
+  cat >"$work/wrong-cli/marqdo" <<'FAKE'
+#!/usr/bin/env bash
+touch "$(dirname "$0")/executed"
+FAKE
+  chmod +x "$work/wrong-cli/marqdo"
+  if scripts/frozen-beta.sh verify "$work/wrong-cli/marqdo"; then
+    echo "error: mismatched CLI passed the baseline check" >&2
+    return 1
+  fi
+  test ! -e "$work/wrong-cli/executed"
+}
+run_step wrong_cli_refused check_wrong_cli
 run_step fmt cargo fmt --all -- --check
 run_step clippy cargo clippy --all-targets -- -D warnings
 run_step test cargo test --locked
@@ -57,19 +71,28 @@ run_step build cargo build --release --locked
 # 1. controlled Tool bundle + frozen-CLI install smoke
 run_step bundle env MARQDO_BIN="$MARQDO_BIN" ./scripts/package.sh
 bundle="$repo_root/dist/marqdo-view"
-archive="$(ls -t "$repo_root"/dist/marqdo-view-*-x86_64-unknown-linux-gnu.tar.gz | head -1)"
+read -r version target < <(python3 -c 'import json; p=json.load(open("dist/marqdo-view/RELEASE_INFO.json")); print(p["tool_version"], p["target"])')
+archive="$repo_root/dist/marqdo-view-$version-$target.tar.gz"
 archive_sha="$(sha256sum "$archive" | cut -d' ' -f1)"
 
 # 2. clean install from the *archive*, in a moved temporary directory
 mkdir -p "$work/extracted"
 tar -xzf "$archive" -C "$work/extracted"
 extracted_bundle="$work/extracted/marqdo-view"
+(cd "$extracted_bundle" && sha256sum -c SHA256SUMS)
 tool_home="$work/tool-home"
 mkdir -p "$tool_home"
 export MARQDO_TOOL_HOME="$tool_home"
+export VIEW_USE_INSTALLED_TOOL=1
 run_step archive_install "$MARQDO_BIN" tool install "$extracted_bundle/tool.json"
-run_step tool_list bash -c "'$MARQDO_BIN' tool list | grep -q view"
-run_step view_help bash -c "'$MARQDO_BIN' view --help | grep -q 'marqdo-view'"
+check_tool_list() {
+  grep -q '^view ' <<<"$("$MARQDO_BIN" tool list)"
+}
+check_view_help() {
+  grep -q 'marqdo-view' <<<"$("$MARQDO_BIN" view --help)"
+}
+run_step tool_list check_tool_list
+run_step view_help check_view_help
 run_step verify "$MARQDO_BIN" view verify examples/mixed-modes/index.mq.md
 run_step export "$MARQDO_BIN" view export examples/control-flow --out "$work/site"
 run_step examples_check env MARQDO_BIN="$MARQDO_BIN" ./scripts/check-examples.sh
@@ -131,11 +154,21 @@ run_step no_exec_suite env MARQDO_BIN="$MARQDO_BIN" ./scripts/test-no-exec.sh
 run_step security_suite ./scripts/test-security.sh
 if [[ "${SKIP_BROWSER:-0}" == "1" ]]; then
   record browser SKIP
-elif [[ -d "$repo_root/tests/browser/node_modules/playwright" && -d "$repo_root/tests/.cache/pw-browsers" ]]; then
-  run_step browser env MARQDO_BIN="$MARQDO_BIN" ./scripts/test-browser.sh
 else
-  record browser SKIP
+  run_step browser env MARQDO_BIN="$MARQDO_BIN" ./scripts/test-browser.sh
 fi
+
+check_tampered_install() {
+  local output
+  printf 'x' >> "$tool_home/view/bin/marqdo-view" || return 1
+  if output="$("$MARQDO_BIN" view --version 2>&1)"; then
+    echo "error: tampered Tool installation was dispatched" >&2
+    return 1
+  fi
+  grep -q 'bundle hash mismatch' <<<"$output"
+}
+run_step tool_tamper_refused check_tampered_install
+run_step tool_remove "$MARQDO_BIN" tool remove view
 
 # 6. frozen core must be byte-identical
 core_after="$(sha256sum "$MARQDO_BIN" | cut -d' ' -f1)"
@@ -147,33 +180,32 @@ fi
 record core_sha PASS
 
 view_binary_sha="$(sha256sum "$bundle/bin/marqdo-view" | cut -d' ' -f1)"
-target="$(python3 -c 'import json;print(json.load(open("dist/marqdo-view/RELEASE_INFO.json"))["target"])')"
-evidence_dir="$repo_root/docs/evidence/$cli_source_sha"
-mkdir -p "$evidence_dir"
-python3 - "$evidence_dir/manifest.json" <<PY
+evidence_path="${VIEW_EVIDENCE_OUT:-$work/manifest.json}"
+mkdir -p "$(dirname "$evidence_path")"
+python3 - "$evidence_path" "$statuses" "$view_source_sha" "$view_binary_sha" \
+  "$cli_source_sha" "$core_before" "$core_after" "$target" "$archive_sha" <<'PY_EVIDENCE'
 import datetime
 import json
 import pathlib
+import sys
 
-path = pathlib.Path("$evidence_dir/manifest.json")
-statuses = {}
-for line in """${statuses}""".splitlines():
-    if "=" in line:
-        name, value = line.split("=", 1)
-        statuses[name] = value
+(path, gates, view_source_sha, view_binary_sha, cli_source_sha,
+ core_before, core_after, target, archive_sha) = sys.argv[1:]
+path = pathlib.Path(path)
+statuses = dict(line.split("=", 1) for line in gates.splitlines())
 manifest = {
     "schema": "marqdo.view-conformance",
     "schema_version": 1,
-    "view_source_sha": "$view_source_sha",
-    "view_binary_sha256": "$view_binary_sha",
-    "cli_source_sha": "$cli_source_sha",
-    "cli_binary_sha256_before": "$core_before",
-    "cli_binary_sha256_after": "$core_after",
+    "view_source_sha": view_source_sha,
+    "view_binary_sha256": view_binary_sha,
+    "cli_source_sha": cli_source_sha,
+    "cli_binary_sha256_before": core_before,
+    "cli_binary_sha256_after": core_after,
     "tool_protocol": 1,
     "analysis_protocol": 2,
     "trace_protocol": 2,
-    "target": "$target",
-    "archive_sha256": "$archive_sha",
+    "target": target,
+    "archive_sha256": archive_sha,
     "generated_at_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
     "tests": {
         "contract": statuses.get("test", "FAIL"),
@@ -189,11 +221,15 @@ manifest = {
         "notes": "Generated from real command exit statuses; install/verify/export/run use the frozen CLI archive copied to an isolated tool home.",
     },
 }
-path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\\n")
+path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
 print("evidence manifest:", path)
-PY
+PY_EVIDENCE
 
 echo
-echo "acceptance: PASS"
-echo "evidence: $evidence_dir/manifest.json"
+if [[ "${SKIP_BROWSER:-0}" == "1" ]]; then
+  echo "acceptance: PARTIAL (browser skipped)"
+else
+  echo "acceptance: PASS"
+fi
+echo "evidence: $evidence_path"
 echo "archive sha256: $archive_sha"

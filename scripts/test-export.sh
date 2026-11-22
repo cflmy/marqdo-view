@@ -11,12 +11,17 @@ cd "$repo_root"
 [[ -x "$MARQDO_BIN" ]] || { echo "error: MARQDO_BIN not executable" >&2; exit 1; }
 core_before="$(sha256sum "$MARQDO_BIN" | cut -d' ' -f1)"
 
-binary="$repo_root/target/release/marqdo-view"
-[[ -x "$binary" ]] || cargo build --release --locked
+if [[ "${VIEW_USE_INSTALLED_TOOL:-0}" == 1 ]]; then
+  view=("$MARQDO_BIN" view)
+else
+  binary="$repo_root/target/release/marqdo-view"
+  [[ -x "$binary" ]] || cargo build --release --locked
+  view=("$binary")
+fi
 
 site="$repo_root/dist/test-export-site"
 rm -rf "$site"
-MARQDO_BIN="$MARQDO_BIN" "$binary" export examples/welcome --out "$site"
+MARQDO_BIN="$MARQDO_BIN" "${view[@]}" export examples/welcome --out "$site"
 
 python3 - "$site" <<'PY'
 import hashlib

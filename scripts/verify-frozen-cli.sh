@@ -34,7 +34,6 @@ if [[ ! -x "$core" ]]; then
 fi
 
 sha_before="$(sha256sum "$core" | cut -d' ' -f1)"
-version_line="$("$core" --version 2>&1 | head -1)"
 
 if [[ -n "$expected" && "$expected" != "$sha_before" ]]; then
   echo "error: frozen CLI SHA-256 mismatch" >&2
@@ -43,8 +42,10 @@ if [[ -n "$expected" && "$expected" != "$sha_before" ]]; then
   exit 1
 fi
 
+version_line="$("$core" --version)"
+command_status=0
 if [[ $# -gt 0 ]]; then
-  "$@"
+  "$@" || command_status=$?
 fi
 
 sha_after="$(sha256sum "$core" | cut -d' ' -f1)"
@@ -59,3 +60,5 @@ printf 'verify-frozen-cli: PASS\n'
 printf '  path:    %s\n' "$core"
 printf '  version: %s\n' "$version_line"
 printf '  sha256:  %s (unchanged)\n' "$sha_before"
+
+exit "$command_status"

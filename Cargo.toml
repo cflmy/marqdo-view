@@ -2,7 +2,7 @@
 name = "marqdo-view"
 version = "0.2.0"
 edition = "2021"
-rust-version = "1.85"
+rust-version = "1.89"
 license = "MIT OR Apache-2.0"
 description = "Marqdo View: read .mq.md documents as documents, with optional verified Analysis v2 and Trace v2"
 repository = "https://github.com/cflmy/marqdo-view"
