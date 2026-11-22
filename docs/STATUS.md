@@ -23,9 +23,9 @@
 | PR-00 基线与旧 View 取证 | **完成** | `docs/audits/legacy-render-paths.md`、`docs/design/visual-tokens.md`、`docs/design/state-matrix.md`、ADR-0001/0002 |
 | PR-01 Tool v1 安装闭环 | **完成** | `tool.json`、`tools/package.sh`、`tools/install-smoke.sh`、`tests/core_contract.rs`、`tests/no_coupling.rs` |
 | PR-02 DocumentModel + Analysis v2 浏览 | **完成** | `src/document.rs`、`src/semantic.rs`、`src/presentation.rs`、`src/render.rs`、`src/server.rs`、`tests/rendering.rs`、`tests/http_live.rs`、`tests/golden/analysis-v2/`（冻结 CLI 生成） |
-| PR-03 Reader 视觉重建 | 进行中（基础主题已就绪） | `assets/reader.css`/`assets/reader.js` 单一入口，`tests/asset_integrity.rs`；完整欢迎页/响应式截图待补 |
+| PR-03 Reader 视觉重建 | **完成（像素级人工比对未执行）** | 单一 `assets/reader.css`/`assets/reader.js`；`tools/test-browser.sh` + `tests/browser/reader.browser.cjs` 在 7 个宽度、无 JS、打印、搜索、设置、显式运行下 PASS；截图证据见 `docs/evidence/PR-03/` |
 | PR-04 Trace v2 运行可视化 | **完成** | `src/trace.rs`、`POST /api/run`（CSRF/Origin/确认/并发）、`tests/trace_contract.rs`、`tests/http_live.rs`、`tests/golden/trace-v2/`（冻结 CLI 生成）、ADR-0004 |
-| PR-05 Live 安全 + 静态导出 | 未开始 | — |
+| PR-05 Live 安全强化 + 静态导出 | 未开始 | — |
 | PR-06 冻结 CLI 端到端验收 | 未开始 | — |
 
 ## 证据与限制
@@ -35,7 +35,8 @@
 - `export` 仍返回 `view.unsupported`（PR-05 落地）；运行入口在 PR-04 起可用，但必须经过页面内显式确认 + CSRF 校验，且只允许 `pure` 模式。
 - 冻结 CLI 安装烟测通过前不得声称 Tool v1 闭环可用；证据由 `tools/install-smoke.sh` 生成。
 - PR-02 的 Analysis golden 全部由冻结 CLI `check --emit` 生成（见 `tests/golden/README.md`）；`examples/diagnostics` 故意 check 失败且没有 golden。
-- 已知限制：逐语句变量值/参数值/内存快照/证明状态仍不可用且标为 UNSUPPORTED；`project`/`strict` 运行授权界面、SSE 流式输出、调试器未实现；`export` 未实现；浏览器截图验收在 PR-03/PR-06。
+- 已知限制：逐语句变量值/参数值/内存快照/证明状态仍不可用且标为 UNSUPPORTED；`project`/`strict` 运行授权界面、SSE 流式输出、调试器未实现；`export` 未实现。
+- 视觉门禁：结构化/几何/无外部资源/无 JS/打印 PASS；与参考截图的像素级人工比对 `U-01` 仍为 UNVERIFIED，需人工复核（见 `docs/evidence/PR-03/README.md`）。
 - 运行安全：首版只提供 `--mode pure`；POST `/api/run` 要求同源 Origin（若提供）、CSRF token、`confirm:true`、单活动运行；运行缓存仅保存在进程内，重启即清空。
 - 已核对旧视觉资产许可（旧仓库 Apache-2.0）：logo/blossom/feather 可复用，KaTeX 不引入。
 - 已知非目标：变量运行值、内存快照、调试器、Prove/Knowledge/Lint 引擎（均标 `UNSUPPORTED`）。

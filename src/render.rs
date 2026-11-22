@@ -1231,7 +1231,9 @@ fn escape_attr(raw: &str) -> String {
 }
 
 fn csp_policy() -> &'static str {
-    "default-src 'none'; style-src 'self'; script-src 'self' file:; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'"
+    // `frame-ancestors` is ignored in <meta>; the HTTP header (server.rs) adds
+    // the framing restrictions. Keep the meta policy identical otherwise.
+    "default-src 'none'; style-src 'self'; script-src 'self' file:; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'"
 }
 
 fn percent_encode_path(raw: &str) -> String {

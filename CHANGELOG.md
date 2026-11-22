@@ -63,9 +63,22 @@ Protocol axes (Tool v1, Analysis v2, Trace v2) are versioned separately.
   never spawn a process.
 - ADR-0004 for the run/CSRF/cache design.
 
+### Added (PR-03)
+
+- Browser acceptance harness (`tests/browser/reader.browser.cjs`,
+  `tools/test-browser.sh`) against real Chromium + the frozen core: single
+  CSS/script, no external requests, no console errors, document/source switch,
+  search, settings, 7 viewport widths without horizontal overflow or dock
+  clipping, no-JS reading, print mode, explicit run + clear.
+- Screenshot evidence for the Welcome page (1664×920, 390×844) and a real
+  Trace run page in `docs/evidence/PR-03/`.
+- Meta CSP no longer carries the ignored `frame-ancestors` directive (the HTTP
+  header still enforces framing).
+
 ### Known limitations
 
 - `export` still returns `view.unsupported` (PR-05).
 - `project`/`strict` grant UI, streaming output, cancellation and debugger are
   not implemented; variables/memory/proof states remain `UNSUPPORTED`.
-- Browser screenshot/geometry acceptance is scheduled for PR-03/PR-06.
+- Pixel-level comparison with the reference screenshot remains a manual
+  UNVERIFIED item; automated geometry/DOM/network/print/no-JS checks pass.

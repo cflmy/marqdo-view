@@ -59,6 +59,13 @@ MARQDO_BIN=/absolute/path/to/marqdo
 "$MARQDO_BIN" view --help
 ```
 
+浏览器验收（需要一次性的 Playwright/Chromium 下载）：
+
+```bash
+(cd tests/browser && npm install && PLAYWRIGHT_BROWSERS_PATH="$PWD/../.cache/pw-browsers" npx playwright install chromium)
+MARQDO_BIN=/absolute/path/to/marqdo ./tools/test-browser.sh
+```
+
 完整安装/验收步骤见 RFC §18，脚本位于 `tools/`。
 
 ## 许可
