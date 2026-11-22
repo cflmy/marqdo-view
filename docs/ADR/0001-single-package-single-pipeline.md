@@ -13,15 +13,16 @@
 ## 决策
 
 1. **单一 Rust package**（`Cargo.toml` 只有一个 `[package]`，无 workspace、无内部 crate）。
-2. **唯一依赖方向**：
+2. **库边界**：`src/lib.rs` 暴露模块以便集成测试与未来 server 复用，`src/main.rs` 只是解析参数、调用 `run()`、打印诊断并退出的薄分派器；这不是第二个渲染/解析入口。
+3. **唯一依赖方向**：
    `CLI/Server → Application → Domain → ProtocolAdapter`，以及
    `Application → Presentation → Renderer → Assets`。
    `Domain` 不得引用 HTTP 请求；`Renderer` 不得启动子进程；`reader.js` 不得解释 Marqdo 语义。
-3. **唯一渲染入口**：`render.rs::ReaderRenderer::render(&PresentationModel, LinkPolicy)`。Live 与 Export 只差 `LinkPolicy` 与控件可用性；`Command` 层不得自己拼 HTML。
-4. **唯一呈现模型**：`presentation.rs::PresentationModel { document, semantic, run, overlays, source_status }`，由 `PresentationBuilder` 从**已验证**类型构建；未验证 JSON 不进入渲染端。
-5. **唯一前端主题**：`assets/reader.css`（`@layer reset,tokens,layout,typography,semantics,overlays,interactions,responsive`）+ `assets/reader.js`（只操作 `[data-action]`/`[data-source-id]`/`data-*`）。禁止 `legacy.css`/`new.css` 并行、禁止 `!important` 覆盖链。
-6. **唯一用户可见命令层**：`cli.rs` 用 clap 解析 `view` 自身的 `browse/export/verify`；`main.rs` 只做分发。
-7. **唯一核心交互**：`core_client.rs::PublicCoreClient` 通过 `MARQDO_BIN` 子进程与公开 JSON 交互；`check --emit` 生成 Analysis v2，`run --trace-file` 生成 Trace v2。禁止链接 CLI crate、读取 CLI 源码、`inspect --ir`。
+4. **唯一渲染入口**：`render.rs::ReaderRenderer::render(&PresentationModel, LinkPolicy)`。Live 与 Export 只差 `LinkPolicy` 与控件可用性；`Command` 层不得自己拼 HTML。
+5. **唯一呈现模型**：`presentation.rs::PresentationModel { document, semantic, run, overlays, source_status }`，由 `PresentationBuilder` 从**已验证**类型构建；未验证 JSON 不进入渲染端。
+6. **唯一前端主题**：`assets/reader.css`（`@layer reset,tokens,layout,typography,semantics,overlays,interactions,responsive`）+ `assets/reader.js`（只操作 `[data-action]`/`[data-source-id]`/`data-*`）。禁止 `legacy.css`/`new.css` 并行、禁止 `!important` 覆盖链。
+7. **唯一用户可见命令层**：`cli.rs` 用 clap 解析 `view` 自身的 `browse/export/verify`；`main.rs` 只做分发。
+8. **唯一核心交互**：`core_client.rs::PublicCoreClient` 通过 `MARQDO_BIN` 子进程与公开 JSON 交互；`check --emit` 生成 Analysis v2，`run --trace-file` 生成 Trace v2。禁止链接 CLI crate、读取 CLI 源码、`inspect --ir`。
 
 ## 后果
 

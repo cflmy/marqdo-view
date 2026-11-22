@@ -21,7 +21,7 @@
 | 阶段 | 状态 | 证据 |
 |---|---|---|
 | PR-00 基线与旧 View 取证 | **完成** | `docs/audits/legacy-render-paths.md`、`docs/design/visual-tokens.md`、`docs/design/state-matrix.md`、ADR-0001/0002 |
-| PR-01 Tool v1 安装闭环 | 未开始 | — |
+| PR-01 Tool v1 安装闭环 | **完成** | `tool.json`、`tools/package.sh`、`tools/install-smoke.sh`、`tests/core_contract.rs`、`tests/no_coupling.rs` |
 | PR-02 DocumentModel + Analysis v2 浏览 | 未开始 | — |
 | PR-03 Reader 视觉重建 | 未开始 | — |
 | PR-04 Trace v2 运行可视化 | 未开始 | — |
@@ -31,6 +31,7 @@
 ## 证据与限制
 
 - 旧 View 运行时状态：`LEGACY_RUNTIME_UNVERIFIED`（旧仓库无预编译产物，且任务禁止修改/编译旧仓库；只做只读静态审计）。
-- 本仓库尚未包含可运行实现；在 PR-01 之前 `marqdo view` 不存在。
+- PR-01 起 `marqdo view --help/--version/verify` 由本程序提供；`browse`/`export` 仍返回 `view.unsupported`（PR-02/PR-05 落地）。
+- 冻结 CLI 安装烟测通过前不得声称 Tool v1 闭环可用；证据由 `tools/install-smoke.sh` 生成。
 - 已核对旧视觉资产许可（旧仓库 Apache-2.0）：logo/blossom/feather 可复用，KaTeX 不引入。
 - 已知非目标：变量运行值、内存快照、调试器、Prove/Knowledge/Lint 引擎（均标 `UNSUPPORTED`）。
