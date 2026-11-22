@@ -1,15 +1,15 @@
 //! Rendering contract tests: one renderer, safe Markdown, exact source view,
 //! verified semantic annotations and Live/Export link differences.
 
-mod common;
+use marqdo_view::config::ViewConfig;
+use marqdo_view::protocol::analysis_v2 as semantic;
+use marqdo_view::reader::assemble::{self as assemble, BuildInput};
+use marqdo_view::reader::markdown::{DocumentIdentity, DocumentModel};
+use marqdo_view::reader::model::{Navigation, SourceStatus};
+use marqdo_view::reader::render::{ReaderRenderer, RenderContext};
+use marqdo_view::reader::source::{Project, SafeRelativePath};
 
-use marqdo_view::document::{DocumentIdentity, DocumentModel};
-use marqdo_view::presentation::{self, BuildInput, Navigation, SourceStatus};
-use marqdo_view::project::{Project, SafeRelativePath, ViewConfig};
-use marqdo_view::render::{ReaderRenderer, RenderContext};
-use marqdo_view::semantic;
-
-fn example(name: &str) -> (marqdo_view::presentation::PresentationModel, String) {
+fn example(name: &str) -> (marqdo_view::reader::model::PresentationModel, String) {
     let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("examples")
         .join(name);
@@ -29,7 +29,7 @@ fn example(name: &str) -> (marqdo_view::presentation::PresentationModel, String)
             .unwrap_or_else(|err| panic!("golden does not verify for {name}: {err}"));
     let config = ViewConfig::load(project.root()).unwrap_or_default();
     let navigation = Navigation::from_project(&project, &config, &entry);
-    let model = presentation::build(BuildInput {
+    let model = assemble::build(BuildInput {
         document,
         analysis: Some(&verified),
         status: SourceStatus::StaticOk,
@@ -42,13 +42,13 @@ fn example(name: &str) -> (marqdo_view::presentation::PresentationModel, String)
     (model, source)
 }
 
-fn render_live(model: &marqdo_view::presentation::PresentationModel) -> String {
+fn render_live(model: &marqdo_view::reader::model::PresentationModel) -> String {
     ReaderRenderer::new()
         .render(model, &RenderContext::live())
         .html
 }
 
-fn render_static(model: &marqdo_view::presentation::PresentationModel, depth: usize) -> String {
+fn render_static(model: &marqdo_view::reader::model::PresentationModel, depth: usize) -> String {
     ReaderRenderer::new()
         .render(model, &RenderContext::static_site(depth))
         .html
@@ -203,7 +203,7 @@ fn malicious_markdown_cannot_inject_markup_or_scripts() {
         &config,
         &SafeRelativePath::parse("index.mq.md").unwrap(),
     );
-    let model = presentation::build(BuildInput {
+    let model = assemble::build(BuildInput {
         document,
         analysis: None,
         status: SourceStatus::CoreUnavailable,
@@ -249,4 +249,15 @@ fn run_controls_are_explicitly_unavailable_before_pr04() {
     // No fake RUNNING/SUCCEEDED marker on a freshly opened document.
     assert!(!html.contains("data-run-state=\"running\""));
     assert!(!html.contains("data-run-state=\"succeeded\""));
+}
+
+#[test]
+fn reader_exposes_simple_theme_toggle_and_no_variable_or_memory_tabs() {
+    let (model, _source) = example("welcome");
+    let html = render_live(&model);
+    assert!(html.contains("data-theme=\"light\""));
+    assert!(html.contains("data-action=\"theme\""));
+    assert!(!html.contains("data-action=\"variables\""));
+    assert!(!html.contains("data-action=\"memory\""));
+    assert!(html.contains("data-action=\"unsupported\""));
 }

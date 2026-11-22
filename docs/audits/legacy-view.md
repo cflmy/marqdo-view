@@ -5,7 +5,7 @@
 - 日期：2026-11-22
 - 旧产品来源：`cflmy/marqdo`，`main@1c55baabd570e18b9da8f9057cef2f848e176690`
   （本机只读 checkout `/root/work/marqdo`；新仓库**没有**任何 Git/path/Cargo 依赖）
-- 新仓库：`marqdo-view`（独立 crate，见 `Cargo.toml` / `tests/no_coupling.rs`）
+- 新仓库：`marqdo-view`（独立 crate，见 `Cargo.toml` / `tests/contract/no_coupling.rs`）
 - 结论适用范围：只作为**视觉与历史取证**。旧 `view` 的运行结果、旧 AST、旧
   `RunCapture` 都**不是** 3.0 语言语义真值；语言真值只来自冻结 CLI 的
   Analysis v2 / Trace v2（见 `docs/audits/protocol-contract-0002.md`）。

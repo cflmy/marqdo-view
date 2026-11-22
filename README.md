@@ -88,8 +88,8 @@ PublicCoreClient ─ MARQDO_BIN 子进程 + 公开 JSON（check --emit / run --t
 - Trace v2 与 Analysis 字节摘要严格绑定；`STALE/TRUNCATED/FAILED/UNSUPPORTED`
   状态显式呈现，不猜测未公开值。
 - Live/Export 内容同源；导出绝不执行、绝不覆盖项目源文件或无关目录。
-- 门禁：`tests/no_coupling.rs` 拒绝旧 crate/源码依赖、第二套渲染器/主题、shell 执行；
-  `tests/asset_integrity.rs` 锁定内嵌资产与唯一主题层。
+- 门禁：`tests/contract/no_coupling.rs` 拒绝旧 crate/源码依赖、第二套渲染器/主题、shell 执行；
+  `tests/contract/asset_integrity.rs` 锁定内嵌资产与唯一主题层。
 
 ## 开发与验收
 

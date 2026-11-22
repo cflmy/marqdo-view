@@ -40,6 +40,28 @@
     --mq-dock-h: 66px;
     --mq-note-width: 176px;
   }
+
+  /* Simple dark theme (RFC-VIEW-0002 §1.2 MVP SMALL): one token override
+   * layer, no theme framework, no remote skin. */
+  .mq-reader[data-theme="dark"] {
+    color-scheme: dark;
+    --mq-paper: #1e1b17;
+    --mq-surface: #26221d;
+    --mq-surface-2: #2e2923;
+    --mq-surface-3: #3a332b;
+    --mq-ink: #ece5da;
+    --mq-strong: #f7f2ea;
+    --mq-muted: #ab9c89;
+    --mq-line: #3d362d;
+    --mq-line-strong: #5b5041;
+    --mq-gold: #d0a55f;
+    --mq-gold-soft: #8a6a37;
+    --mq-olive: #a3b482;
+    --mq-ok: #a3b482;
+    --mq-warn: #d7a55a;
+    --mq-error: #e08072;
+    --mq-focus: #e2b877;
+  }
 }
 
 @layer reset {

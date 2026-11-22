@@ -2,7 +2,7 @@
 //! The server is a real child process so startup, URL output, routing, security
 //! headers, CSRF and the explicit-run flow are exercised end to end.
 
-mod common;
+use crate::common;
 
 use common::{run_view, FakeCore};
 use std::io::{BufRead, BufReader, Read, Write};
@@ -566,4 +566,24 @@ fn cli_verify_output_contract_still_holds_for_installed_style_invocation() {
     assert_eq!(json["result"], "PASS");
     assert_eq!(json["executed"], false);
     assert_eq!(json["analysis"]["schema_version"], 2);
+}
+
+#[test]
+fn documents_api_is_a_read_only_structure_and_old_route_is_gone() {
+    let server = start_server();
+    let response = http_get(server.port, None, "/api/documents");
+    assert_eq!(response.status, 200);
+    let body = json_body(&response.body);
+    assert_eq!(body["schema"], "marqdo.view-documents");
+    assert_eq!(body["schema_version"], 1);
+    assert!(body["documents"].is_array());
+    assert!(body["documents"].as_array().unwrap().len() >= 2);
+    assert!(body["current"]["relative_path"].is_string());
+    assert!(body["current"]["outline"].is_array());
+    assert!(body["current"]["note"].is_null() || body["current"]["note"].is_string());
+    assert!(body["note"].as_str().unwrap().contains("never executes"));
+
+    // The old singular route is not part of the target API surface.
+    let old = http_get(server.port, None, "/api/document?path=index.mq.md");
+    assert_eq!(old.status, 404);
 }

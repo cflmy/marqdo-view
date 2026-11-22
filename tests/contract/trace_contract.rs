@@ -2,9 +2,9 @@
 //! goldens bind to the committed Analysis v2 bytes by digest, so a changed
 //! source cannot silently reuse an old trace.
 
-use marqdo_view::semantic;
-use marqdo_view::source_map::{sha256_prefixed, SourceIndex};
-use marqdo_view::trace::{verify_trace, RunDisplayState, TraceVerificationInput};
+use marqdo_view::protocol::analysis_v2 as semantic;
+use marqdo_view::protocol::trace_v2::{verify_trace, RunDisplayState, TraceVerificationInput};
+use marqdo_view::reader::source::{sha256_prefixed, SourceIndex};
 use serde_json::Value;
 
 struct Fixture {
@@ -43,7 +43,7 @@ fn verify(
     trace_golden: &str,
     run_golden: &str,
     exit_code: i32,
-) -> marqdo_view::trace::VerifiedRun {
+) -> marqdo_view::protocol::trace_v2::VerifiedRun {
     let trace = golden_bytes(trace_golden);
     let run_json = golden_json(run_golden);
     verify_trace(TraceVerificationInput {

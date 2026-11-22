@@ -38,7 +38,7 @@ MARQDO_BIN="$MARQDO_BIN" scripts/package.sh
 | 冻结 CLI SHA | 全流程前后 | 均为 `062cb56e…`，**未变化**；未构建/修改 CLI |
 
 `cargo build --release --locked` 的依赖图不含 `marqdo-cli`/旧 `marqdo` 私有 crate
-（`tests/no_coupling.rs` 门禁）。
+（`tests/contract/no_coupling.rs` 门禁）。
 
 ## 备注
 

@@ -22,7 +22,7 @@
 |---|---|---|
 | PR-00 基线、旧 View 取证、冻结 CLI 合同 | **完成** | `docs/audits/legacy-view.md`、`docs/audits/protocol-contract-0002.md`、`docs/decisions/0007` |
 | PR-01 Tool v1 打包/安装/调度、0.2.0、scripts/、CI | **完成** | `scripts/package.sh`、`scripts/install-smoke.sh`、`scripts/verify-frozen-cli.sh`、`.github/workflows/ci.yml`；冻结 CLI `tool install`/`view --help`/篡改拒绝实测 |
-| PR-02 Reader/Analysis 只读面与目标目录结构 | 待开始（现有 0001 实现可迁移） | `src/document.rs`、`src/semantic.rs`、`src/render.rs`、`src/server.rs` |
+| PR-02 Reader/Analysis 只读面与目标目录结构 | **完成** | `src/protocol/*`、`src/reader/*`、`src/config.rs`、`tests/{contract,integration}/`、`/api/documents`；证据 `docs/evidence/PR-02/` |
 | PR-03 执行层：request/process/controller、pure + project grants | 待开始（现有同步 `pure` 执行可迁移） | `src/core_client.rs`、`src/app.rs` |
 | PR-04 SSE 任务生命周期、取消、7 路由、会话 Cookie/CSRF | **未实现（MVP 阻塞项）** | — |
 | PR-05 Trace 绑定/原文标注/浏览器回归 | 待开始（现有 Trace 校验可迁移） | `src/trace.rs` |
@@ -36,7 +36,7 @@
 |---|---|
 | 原始 Markdown/GFM 阅读、源码态、搜索/设置/打印 | 已实现（单一 `assets/reader.css`/`assets/reader.js`） |
 | Analysis v2 严格校验、函数/Unit/签名/诊断/导入/引用/资源投影 | 已实现（无效 span 降级） |
-| 单一 `ReaderRenderer`，Live/Export 共用 | 已实现（门禁测试） |
+| 单一 `ReaderRenderer`，Live/Export 共用 | 已实现（`src/reader/render.rs`，门禁测试） |
 | 显式确认后同步运行 `pure` + Trace v2 校验与展示 | 已实现，但**不是 0002 的异步 SSE 闭环** |
 | 静态离线导出（无执行、manifest/哈希、原子发布） | 已实现，待按 0002 重新验收 |
 | Tool v1 打包/安装/分发、冻结 CLI SHA 前后一致 | 已实现，待迁移至 `scripts/` 与 0.2.0 |
@@ -63,10 +63,11 @@
 7. **执行预算未按 0002**：默认 30s（最大 120s）、`--fuel 1000000`、
    `--max-output 1048576`、`--trace-max-events 10000`、`--trace-max-bytes 4194304`、
    JSON/Trace/日志 4 MiB 有界读取与 `view.output_limit` 未实现。
-8. **目录/测试/脚本/示例未按 0002 §5.3**：缺 `src/protocol`、`src/reader`、
-   `src/execution`、`src/server`、`tests/{contract,integration,security,browser,
-   fixtures,golden}`、`scripts/`、`examples/{welcome,branch-loop,function-params,
-   knowledge-only,unsafe-side-effect}.mq.md`、`.github/workflows/ci.yml`。
+8. **目录/测试/示例仍有缺口**：`src/protocol`/`src/reader`/`src/config.rs`/
+   `tests/{contract,integration}`/`scripts/`/`.github/workflows/ci.yml` 已就位；
+   仍缺 `src/execution/*`、`src/server/{mod,routes,security,sse}.rs`、
+   `tests/security/` 套件、`examples/{welcome,branch-loop,function-params,
+   knowledge-only,unsafe-side-effect}.mq.md`、`docs/design` 0002 宽度截图矩阵。
 9. **文档口径**：README/COMPATIBILITY/ACCEPTANCE 仍含 0001 时期表述，需在
    PR-06 前全部更新为 0002 口径。
 10. **视觉回归矩阵**：0002 要求 2048×1133 源参考与 1664×920/1440×900/1024×768/

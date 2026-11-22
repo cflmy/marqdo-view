@@ -22,6 +22,6 @@
 
 ## 后果
 
-- 同页多个 H2/H3 永远得到不同 id；`tests/rendering.rs::semantic_annotations_come_from_analysis_and_are_unique` 断言唯一性。
+- 同页多个 H2/H3 永远得到不同 id；`tests/integration/rendering.rs::semantic_annotations_come_from_analysis_and_are_unique` 断言唯一性。
 - Setext 标题没有合法前缀声明，会被原样显示并沿用自身 span 锚点；如果未来需要更精确的继承模式标注，必须通过新的公开协议字段实现，不能在 JS/CSS 里猜。
 - 标题显示与源码态自动保持一致；无需额外“复制原文”逻辑。

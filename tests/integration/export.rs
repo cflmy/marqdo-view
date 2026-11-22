@@ -1,7 +1,7 @@
 //! Static export contract tests: pure read-only, same renderer, offline assets,
 //! safe output paths and no execution (RFC-VIEW-0001 §11.3, R-02, X-04).
 
-mod common;
+use crate::common;
 
 use common::{run_view, sha256_hex, FakeCore, TempProject};
 use std::path::{Path, PathBuf};
@@ -124,7 +124,7 @@ fn exports_offline_site_with_shared_renderer_and_relative_links() {
         assert_eq!(sha256_hex(&bytes), entry["sha256"].as_str().unwrap());
     }
     // Assets are exactly the embedded bundle bytes.
-    let bundle = marqdo_view::assets::AssetBundle::get();
+    let bundle = marqdo_view::reader::assets::AssetBundle::get();
     let css = std::fs::read(out.join("assets").join(bundle.hashed_css_name())).unwrap();
     assert_eq!(css, bundle.css_bytes());
 

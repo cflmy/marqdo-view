@@ -6,6 +6,22 @@ Protocol axes (Tool v1, Analysis v2, Trace v2) are versioned separately.
 
 ## [Unreleased]
 
+### Changed (RFC-VIEW-0002 PR-02)
+
+- Restructured the crate into the RFC-VIEW-0002 §5.3 layout: `src/protocol/
+  {analysis_v2,trace_v2,tool_v1}.rs`, `src/reader/{source,markdown,model,
+  assemble,render,assets}.rs`, `src/config.rs`; `lib.rs` is the composition
+  root and `app.rs`/`project.rs`/`semantic.rs`/`trace.rs`/`document.rs`/
+  `presentation.rs`/`source_map.rs`/`render.rs`/`assets.rs` are gone.
+- Replaced `GET /api/document` with the read-only `GET /api/documents`
+  (documents list + current outline/function/analysis summary).
+- Reading UI: removed variable/memory placeholder menu entries (one explicit
+  "unsupported capability" explanation remains), added a simple dark theme
+  toggle with a single token override layer and persisted preference.
+- Reorganized tests into Cargo `[[test]]` suites: `tests/contract/` (CLI/Tool/
+  Analysis/Trace/coupling/assets) and `tests/integration/` (Live HTTP/renderer/
+  Unicode/export); `tests/fixtures`, `tests/golden`, `tests/browser` unchanged.
+
 ### Changed (RFC-VIEW-0002 PR-01)
 
 - View product version is now `0.2.0` (`Cargo.toml`, `tool.json`, binary

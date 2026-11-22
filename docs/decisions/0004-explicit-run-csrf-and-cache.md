@@ -22,4 +22,4 @@
 
 - 正面：运行路径可被 HTTP 层测试完整覆盖（拒绝路径不产生 `run` 进程；页面加载 10 次为 0 次运行）；Live 与 Export 继续共用唯一的 Reader 渲染字节。
 - 负面：运行完成后整页重载（保留阅读位置）；首版无流式输出/取消/多运行历史；这些属于后续 PR，不得伪造。
-- 门禁：`tests/http_live.rs` 覆盖 token/Origin/confirm/mode/单活动/清缓存/源码变化 stale；`tests/trace_contract.rs` 覆盖 digest、module、seq、truncated、failed。
+- 门禁：`tests/integration/http_live.rs` 覆盖 token/Origin/confirm/mode/单活动/清缓存/源码变化 stale；`tests/contract/trace_contract.rs` 覆盖 digest、module、seq、truncated、failed。

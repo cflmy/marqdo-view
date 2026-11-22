@@ -4,7 +4,7 @@
 //! asset carries its SHA-256; browser URLs use a hash prefix so a changed asset
 //! can never be confused with a cached older one.
 
-use crate::source_map::sha256_hex;
+use crate::reader::source::sha256_hex;
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
@@ -45,31 +45,31 @@ impl AssetBundle {
                 "reader",
                 "css",
                 "text/css; charset=utf-8",
-                include_bytes!("../assets/reader.css"),
+                include_bytes!("../../assets/reader.css"),
             ),
             asset(
                 "reader",
                 "js",
                 "text/javascript; charset=utf-8",
-                include_bytes!("../assets/reader.js"),
+                include_bytes!("../../assets/reader.js"),
             ),
             asset(
                 "logo",
                 "svg",
                 "image/svg+xml",
-                include_bytes!("../assets/logo.svg"),
+                include_bytes!("../../assets/logo.svg"),
             ),
             asset(
                 "blossom",
                 "webp",
                 "image/webp",
-                include_bytes!("../assets/blossom.webp"),
+                include_bytes!("../../assets/blossom.webp"),
             ),
             asset(
                 "feather",
                 "webp",
                 "image/webp",
-                include_bytes!("../assets/feather.webp"),
+                include_bytes!("../../assets/feather.webp"),
             ),
         ];
         let mut by_hashed_name = HashMap::new();
@@ -183,15 +183,15 @@ mod tests {
         let bundle = AssetBundle::get();
         assert_eq!(
             bundle.css().sha256,
-            sha256_hex(include_bytes!("../assets/reader.css"))
+            sha256_hex(include_bytes!("../../assets/reader.css"))
         );
         assert_eq!(
             bundle.js().sha256,
-            sha256_hex(include_bytes!("../assets/reader.js"))
+            sha256_hex(include_bytes!("../../assets/reader.js"))
         );
         assert_eq!(
             bundle.logo().sha256,
-            sha256_hex(include_bytes!("../assets/logo.svg"))
+            sha256_hex(include_bytes!("../../assets/logo.svg"))
         );
         assert_eq!(bundle.assets[3].sha256.len(), 64);
         assert!(bundle.by_path(&bundle.logo().hashed_name()).is_some());

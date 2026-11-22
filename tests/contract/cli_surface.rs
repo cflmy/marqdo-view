@@ -1,7 +1,7 @@
 //! CLI surface tests: this program owns its own help/subcommands and refuses
 //! unsafe defaults. Exit codes follow RFC-VIEW-0001 §10.2.
 
-mod common;
+use crate::common;
 
 use common::run_view;
 
@@ -76,7 +76,7 @@ fn degradation_without_core_keeps_prose_readable() {
     project.marqdo_project("# @knowledge 标题\n\n正文 **加粗**。\n");
     // Explicitly point at a missing core so the test is independent of the
     // caller environment (acceptance scripts export MARQDO_BIN).
-    let context = marqdo_view::app::AppContext::open(
+    let context = marqdo_view::reader::assemble::DocumentService::open(
         &project.dir,
         Some(std::path::Path::new("/definitely/missing/marqdo-frozen")),
     )

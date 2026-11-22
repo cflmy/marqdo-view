@@ -11,10 +11,10 @@
 
 | # | 条款 | 状态 | 实现位置 / 证据 |
 |---|---|---|---|
-| M1 | 独立构建/测试/打包/安装；不改/不重编译 CLI；无私有 crate/Git/path 依赖 | PASS（0001 基线） | `Cargo.toml`、`tests/no_coupling.rs`、`scripts/acceptance.sh`（SHA 前后一致） |
+| M1 | 独立构建/测试/打包/安装；不改/不重编译 CLI；无私有 crate/Git/path 依赖 | PASS（0001 基线） | `Cargo.toml`、`tests/contract/no_coupling.rs`、`scripts/acceptance.sh`（SHA 前后一致） |
 | M2 | 语言真相=Analysis v2；运行真相=`run/call --json`+Trace v2；原文=`.mq.md`；Markdown 不判语义 | PARTIAL | 已实现 Analysis 严格校验与 Trace 绑定；`call` 入口与请求合同待 PR-03/04 |
-| M3 | 打开/刷新/搜索/切换/导出/预览/目录/诊断绝不运行 | PASS（0001 证据，待 0002 复核） | `tests/http_live.rs`、`tests/export.rs`、浏览器证据 |
-| M4 | 单一 Read Model / HTML 组件 / CSS / JS；Live=Export | PASS（0001 证据） | `src/render.rs`、`src/assets.rs`、`tests/no_coupling.rs`、`tests/asset_integrity.rs` |
+| M3 | 打开/刷新/搜索/切换/导出/预览/目录/诊断绝不运行 | PASS（0001 证据，待 0002 复核） | `tests/integration/http_live.rs`、`tests/integration/export.rs`、浏览器证据 |
+| M4 | 单一 Read Model / HTML 组件 / CSS / JS；Live=Export | PASS（0001 证据） | `src/render.rs`、`src/assets.rs`、`tests/contract/no_coupling.rs`、`tests/contract/asset_integrity.rs` |
 | M5 | 原生执行只经 `MARQDO_BIN run/call` 子进程；无第二运行时 | PARTIAL | 子进程已有；`call` 与取消/状态机待 PR-03/04 |
 | M6 | Tool 是普通进程；不得宣称 OS 沙箱 | PARTIAL | 文档已声明；UI 文案待 PR-04/06 复核 |
 | M7 | 不开发 lint/knowledge/prove；无硬依赖 | N/A（合规） | 无相关目录/依赖 |
@@ -25,8 +25,8 @@
 | 功能 | 状态 | 计划/证据 |
 |---|---|---|
 | Markdown/GFM 阅读 | PASS | `src/document.rs`、`src/render.rs`、浏览器证据 |
-| `@exec`/`@knowledge` 轻量标识（依 Analysis） | PASS | `src/semantic.rs`、`tests/rendering.rs` |
-| 源码态 | PASS | `src/render.rs`、`tests/unicode_spans.rs` |
+| `@exec`/`@knowledge` 轻量标识（依 Analysis） | PASS | `src/semantic.rs`、`tests/integration/rendering.rs` |
+| 源码态 | PASS | `src/render.rs`、`tests/integration/unicode_spans.rs` |
 | 函数清单/导航 | PASS | `src/presentation.rs`、`src/render.rs` |
 | 单函数参数填写 + 调用 | **PENDING** | PR-03 请求合同 + PR-04 前端表单 |
 | 文档入口 `main` 执行 | PARTIAL | 同步 pure 已存在；需改为 SSE 异步任务（PR-04） |
@@ -50,9 +50,9 @@
 |---|---|---|
 | 唯一 Reader+Controller+CLI；无 DocumentService→Execution 隐式调用 | PARTIAL | 现同步架构无隐式执行；SSE 后复核 |
 | 层间数据结构（SourceDocument/AnalysisArtifact/SemanticAnchor/ExecutionRecord/PresentationModel） | PARTIAL | 现有类型可映射；PR-02/03 重整 |
-| §5.3 目标目录（protocol/reader/execution/server/scripts/tests 树） | **PENDING** | PR-01/02/04 迁移 |
+| §5.3 目标目录（protocol/reader/execution/server/scripts/tests 树） | PARTIAL | protocol/reader/config/scripts/tests(contract,integration) 已迁移；execution/server 拆分与 security 套件待 PR-03/04 |
 | §5.4 单一渲染流水线；Export 类型边界不可执行 | PASS（0001） | `src/export.rs` 不依赖执行层；PR-06 复核 |
-| 无第二 Markdown AST/解释器/主题/JS 入口 | PASS | `tests/no_coupling.rs`、`tests/asset_integrity.rs` |
+| 无第二 Markdown AST/解释器/主题/JS 入口 | PASS | `tests/contract/no_coupling.rs`、`tests/contract/asset_integrity.rs` |
 
 ## 4. §6 HTTP / SSE / 执行合同
 
@@ -77,7 +77,7 @@
 |---|---|---|
 | PR-00 取证/基线 | **完成** | 待提交（本提交） |
 | PR-01 Tool/打包/scripts/CI/0.2.0 | **完成** | `scripts/package.sh`、`scripts/install-smoke.sh`、`scripts/verify-frozen-cli.sh`、`.github/workflows/ci.yml` |
-| PR-02 Reader/Analysis 结构与只读路由 | PENDING | — |
+| PR-02 Reader/Analysis 结构与只读路由 | **完成** | `src/protocol/*`、`src/reader/*`、`src/config.rs`、`/api/documents`、`tests/{contract,integration}`；`docs/evidence/PR-02/` |
 | PR-03 执行层/请求/进程/控制器 | PENDING | — |
 | PR-04 SSE/路由/会话/前端闭环 | PENDING | — |
 | PR-05 Trace 绑定/标注/浏览器回归 | PENDING | — |
@@ -88,9 +88,9 @@
 | 组 | 状态 | 说明 |
 |---|---|---|
 | E01 Tool 安装/卸载/分发 | PASS（0001 证据；PR-01 重跑） | `scripts/acceptance.sh` |
-| E02 打开 knowledge+exec 文件不运行 | PASS | `tests/http_live.rs` |
+| E02 打开 knowledge+exec 文件不运行 | PASS | `tests/integration/http_live.rs` |
 | E03 Source/Document 切换 | PASS | 浏览器证据 |
-| E04 中文/Emoji/表格/公式 span | PASS | `tests/unicode_spans.rs`、golden |
+| E04 中文/Emoji/表格/公式 span | PASS | `tests/integration/unicode_spans.rs`、golden |
 | E05 main 运行 run --json --trace-file | PARTIAL | 同步路径有；SSE 终态待 PR-04 |
 | E06 H2 Exec n=5 call | **PENDING** | PR-03/04 |
 | E07 文本/列表常量参数 | **PENDING** | PR-03/04 |
@@ -101,7 +101,7 @@
 | E12 长任务心跳/GET 不重启 | **PENDING** | PR-04 |
 | E13 取消终止进程树 | **PENDING** | PR-03/04 |
 | E14 静态导出零联网/相对链接 | PARTIAL | 已实现；PR-06 复核 |
-| E15 刷新/重开不自动执行 | PASS | `tests/http_live.rs` |
+| E15 刷新/重开不自动执行 | PASS | `tests/integration/http_live.rs` |
 | E16 运行后改源码 → stale 无高亮 | PARTIAL | 现有 stale；PR-05 复核 |
 | N01–N22 | PARTIAL | 0001 已覆盖部分（路径/XSS/跨站/digest/超时/打包完整性）；SSE/去重/取消/会话项待 PR-04 补齐，逐项记录在 PR-05/06 证据 |
 

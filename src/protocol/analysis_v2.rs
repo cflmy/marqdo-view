@@ -7,8 +7,7 @@
 //! instead of being pointed at nearby text (RFC-VIEW-0001 §4.3, §8.2).
 
 use crate::error::{ViewError, ViewResult};
-use crate::source_map::{sha256_hex, sha256_prefixed, SourceIndex, SourceSpan};
-use crate::version;
+use crate::reader::source::{sha256_hex, sha256_prefixed, SourceIndex, SourceSpan};
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -549,12 +548,12 @@ pub fn verify_analysis(
             detail: format!("unexpected Analysis schema {:?}", raw.schema),
         });
     }
-    if raw.schema_version != version::ANALYSIS_PROTOCOL {
+    if raw.schema_version != crate::protocol::tool_v1::ANALYSIS_PROTOCOL {
         return Err(ViewError::ProtocolIncompatible {
             detail: format!(
                 "Analysis schema_version {} is not supported (View implements v{})",
                 raw.schema_version,
-                version::ANALYSIS_PROTOCOL
+                crate::protocol::tool_v1::ANALYSIS_PROTOCOL
             ),
         });
     }

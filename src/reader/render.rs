@@ -10,12 +10,12 @@
 //! Markdown is serialized here from the View-owned `DocBlock` tree, with raw
 //! HTML omitted by default and every URL scheme sanitized.
 
-use crate::assets::AssetBundle;
-use crate::document::{DocBlock, Inline, TableAlign};
-use crate::presentation::{anchor_for_span, PresentationModel};
-use crate::project::SafeRelativePath;
-use crate::semantic::{source_id, UnitKind};
-use crate::source_map::SourceSpan;
+use crate::protocol::analysis_v2::{source_id, UnitKind};
+use crate::reader::assets::AssetBundle;
+use crate::reader::markdown::{DocBlock, Inline, TableAlign};
+use crate::reader::model::{anchor_for_span, PresentationModel};
+use crate::reader::source::SafeRelativePath;
+use crate::reader::source::SourceSpan;
 use std::fmt::Write as _;
 
 /// How links to other documents are resolved. This is the only Live/Export
@@ -156,7 +156,7 @@ impl ReaderRenderer {
 <link rel="stylesheet" href="{css}"/>
 <script defer src="{js}"></script>
 </head>
-<body class="mq-reader" data-mode="document" data-annotations="{annotations}" data-size="normal" data-source-status="{status}" data-run-state="{run_state}" data-run-available="{run_available}" data-live="{live}">
+<body class="mq-reader" data-mode="document" data-theme="light" data-annotations="{annotations}" data-size="normal" data-source-status="{status}" data-run-state="{run_state}" data-run-available="{run_available}" data-live="{live}">
 <a class="mq-skip" href="#mq-main">跳到正文</a>
 "##,
             presentation_version = model.version,
@@ -205,7 +205,7 @@ impl ReaderRenderer {
         html: &mut String,
         model: &PresentationModel,
         _ctx: &RenderContext,
-        navigation: &crate::presentation::Navigation,
+        navigation: &crate::reader::model::Navigation,
     ) {
         let active = model
             .navigation
@@ -254,7 +254,7 @@ impl ReaderRenderer {
         );
     }
 
-    fn render_welcome(&self, html: &mut String, navigation: &crate::presentation::Navigation) {
+    fn render_welcome(&self, html: &mut String, navigation: &crate::reader::model::Navigation) {
         let _ = write!(
             html,
             r##"<section class="mq-welcome" aria-label="欢迎页">
@@ -509,6 +509,7 @@ impl ReaderRenderer {
   <div class="mq-dialog-head"><h2 id="mq-settings-title">阅读设置</h2><button type="button" class="mq-icon-btn mq-close" data-action="close-dialog" aria-label="关闭设置">×</button></div>
   <ul class="mq-menu-list">
     <li><button type="button" data-action="size">正文字号 <span class="mq-menu-hint">标准 / 大 / 小</span></button></li>
+    <li><button type="button" data-action="theme">主题 <span class="mq-menu-hint">暖纸 / 深色</span></button></li>
     <li><button type="button" data-action="annotations">语义标注显隐 <span class="mq-menu-hint">锚点与侧注</span></button></li>
     <li><button type="button" data-action="print">打印 / 保存为 PDF <span class="mq-menu-hint">保留正文与注释</span></button></li>
   </ul>
@@ -519,8 +520,7 @@ impl ReaderRenderer {
     <li><button type="button" data-action="mode-document">文档态 <span class="mq-menu-hint">原始 Markdown 阅读</span></button></li>
     <li><button type="button" data-action="mode-source">源码态 <span class="mq-menu-hint">逐行原文，含标记</span></button></li>
     <li><button type="button" data-action="functions">函数大纲 <span class="mq-menu-hint">来自 Analysis v2</span></button></li>
-    <li><button type="button" data-action="variables">变量信息 <span class="mq-menu-hint">静态目标 · 运行值不支持</span></button></li>
-    <li><button type="button" data-action="memory">内存快照 <span class="mq-menu-hint">当前协议不支持</span></button></li>
+    <li><button type="button" data-action="unsupported">未提供的能力 <span class="mq-menu-hint">变量 / 内存 / 调试 / 证明</span></button></li>
     <li><button type="button" data-action="print">打印 <span class="mq-menu-hint">隐藏交互与装饰</span></button></li>
     <li><button type="button" data-action="about">关于 Marqdo View <span class="mq-menu-hint">版本与协议</span></button></li>
   </ul>
@@ -918,7 +918,7 @@ fn resolve_heading_unit(
     model: &PresentationModel,
     heading_span: SourceSpan,
     level: u8,
-) -> Option<&crate::semantic::SemanticUnit> {
+) -> Option<&crate::protocol::analysis_v2::SemanticUnit> {
     let projection = model.semantic.as_ref()?;
     // A function heading maps to its function unit exactly; never borrow the
     // ancestor function for H3/H4 sections (that would duplicate DOM ids).
@@ -945,7 +945,7 @@ fn resolve_heading_unit(
 
 fn display_heading_content(
     content: &[Inline],
-    unit: Option<&crate::semantic::SemanticUnit>,
+    unit: Option<&crate::protocol::analysis_v2::SemanticUnit>,
 ) -> (Option<(&'static str, &'static str)>, Vec<Inline>) {
     let Some(unit) = unit else {
         return (None, content.to_vec());

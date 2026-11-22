@@ -7,8 +7,8 @@
 //! states, never invented (RFC-VIEW-0001 §4.4, §12).
 
 use crate::error::{ViewError, ViewResult};
-use crate::semantic::{ModuleSummary, SemanticProjection};
-use crate::source_map::{sha256_hex, sha256_prefixed, SourceIndex, SourceSpan};
+use crate::protocol::analysis_v2::{ModuleSummary, SemanticProjection};
+use crate::reader::source::{sha256_hex, sha256_prefixed, SourceIndex, SourceSpan};
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -343,12 +343,12 @@ pub fn verify_trace(input: TraceVerificationInput<'_>) -> ViewResult<VerifiedRun
             detail: format!("unexpected Trace schema {:?}", raw.schema),
         });
     }
-    if raw.schema_version != crate::version::TRACE_PROTOCOL {
+    if raw.schema_version != crate::protocol::tool_v1::TRACE_PROTOCOL {
         return Err(ViewError::ProtocolIncompatible {
             detail: format!(
                 "Trace schema_version {} is not supported (View implements v{})",
                 raw.schema_version,
-                crate::version::TRACE_PROTOCOL
+                crate::protocol::tool_v1::TRACE_PROTOCOL
             ),
         });
     }

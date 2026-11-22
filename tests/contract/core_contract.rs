@@ -4,11 +4,11 @@
 //! The fake core is a shell script, not a mocked Rust trait, so everything at
 //! the process boundary is exercised for real.
 
-mod common;
+use crate::common;
 
 use common::{minimal_analysis, sha256_hex, FakeCore, TempProject};
 use marqdo_view::core_client::{CheckOptions, CheckResponse, CoreClient, RunOptions};
-use marqdo_view::project::Project;
+use marqdo_view::reader::source::Project;
 
 fn fixture(name: &str) -> (TempProject, FakeCore) {
     let project = TempProject::new(name);

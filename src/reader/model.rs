@@ -1,13 +1,14 @@
 //! Presentation model: the one intermediate form between verified domain data
-//! and the one `ReaderRenderer`.
+//! and the one `ReaderRenderer` (RFC-VIEW-0002 §5.2).
 //!
-//! Nothing here spawns processes, builds HTML or parses Markdown semantics. It
-//! only composes already-verified pieces (RFC-VIEW-0001 §6.3, §14.2).
+//! Nothing here spawns processes, builds HTML or parses Markdown semantics.
+//! Assembly from Analysis/Trace happens in `reader::assemble`.
 
-use crate::document::{DocumentIdentity, DocumentModel};
-use crate::project::{Project, SafeRelativePath, ViewConfig};
-use crate::semantic::{CoreDiagnostic, SemanticProjection, ViewWarning};
-use crate::trace::{RunDisplayState, RunProjection};
+use crate::config::ViewConfig;
+use crate::protocol::analysis_v2::{CoreDiagnostic, SemanticProjection, ViewWarning};
+use crate::protocol::trace_v2::{RunDisplayState, RunProjection};
+use crate::reader::markdown::DocumentModel;
+use crate::reader::source::{Project, SafeRelativePath};
 
 /// Private View presentation-model version. Not a public protocol.
 pub const PRESENTATION_VERSION: u32 = 1;
@@ -156,125 +157,6 @@ impl PresentationModel {
             .iter()
             .filter(|diagnostic| diagnostic.severity == "error")
     }
-}
-
-/// Input to the one builder. `analysis` is already protocol/byte verified.
-pub struct BuildInput<'a> {
-    pub document: DocumentModel,
-    pub analysis: Option<&'a crate::semantic::VerifiedAnalysis>,
-    pub status: SourceStatus,
-    pub status_note: Option<String>,
-    pub diagnostics: Vec<CoreDiagnostic>,
-    pub navigation: Navigation,
-    pub core_version: Option<String>,
-    pub run: Option<&'a crate::trace::VerifiedRun>,
-}
-
-pub fn build(input: BuildInput<'_>) -> PresentationModel {
-    let BuildInput {
-        mut document,
-        analysis,
-        status,
-        status_note,
-        mut diagnostics,
-        navigation,
-        core_version,
-        run,
-    } = input;
-
-    let semantic = analysis.map(|verified| verified.projection.clone());
-    if let Some(projection) = &semantic {
-        document.identity = DocumentIdentity {
-            project_root_id: projection.project_root_id.clone(),
-            module_id: projection.module_id.clone(),
-            relative_path: projection.relative_path.clone(),
-            source_sha256: projection.source_digest.clone(),
-        };
-        for diagnostic in &projection.diagnostics {
-            if !diagnostics.iter().any(|existing| {
-                existing.code == diagnostic.code
-                    && existing.message == diagnostic.message
-                    && existing.span == diagnostic.span
-            }) {
-                diagnostics.push(diagnostic.clone());
-            }
-        }
-    }
-    let warnings = semantic
-        .as_ref()
-        .map(|projection| projection.warnings.clone())
-        .unwrap_or_default();
-    let outline = semantic.as_ref().map(build_outline).unwrap_or_default();
-
-    PresentationModel {
-        version: PRESENTATION_VERSION,
-        title: document.title(),
-        document,
-        semantic,
-        source_status: status,
-        status_note,
-        diagnostics,
-        warnings,
-        navigation,
-        outline,
-        core_version,
-        run: run.map(|verified| verified.projection.clone()),
-    }
-}
-
-fn build_outline(projection: &SemanticProjection) -> Vec<OutlineEntry> {
-    let mut entries = Vec::new();
-    for function in &projection.functions {
-        let params = if function.signature.params.is_empty() {
-            String::new()
-        } else {
-            function
-                .signature
-                .params
-                .iter()
-                .map(|param| {
-                    if param.ty.is_empty() {
-                        param.name.clone()
-                    } else {
-                        format!("{}: {}", param.name, param.ty)
-                    }
-                })
-                .collect::<Vec<_>>()
-                .join(", ")
-        };
-        let detail = if params.is_empty() {
-            "无参数".to_string()
-        } else {
-            format!("params({params})")
-        };
-        entries.push(OutlineEntry {
-            label: function.local_name.clone(),
-            anchor: anchor_for_span(function.heading_span.start, function.heading_span.end),
-            detail,
-            kind: OutlineKind::Function,
-        });
-    }
-    for unit in &projection.units {
-        let kind = match unit.kind {
-            crate::semantic::UnitKind::Knowledge if unit.level >= 2 => OutlineKind::Knowledge,
-            crate::semantic::UnitKind::Section => OutlineKind::Section,
-            _ => continue,
-        };
-        if unit.name.is_empty() {
-            continue;
-        }
-        entries.push(OutlineEntry {
-            label: unit.name.clone(),
-            anchor: anchor_for_span(unit.span.start, unit.span.end),
-            detail: if unit.level == 2 {
-                "知识单元".to_string()
-            } else {
-                "章节".to_string()
-            },
-            kind,
-        });
-    }
-    entries
 }
 
 /// Deterministic heading anchor derived from the heading byte span. It never

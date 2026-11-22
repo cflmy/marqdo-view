@@ -1,11 +1,11 @@
 //! Degradation/state matrix contract (RFC-VIEW-0001 S-05..S-07, §12.3):
 //! prose stays readable while semantics become explicitly unusable.
 
-mod common;
+use crate::common;
 
 use common::{minimal_analysis, sha256_hex, FakeCore, TempProject};
-use marqdo_view::app::AppContext;
-use marqdo_view::presentation::SourceStatus;
+use marqdo_view::reader::assemble::DocumentService;
+use marqdo_view::reader::model::SourceStatus;
 
 fn project(name: &str) -> (TempProject, FakeCore) {
     let project = TempProject::new(name);
@@ -24,7 +24,7 @@ fn failed_check_keeps_prose_and_shows_core_diagnostics() {
     core.set_check_json(
         r#"{"command":"check","success":false,"errors":1,"diagnostics":[{"code":"sem.unclosed_control","column":1,"file":"/home/secret/index.mq.md","line":3,"message":"`if` is not closed by `end`","module":"root:fixture@0.1.0::index.mq.md","severity":"error"}]}"#,
     );
-    let context = AppContext::open(&project.dir, Some(&core.script)).unwrap();
+    let context = DocumentService::open(&project.dir, Some(&core.script)).unwrap();
     let relative = context.project().entry().relative.clone();
     let model = context.load(&relative).unwrap();
     assert_eq!(model.source_status, SourceStatus::CoreError);
@@ -46,7 +46,7 @@ fn failed_check_keeps_prose_and_shows_core_diagnostics() {
 fn source_digest_mismatch_degrades_instead_of_misbinding() {
     let (project, core) = project("state-source-mismatch");
     core.set_analysis(&minimal_analysis("index.mq.md", &"0".repeat(64), 2));
-    let context = AppContext::open(&project.dir, Some(&core.script)).unwrap();
+    let context = DocumentService::open(&project.dir, Some(&core.script)).unwrap();
     let relative = context.project().entry().relative.clone();
     let model = context.load(&relative).unwrap();
     assert_eq!(model.source_status, SourceStatus::SourceMismatch);
@@ -59,7 +59,7 @@ fn unknown_analysis_schema_is_a_hard_protocol_error() {
     let (project, core) = project("state-protocol");
     let source = std::fs::read(project.path("index.mq.md")).unwrap();
     core.set_analysis(&minimal_analysis("index.mq.md", &sha256_hex(&source), 3));
-    let context = AppContext::open(&project.dir, Some(&core.script)).unwrap();
+    let context = DocumentService::open(&project.dir, Some(&core.script)).unwrap();
     let relative = context.project().entry().relative.clone();
     let err = context.load(&relative).unwrap_err();
     assert_eq!(err.code(), "view.protocol_incompatible");
@@ -78,7 +78,7 @@ fn invalid_core_span_is_dropped_with_an_explicit_warning() {
         "span": {"start": 0, "end": 999_999}
     }]);
     core.set_analysis(&serde_json::to_string(&analysis).unwrap());
-    let context = AppContext::open(&project.dir, Some(&core.script)).unwrap();
+    let context = DocumentService::open(&project.dir, Some(&core.script)).unwrap();
     let relative = context.project().entry().relative.clone();
     let model = context.load(&relative).unwrap();
     assert_eq!(model.source_status, SourceStatus::StaticOk);
@@ -105,30 +105,36 @@ fn run_attached_to_changed_source_becomes_stale() {
     let analysis =
         std::fs::read(repo_root.join("tests/golden/analysis-v2/control-flow.json")).unwrap();
     core.set_analysis(std::str::from_utf8(&analysis).unwrap());
-    let context = AppContext::open(&project.dir, Some(&core.script)).unwrap();
+    let context = DocumentService::open(&project.dir, Some(&core.script)).unwrap();
     let relative = context.project().entry().relative.clone();
 
     // Build a verified run directly from the golden trace + golden analysis.
-    let source_index = marqdo_view::source_map::SourceIndex::new(&source);
-    let verified_analysis =
-        marqdo_view::semantic::verify_analysis(&analysis, &source, &source_index, "index.mq.md")
-            .unwrap();
+    let source_index = marqdo_view::reader::source::SourceIndex::new(&source);
+    let verified_analysis = marqdo_view::protocol::analysis_v2::verify_analysis(
+        &analysis,
+        &source,
+        &source_index,
+        "index.mq.md",
+    )
+    .unwrap();
     let trace =
         std::fs::read(repo_root.join("tests/golden/trace-v2/control-flow.trace.json")).unwrap();
     let run_json: serde_json::Value = serde_json::from_slice(
         &std::fs::read(repo_root.join("tests/golden/trace-v2/control-flow.run.json")).unwrap(),
     )
     .unwrap();
-    let run = marqdo_view::trace::verify_trace(marqdo_view::trace::TraceVerificationInput {
-        trace_bytes: &trace,
-        analysis_bytes: &analysis,
-        semantic: &verified_analysis.projection,
-        modules: &verified_analysis.projection.modules,
-        source: &source,
-        source_index: &source_index,
-        run_json: &run_json,
-        exit_code: 0,
-    })
+    let run = marqdo_view::protocol::trace_v2::verify_trace(
+        marqdo_view::protocol::trace_v2::TraceVerificationInput {
+            trace_bytes: &trace,
+            analysis_bytes: &analysis,
+            semantic: &verified_analysis.projection,
+            modules: &verified_analysis.projection.modules,
+            source: &source,
+            source_index: &source_index,
+            run_json: &run_json,
+            exit_code: 0,
+        },
+    )
     .unwrap();
     let attached = context.load_with_run(&relative, Some(&run)).unwrap();
     assert_eq!(attached.run_state().data_value(), "succeeded");

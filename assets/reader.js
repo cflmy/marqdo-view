@@ -213,6 +213,22 @@
     closeAllDialogs();
   }
 
+  function applyTheme(theme, announce) {
+    var next = theme === "dark" ? "dark" : "light";
+    reader.dataset.theme = next;
+    try {
+      window.localStorage.setItem("marqdo.view.theme", next);
+    } catch (error) {
+      /* storage is optional */
+    }
+    if (announce) toast(next === "dark" ? "已切换到深色主题" : "已切换到暖纸主题");
+  }
+
+  function cycleTheme() {
+    applyTheme(reader.dataset.theme === "dark" ? "light" : "dark", true);
+    closeAllDialogs();
+  }
+
   function cycleTextSize() {
     var order = ["normal", "large", "small"];
     var current = reader.dataset.size || "normal";
@@ -272,17 +288,15 @@
       case "annotations":
         toggleAnnotationVisibility();
         break;
-      case "variables":
+      case "unsupported":
         showUnsupported(
-          "变量快照",
-          "Trace v2 不提供逐语句赋值后的实际值；View 只能展示 Analysis 中的静态参数与赋值目标，绝不猜测运行时数据。"
+          "变量快照 / 内存检查 / 调试器 / 证明状态",
+          "Trace v2 不提供逐语句赋值后的实际值或内存快照，公开协议也没有断点/单步通道；" +
+            "知识证明属于独立 Prove 工具。View 绝不猜测这些运行事实，相应能力在具备公开、受版本约束的协议前不会出现。"
         );
         break;
-      case "memory":
-        showUnsupported(
-          "内存快照",
-          "当前公开协议没有内存观测通道；该能力需等待未来独立、受权限审计的调试协议。"
-        );
+      case "theme":
+        cycleTheme();
         break;
       case "about":
         openDialog("mq-dialog-about");
@@ -450,6 +464,18 @@
       }
     }
   }, true);
+
+  // Restore reading preferences (theme only; never secrets/permissions).
+  try {
+    var storedTheme = window.localStorage.getItem("marqdo.view.theme");
+    if (storedTheme === "dark" || storedTheme === "light") {
+      applyTheme(storedTheme, false);
+    } else if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+      applyTheme("dark", false);
+    }
+  } catch (error) {
+    /* storage is optional */
+  }
 
   // Restore a URL-selected mode, then honour the persisted diagnostics state.
   try {

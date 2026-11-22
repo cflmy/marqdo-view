@@ -1,25 +1,148 @@
-//! Application layer: turns parsed commands into use cases.
+//! Assembly of the one `PresentationModel`.
 //!
-//! No HTML is built here and no Markdown semantics are decided here. Browse and
-//! (later) Export call the same `load` + one `ReaderRenderer`.
+//! Merges the raw document, verified Analysis v2, diagnostics and an optional
+//! verified Trace v2 run into the model; decides stale/revoked semantics here
+//! and nowhere else (RFC-VIEW-0002 §5.2/§5.4).
 
-use crate::cli::{ExportArgs, RuntimeOpts, VerifyArgs};
+use crate::config::ViewConfig;
+use crate::protocol::analysis_v2::{CoreDiagnostic, SemanticProjection};
+use crate::protocol::trace_v2::VerifiedRun;
+use crate::reader::markdown::{DocumentIdentity, DocumentModel};
+use crate::reader::model::{
+    Navigation, OutlineEntry, OutlineKind, PresentationModel, SourceStatus,
+};
+use crate::reader::source::{Project, SafeRelativePath};
+
 use crate::core_client::{
     CheckOptions, CheckResponse, CoreClient, RawCheckDiagnostic, RunOptions, SandboxMode,
 };
-use crate::document::{DocumentIdentity, DocumentModel};
 use crate::error::{ViewError, ViewResult};
-use crate::export::{export as run_export, ExportOptions};
-use crate::presentation::{self, BuildInput, Navigation, PresentationModel, SourceStatus};
-use crate::project::{Project, SafeRelativePath, ViewConfig};
-use crate::semantic::{self, CoreDiagnostic};
-use crate::trace::{self, TraceVerificationInput, VerifiedRun};
-use crate::version;
+use crate::protocol::analysis_v2;
+use crate::protocol::trace_v2::{self, TraceVerificationInput};
+use crate::reader::model::{anchor_for_span, PRESENTATION_VERSION};
 
-/// Process-wide context for one browsed project: root, optional site config and
-/// an optional negotiated frozen core. A missing core degrades to prose only;
-/// an incompatible protocol is a hard error (RFC §4).
-pub struct AppContext {
+/// Input to the one builder. `analysis` is already protocol/byte verified.
+pub struct BuildInput<'a> {
+    pub document: DocumentModel,
+    pub analysis: Option<&'a crate::protocol::analysis_v2::VerifiedAnalysis>,
+    pub status: SourceStatus,
+    pub status_note: Option<String>,
+    pub diagnostics: Vec<CoreDiagnostic>,
+    pub navigation: Navigation,
+    pub core_version: Option<String>,
+    pub run: Option<&'a crate::protocol::trace_v2::VerifiedRun>,
+}
+
+pub fn build(input: BuildInput<'_>) -> PresentationModel {
+    let BuildInput {
+        mut document,
+        analysis,
+        status,
+        status_note,
+        mut diagnostics,
+        navigation,
+        core_version,
+        run,
+    } = input;
+
+    let semantic = analysis.map(|verified| verified.projection.clone());
+    if let Some(projection) = &semantic {
+        document.identity = DocumentIdentity {
+            project_root_id: projection.project_root_id.clone(),
+            module_id: projection.module_id.clone(),
+            relative_path: projection.relative_path.clone(),
+            source_sha256: projection.source_digest.clone(),
+        };
+        for diagnostic in &projection.diagnostics {
+            if !diagnostics.iter().any(|existing| {
+                existing.code == diagnostic.code
+                    && existing.message == diagnostic.message
+                    && existing.span == diagnostic.span
+            }) {
+                diagnostics.push(diagnostic.clone());
+            }
+        }
+    }
+    let warnings = semantic
+        .as_ref()
+        .map(|projection| projection.warnings.clone())
+        .unwrap_or_default();
+    let outline = semantic.as_ref().map(build_outline).unwrap_or_default();
+
+    PresentationModel {
+        version: PRESENTATION_VERSION,
+        title: document.title(),
+        document,
+        semantic,
+        source_status: status,
+        status_note,
+        diagnostics,
+        warnings,
+        navigation,
+        outline,
+        core_version,
+        run: run.map(|verified| verified.projection.clone()),
+    }
+}
+
+fn build_outline(projection: &SemanticProjection) -> Vec<OutlineEntry> {
+    let mut entries = Vec::new();
+    for function in &projection.functions {
+        let params = if function.signature.params.is_empty() {
+            String::new()
+        } else {
+            function
+                .signature
+                .params
+                .iter()
+                .map(|param| {
+                    if param.ty.is_empty() {
+                        param.name.clone()
+                    } else {
+                        format!("{}: {}", param.name, param.ty)
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        let detail = if params.is_empty() {
+            "无参数".to_string()
+        } else {
+            format!("params({params})")
+        };
+        entries.push(OutlineEntry {
+            label: function.local_name.clone(),
+            anchor: anchor_for_span(function.heading_span.start, function.heading_span.end),
+            detail,
+            kind: OutlineKind::Function,
+        });
+    }
+    for unit in &projection.units {
+        let kind = match unit.kind {
+            crate::protocol::analysis_v2::UnitKind::Knowledge if unit.level >= 2 => {
+                OutlineKind::Knowledge
+            }
+            crate::protocol::analysis_v2::UnitKind::Section => OutlineKind::Section,
+            _ => continue,
+        };
+        if unit.name.is_empty() {
+            continue;
+        }
+        entries.push(OutlineEntry {
+            label: unit.name.clone(),
+            anchor: anchor_for_span(unit.span.start, unit.span.end),
+            detail: if unit.level == 2 {
+                "知识单元".to_string()
+            } else {
+                "章节".to_string()
+            },
+            kind,
+        });
+    }
+    entries
+}
+
+pub struct DocumentService {
     project: Project,
     config: ViewConfig,
     core: Option<CoreClient>,
@@ -27,7 +150,7 @@ pub struct AppContext {
     core_note: Option<String>,
 }
 
-impl AppContext {
+impl DocumentService {
     pub fn open(path: &std::path::Path, marqdo_bin: Option<&std::path::Path>) -> ViewResult<Self> {
         let project = Project::open(path)?;
         let config = ViewConfig::load(project.root())?;
@@ -126,7 +249,7 @@ impl AppContext {
                     success: true,
                     analysis: Some(check),
                     ..
-                } => match semantic::verify_analysis(
+                } => match analysis_v2::verify_analysis(
                     &check.analysis_bytes,
                     &document.source,
                     &document.source_index,
@@ -172,7 +295,7 @@ impl AppContext {
                     })
                 } else {
                     Some(VerifiedRun {
-                        projection: trace::stale_projection(
+                        projection: trace_v2::stale_projection(
                             &run.projection.analysis_digest,
                             &document.source_index,
                         ),
@@ -180,7 +303,7 @@ impl AppContext {
                 }
             }
             (Some(run), None) => Some(VerifiedRun {
-                projection: trace::stale_projection(
+                projection: trace_v2::stale_projection(
                     &run.projection.analysis_digest,
                     &document.source_index,
                 ),
@@ -188,7 +311,7 @@ impl AppContext {
             (None, _) => None,
         };
 
-        Ok(presentation::build(BuildInput {
+        Ok(build(BuildInput {
             document,
             analysis: verified.as_ref(),
             status,
@@ -208,11 +331,11 @@ impl AppContext {
             detail: "没有可用的冻结核心（MARQDO_BIN），运行被拒绝".to_string(),
         })?;
         let source_bytes = self.project.read_source(relative)?;
-        let source_digest = crate::source_map::sha256_hex(&source_bytes);
+        let source_digest = crate::reader::source::sha256_hex(&source_bytes);
         let source = String::from_utf8(source_bytes).map_err(|err| ViewError::Io {
             detail: format!("{relative} is not valid UTF-8: {err}"),
         })?;
-        let source_index = crate::source_map::SourceIndex::new(&source);
+        let source_index = crate::reader::source::SourceIndex::new(&source);
 
         let run = client.run(
             &self.project,
@@ -237,13 +360,13 @@ impl AppContext {
         let check = response.analysis.ok_or_else(|| ViewError::AnalysisFailed {
             detail: "运行后的静态检查失败，无法绑定 Trace".to_string(),
         })?;
-        let verified = semantic::verify_analysis(
+        let verified = analysis_v2::verify_analysis(
             &check.analysis_bytes,
             &source,
             &source_index,
             relative.as_str(),
         )?;
-        let verified_run = trace::verify_trace(TraceVerificationInput {
+        let verified_run = trace_v2::verify_trace(TraceVerificationInput {
             trace_bytes: &trace_bytes,
             analysis_bytes: &check.analysis_bytes,
             semantic: &verified.projection,
@@ -265,172 +388,6 @@ pub struct ExecutedRun {
     pub verified: VerifiedRun,
     pub source_digest: String,
     pub analysis_digest: String,
-}
-
-pub fn verify(opts: &RuntimeOpts, args: &VerifyArgs) -> ViewResult<i32> {
-    let path = args
-        .path
-        .clone()
-        .or_else(|| opts.path.clone())
-        .unwrap_or_else(|| std::path::PathBuf::from("."));
-    let project = Project::open(&path)?;
-    let entry = project.entry().relative.clone();
-    let source_bytes = project.read_source(&entry)?;
-    let source = String::from_utf8(source_bytes).map_err(|err| ViewError::Io {
-        detail: format!("{entry} is not valid UTF-8: {err}"),
-    })?;
-    let source_index = crate::source_map::SourceIndex::new(&source);
-
-    let client = CoreClient::from_env(opts.marqdo_bin.as_deref())?;
-    let core_version = client.negotiate()?;
-    let response = client.check(
-        &project,
-        &entry,
-        &CheckOptions {
-            refs: args.refs,
-            timeout: None,
-        },
-    )?;
-    let check = match response {
-        CheckResponse {
-            success: false,
-            diagnostics,
-            exit_code,
-            ..
-        } => {
-            let first = diagnostics
-                .first()
-                .map(|diagnostic| {
-                    format!(
-                        "{}: {}",
-                        if diagnostic.code.is_empty() {
-                            "diagnostic"
-                        } else {
-                            &diagnostic.code
-                        },
-                        diagnostic.message
-                    )
-                })
-                .unwrap_or_else(|| "no diagnostic detail".to_string());
-            return Err(ViewError::AnalysisFailed {
-                detail: format!(
-                    "`marqdo check` failed with exit code {exit_code} ({} diagnostic(s)); first: {first}",
-                    diagnostics.len()
-                ),
-            });
-        }
-        CheckResponse {
-            analysis: Some(check),
-            ..
-        } => check,
-        CheckResponse { analysis: None, .. } => {
-            return Err(ViewError::AnalysisFailed {
-                detail: "`marqdo check` succeeded but emitted no Analysis".to_string(),
-            })
-        }
-    };
-    let verified = semantic::verify_analysis(
-        &check.analysis_bytes,
-        &source,
-        &source_index,
-        entry.as_str(),
-    )?;
-    let projection = &verified.projection;
-
-    if args.json {
-        let doc = serde_json::json!({
-            "schema": "marqdo.view-verify",
-            "schema_version": 1,
-            "ok": true,
-            "core": {
-                "version": core_version.version.to_string(),
-                "supported_range": version::PRODUCT_RANGE,
-            },
-            "analysis": {
-                "schema": "marqdo.analysis",
-                "schema_version": version::ANALYSIS_PROTOCOL,
-                "digest": projection.analysis_digest,
-                "producer_version": projection.producer_version,
-                "markdown_profile": projection.markdown_profile,
-                "functions": projection.functions.len(),
-                "units": projection.units.len(),
-                "diagnostics": projection.diagnostics.len(),
-            },
-            "project": {
-                "root_id": projection.project_root_id,
-                "identity_kind": projection.identity_kind,
-                "lock_digest": projection.lock_digest,
-                "stdlib_version": projection.stdlib_version,
-            },
-            "document": {
-                "relative_path": entry.as_str(),
-                "module_id": projection.module_id,
-                "source_digest": projection.source_digest,
-                "source_digest_matches": true,
-            },
-            "result": "PASS",
-            "executed": false,
-            "note": "Static verification only; the document was not executed.",
-        });
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&doc).unwrap_or_else(|_| "{}".to_string())
-        );
-    } else {
-        println!(
-            "core: marqdo {} (supported {})",
-            core_version.version,
-            version::PRODUCT_RANGE
-        );
-        println!(
-            "project: {} ({})",
-            projection.project_root_id, projection.identity_kind
-        );
-        println!("document: {entry}");
-        println!(
-            "analysis: schema=marqdo.analysis v2 modules={} functions={} digest={}",
-            projection.modules.len(),
-            projection.functions.len(),
-            projection.analysis_digest
-        );
-        println!("source digest: match");
-        println!("result: PASS (static only; document not executed)");
-    }
-    Ok(0)
-}
-
-pub fn browse(opts: &RuntimeOpts) -> ViewResult<i32> {
-    let path = opts
-        .path
-        .clone()
-        .unwrap_or_else(|| std::path::PathBuf::from("."));
-    let context = AppContext::open(&path, opts.marqdo_bin.as_deref())?;
-    crate::server::serve(context, opts)
-}
-
-pub fn export(opts: &RuntimeOpts, args: &ExportArgs) -> ViewResult<i32> {
-    let path = args
-        .path
-        .clone()
-        .or_else(|| opts.path.clone())
-        .unwrap_or_else(|| std::path::PathBuf::from("."));
-    let context = AppContext::open(&path, opts.marqdo_bin.as_deref())?;
-    let summary = run_export(
-        &context,
-        &ExportOptions {
-            out: args.out.clone(),
-            no_annotations: args.no_annotations,
-        },
-    )?;
-    println!(
-        "marqdo view export: {} page(s), {} file(s) → {}",
-        summary.pages,
-        summary.files,
-        summary.out.display()
-    );
-    println!("manifest: sha256:{}", summary.manifest_sha256);
-    println!("executed: false (纯静态导出，未运行任何文档)");
-    Ok(0)
 }
 
 fn generic_core_note(err: &ViewError) -> String {

@@ -4,15 +4,15 @@
 //! exposed until the explicit-run flow lands; every response carries a strict
 //! CSP and the Host header is validated to blunt DNS-rebinding.
 
-use crate::app::AppContext;
-use crate::assets::AssetBundle;
 use crate::cli::RuntimeOpts;
 use crate::error::{ViewError, ViewResult};
-use crate::presentation::PresentationModel;
-use crate::project::SafeRelativePath;
-use crate::render::{ReaderRenderer, RenderContext};
-use crate::source_map::sha256_hex;
-use crate::trace::VerifiedRun;
+use crate::protocol::trace_v2::VerifiedRun;
+use crate::reader::assemble::DocumentService;
+use crate::reader::assets::AssetBundle;
+use crate::reader::model::PresentationModel;
+use crate::reader::render::{ReaderRenderer, RenderContext};
+use crate::reader::source::sha256_hex;
+use crate::reader::source::SafeRelativePath;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -22,7 +22,7 @@ const MAX_URL_BYTES: usize = 2048;
 const MAX_QUERY_BYTES: usize = 4096;
 const MAX_BODY_BYTES: usize = 16 * 1024;
 
-pub fn serve(ctx: AppContext, opts: &RuntimeOpts) -> ViewResult<i32> {
+pub fn serve(ctx: DocumentService, opts: &RuntimeOpts) -> ViewResult<i32> {
     let address = format!("{}:{}", opts.host, opts.port);
     let server = Server::http(&address).map_err(|err| ViewError::Io {
         detail: format!("listen on {address}: {err}"),
@@ -89,7 +89,7 @@ pub fn serve(ctx: AppContext, opts: &RuntimeOpts) -> ViewResult<i32> {
 }
 
 struct ServerState {
-    ctx: AppContext,
+    ctx: DocumentService,
     csrf_token: String,
     renderer: ReaderRenderer,
     cache: Mutex<HashMap<String, CacheEntry>>,
@@ -291,7 +291,7 @@ fn handle(state: &ServerState, request: Request) -> ViewResult<()> {
                 Err(err) => serve_error_page(request, &err, is_head),
             }
         }
-        "/api/document" => {
+        "/api/documents" => {
             let relative = match query_param(query, "path")
                 .and_then(|raw| percent_decode(&raw))
                 .map(|decoded| SafeRelativePath::parse(&decoded))
@@ -303,7 +303,7 @@ fn handle(state: &ServerState, request: Request) -> ViewResult<()> {
                 None => state.ctx.project().entry().relative.clone(),
             };
             match state.load_for_page(&relative, query_param(query, "run").as_deref()) {
-                Ok(model) => serve_document_json(request, &model),
+                Ok(model) => serve_documents_json(state, request, &relative, &model),
                 Err(err) => respond_json_error(request, StatusCode(500), &err),
             }
         }
@@ -326,9 +326,9 @@ fn handle(state: &ServerState, request: Request) -> ViewResult<()> {
                     "version": state.ctx.core_version(),
                 },
                 "protocols": {
-                    "tool": crate::version::TOOL_PROTOCOL,
-                    "analysis": crate::version::ANALYSIS_PROTOCOL,
-                    "trace": crate::version::TRACE_PROTOCOL,
+                    "tool": crate::protocol::tool_v1::TOOL_PROTOCOL,
+                    "analysis": crate::protocol::tool_v1::ANALYSIS_PROTOCOL,
+                    "trace": crate::protocol::tool_v1::TRACE_PROTOCOL,
                 },
                 "documents": documents,
                 "run_api": true,
@@ -684,7 +684,7 @@ fn serve_page(
     is_head: bool,
 ) -> ViewResult<()> {
     let ctx = RenderContext {
-        links: crate::render::LinkPolicy::LocalServer,
+        links: crate::reader::render::LinkPolicy::LocalServer,
         live: true,
         csrf_token: Some(state.csrf_token.clone()),
         run_available: state.ctx.core().is_some() && model.can_offer_run(),
@@ -703,55 +703,84 @@ fn serve_error_page(request: Request, err: &ViewError, is_head: bool) -> ViewRes
     respond_html(request, html.into_bytes(), is_head)
 }
 
-fn serve_document_json(request: Request, model: &PresentationModel) -> ViewResult<()> {
+fn serve_documents_json(
+    state: &ServerState,
+    request: Request,
+    relative: &SafeRelativePath,
+    model: &PresentationModel,
+) -> ViewResult<()> {
     let semantic = model.semantic.as_ref();
+    let documents = state
+        .ctx
+        .project()
+        .list_documents()
+        .unwrap_or_default()
+        .into_iter()
+        .map(|path| {
+            serde_json::json!({
+                "path": path.as_str(),
+                "active": path == *relative,
+            })
+        })
+        .collect::<Vec<_>>();
+    let functions = model
+        .outline
+        .iter()
+        .filter(|entry| entry.kind == crate::reader::model::OutlineKind::Function)
+        .map(|entry| {
+            serde_json::json!({
+                "label": entry.label,
+                "anchor": entry.anchor,
+                "detail": entry.detail,
+            })
+        })
+        .collect::<Vec<_>>();
     let doc = serde_json::json!({
-        "schema": "marqdo.view-document",
+        "schema": "marqdo.view-documents",
         "schema_version": 1,
-        "title": model.title,
-        "document": {
+        "entry": state.ctx.project().entry().relative.as_str(),
+        "documents": documents,
+        "current": {
             "relative_path": model.document.identity.relative_path,
             "module_id": model.document.identity.module_id,
+            "title": model.title,
             "source_sha256": sha256_hex(model.document.source.as_bytes()),
+            "source_status": model.source_status.data_value(),
+            "semantics_usable": model.source_status.semantics_usable(),
+            "analysis": semantic.map(|projection| serde_json::json!({
+                "digest": projection.analysis_digest,
+                "schema_version": crate::protocol::tool_v1::ANALYSIS_PROTOCOL,
+                "producer_version": projection.producer_version,
+                "project_root_id": projection.project_root_id,
+                "functions": projection.functions.len(),
+                "units": projection.units.len(),
+                "diagnostics": projection.diagnostics.len(),
+            })),
+            "outline": model.outline.iter().map(|entry| serde_json::json!({
+                "label": entry.label,
+                "anchor": entry.anchor,
+                "detail": entry.detail,
+                "kind": match entry.kind {
+                    crate::reader::model::OutlineKind::Function => "function",
+                    crate::reader::model::OutlineKind::Knowledge => "knowledge",
+                    crate::reader::model::OutlineKind::Section => "section",
+                },
+            })).collect::<Vec<_>>(),
+            "functions": functions,
+            "run": model.run.as_ref().map(|run| serde_json::json!({
+                "state": run.state.data_value(),
+                "label": run.state.label(),
+                "run_id": run.run_id,
+                "run_status": run.run_status,
+                "exit_code": run.exit_code,
+                "event_count": run.counts.total(),
+                "entry_event_count": run.entry_event_count,
+                "truncated": run.truncated.as_ref().map(|truncated| truncated.label()),
+                "has_result_value": run.result_value.is_some(),
+            })),
+            "can_offer_run": model.can_offer_run(),
         },
-        "source_status": model.source_status.data_value(),
-        "semantics_usable": model.source_status.semantics_usable(),
-        "analysis": semantic.map(|projection| serde_json::json!({
-            "digest": projection.analysis_digest,
-            "schema_version": crate::version::ANALYSIS_PROTOCOL,
-            "producer_version": projection.producer_version,
-            "project_root_id": projection.project_root_id,
-            "functions": projection.functions.len(),
-            "units": projection.units.len(),
-            "diagnostics": projection.diagnostics.len(),
-        })),
-        "outline": model.outline.iter().map(|entry| serde_json::json!({
-            "label": entry.label,
-            "anchor": entry.anchor,
-            "detail": entry.detail,
-            "kind": match entry.kind {
-                crate::presentation::OutlineKind::Function => "function",
-                crate::presentation::OutlineKind::Knowledge => "knowledge",
-                crate::presentation::OutlineKind::Section => "section",
-            },
-        })).collect::<Vec<_>>(),
-        "navigation": {
-            "documents": model.navigation.documents.iter().map(|doc| doc.as_str()).collect::<Vec<_>>(),
-            "welcome": model.navigation.welcome,
-        },
-        "run": model.run.as_ref().map(|run| serde_json::json!({
-            "state": run.state.data_value(),
-            "label": run.state.label(),
-            "run_id": run.run_id,
-            "run_status": run.run_status,
-            "exit_code": run.exit_code,
-            "event_count": run.counts.total(),
-            "entry_event_count": run.entry_event_count,
-            "truncated": run.truncated.as_ref().map(|truncated| truncated.label()),
-            "has_result_value": run.result_value.is_some(),
-        })),
-        "can_offer_run": model.can_offer_run(),
-        "note": "Read-only PresentationModel summary; this page load never executes the document.",
+        "note": "Read-only document structure; this request never executes the document.",
     });
     respond_json(request, StatusCode(200), &doc)
 }

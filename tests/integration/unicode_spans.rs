@@ -1,12 +1,14 @@
 //! Unicode/CRLF/duplicate-text span contract (RFC-VIEW-0001 S-04).
 //! Goldens are emitted by the frozen CLI from the exact fixture bytes.
 
-use marqdo_view::document::{DocumentIdentity, DocumentModel};
-use marqdo_view::presentation::{self, BuildInput, Navigation, SourceStatus};
-use marqdo_view::project::{Project, SafeRelativePath, ViewConfig};
-use marqdo_view::render::{ReaderRenderer, RenderContext};
-use marqdo_view::semantic;
-use marqdo_view::source_map::sha256_hex;
+use marqdo_view::config::ViewConfig;
+use marqdo_view::protocol::analysis_v2 as semantic;
+use marqdo_view::reader::assemble::{self as assemble, BuildInput};
+use marqdo_view::reader::markdown::{DocumentIdentity, DocumentModel};
+use marqdo_view::reader::model::{Navigation, SourceStatus};
+use marqdo_view::reader::render::{ReaderRenderer, RenderContext};
+use marqdo_view::reader::source::sha256_hex;
+use marqdo_view::reader::source::{Project, SafeRelativePath};
 
 fn repo_root() -> std::path::PathBuf {
     std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -15,7 +17,7 @@ fn repo_root() -> std::path::PathBuf {
 fn load(path: &str, golden: &str) -> (String, Vec<u8>, semantic::VerifiedAnalysis) {
     let root = repo_root();
     let source = std::fs::read_to_string(root.join(path)).unwrap();
-    let index = marqdo_view::source_map::SourceIndex::new(&source);
+    let index = marqdo_view::reader::source::SourceIndex::new(&source);
     let analysis = std::fs::read(root.join(golden)).unwrap();
     let relative = std::path::Path::new(path)
         .file_name()
@@ -32,7 +34,7 @@ fn render(verified: &semantic::VerifiedAnalysis, source: &str, relative: &str) -
     let entry = SafeRelativePath::parse(relative).unwrap();
     let document = DocumentModel::parse(source.to_string(), DocumentIdentity::placeholder(&entry));
     let navigation = Navigation::from_project(&project, &ViewConfig::default(), &entry);
-    let model = presentation::build(BuildInput {
+    let model = assemble::build(BuildInput {
         document,
         analysis: Some(verified),
         status: SourceStatus::StaticOk,
@@ -67,7 +69,7 @@ fn unicode_spans_are_exact_and_duplicate_returns_get_distinct_anchors() {
     let first = returns[0].span;
     let second = returns[1].span;
     assert_ne!(first, second);
-    let index = marqdo_view::source_map::SourceIndex::new(&source);
+    let index = marqdo_view::reader::source::SourceIndex::new(&source);
     // Core statement spans cover the whole carrier node (including markers).
     assert_eq!(index.source_text(&source, first), Some("`return 1`"));
     assert_eq!(index.source_text(&source, second), Some("`return 1`"));
@@ -106,7 +108,7 @@ fn crlf_source_keeps_exact_digest_and_line_mapping() {
         verified.projection.source_digest,
         sha256_hex(source.as_bytes())
     );
-    let index = marqdo_view::source_map::SourceIndex::new(&source);
+    let index = marqdo_view::reader::source::SourceIndex::new(&source);
     let function = &verified.projection.functions[0];
     for (_, statement) in verified
         .projection
@@ -137,7 +139,7 @@ fn knowledge_emphasis_never_becomes_an_execution_anchor() {
     let project = Project::open(&root.join("examples/mixed-modes")).unwrap();
     let entry = project.entry().relative.clone();
     let source = project.read_source_text(&entry).unwrap();
-    let index = marqdo_view::source_map::SourceIndex::new(&source);
+    let index = marqdo_view::reader::source::SourceIndex::new(&source);
     let analysis = std::fs::read(root.join("tests/golden/analysis-v2/mixed-modes.json")).unwrap();
     let verified = semantic::verify_analysis(&analysis, &source, &index, entry.as_str()).unwrap();
     assert_eq!(
@@ -146,7 +148,7 @@ fn knowledge_emphasis_never_becomes_an_execution_anchor() {
     );
     let document = DocumentModel::parse(source.clone(), DocumentIdentity::placeholder(&entry));
     let navigation = Navigation::from_project(&project, &ViewConfig::default(), &entry);
-    let model = presentation::build(BuildInput {
+    let model = assemble::build(BuildInput {
         document,
         analysis: Some(&verified),
         status: SourceStatus::StaticOk,

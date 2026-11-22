@@ -49,7 +49,7 @@ fn reused_assets_match_their_recorded_hashes() {
 
 #[test]
 fn embedded_asset_bundle_matches_disk_and_has_one_theme() {
-    let bundle = marqdo_view::assets::AssetBundle::get();
+    let bundle = marqdo_view::reader::assets::AssetBundle::get();
     let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let css = std::fs::read(root.join("assets/reader.css")).unwrap();
     assert_eq!(sha256_hex(&css), bundle.css().sha256);

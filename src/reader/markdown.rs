@@ -6,8 +6,8 @@
 //! No semantic decision (which node is executable) is taken here — that comes
 //! exclusively from validated Analysis v2 (`semantic.rs`).
 
-use crate::project::SafeRelativePath;
-use crate::source_map::{sha256_hex, SourceIndex, SourceSpan};
+use crate::reader::source::SafeRelativePath;
+use crate::reader::source::{sha256_hex, SourceIndex, SourceSpan};
 use comrak::nodes::{ListType, NodeValue, Sourcepos, TableAlignment};
 use comrak::{parse_document, Arena, Options};
 

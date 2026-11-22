@@ -10,9 +10,9 @@
 //!   drop.
 
 use crate::error::{ViewError, ViewResult};
-use crate::project::{Project, SafeRelativePath};
-use crate::source_map::{sha256_hex, sha256_prefixed};
-use crate::version::{self, CoreVersion};
+use crate::protocol::tool_v1::{self, CoreVersion};
+use crate::reader::source::{sha256_hex, sha256_prefixed};
+use crate::reader::source::{Project, SafeRelativePath};
 use serde::{Deserialize, Serialize};
 use std::ffi::OsString;
 use std::io::Read;
@@ -240,9 +240,9 @@ impl CoreClient {
         Ok(Self {
             bin,
             protocol_env: ProtocolEnv {
-                tool: std::env::var(version::ENV_TOOL_PROTOCOL).ok(),
-                analysis: std::env::var(version::ENV_PROTOCOL_ANALYSIS).ok(),
-                trace: std::env::var(version::ENV_PROTOCOL_TRACE).ok(),
+                tool: std::env::var(tool_v1::ENV_TOOL_PROTOCOL).ok(),
+                analysis: std::env::var(tool_v1::ENV_PROTOCOL_ANALYSIS).ok(),
+                trace: std::env::var(tool_v1::ENV_PROTOCOL_TRACE).ok(),
             },
         })
     }
@@ -265,7 +265,7 @@ impl CoreClient {
     /// environment variables. A missing Development-mode env is allowed; an
     /// unknown major is a hard error.
     pub fn negotiate(&self) -> ViewResult<CoreVersion> {
-        version::negotiate_protocol_env(
+        tool_v1::negotiate_protocol_env(
             self.protocol_env.tool.as_deref(),
             self.protocol_env.analysis.as_deref(),
             self.protocol_env.trace.as_deref(),
@@ -285,13 +285,13 @@ impl CoreClient {
                 ),
             });
         }
-        let version = version::parse_version_output(&output.stdout)?;
-        if !version::product_is_compatible(&version.version) {
+        let version = tool_v1::parse_version_output(&output.stdout)?;
+        if !tool_v1::product_is_compatible(&version.version) {
             return Err(ViewError::ProtocolIncompatible {
                 detail: format!(
                     "core {} is outside the supported range {}",
                     version.version,
-                    version::PRODUCT_RANGE
+                    tool_v1::PRODUCT_RANGE
                 ),
             });
         }
@@ -653,6 +653,145 @@ fn summarize_stderr(stderr: &str) -> String {
         }
         text
     }
+}
+
+// ---------------------------------------------------------------------------
+// `marqdo view verify`: static Analysis/source binding check. Never executes.
+// ---------------------------------------------------------------------------
+
+use crate::cli::{RuntimeOpts, VerifyArgs};
+use crate::protocol::analysis_v2;
+
+pub fn verify_command(opts: &RuntimeOpts, args: &VerifyArgs) -> ViewResult<i32> {
+    let path = args
+        .path
+        .clone()
+        .or_else(|| opts.path.clone())
+        .unwrap_or_else(|| std::path::PathBuf::from("."));
+    let project = Project::open(&path)?;
+    let entry = project.entry().relative.clone();
+    let source_bytes = project.read_source(&entry)?;
+    let source = String::from_utf8(source_bytes).map_err(|err| ViewError::Io {
+        detail: format!("{entry} is not valid UTF-8: {err}"),
+    })?;
+    let source_index = crate::reader::source::SourceIndex::new(&source);
+
+    let client = CoreClient::from_env(opts.marqdo_bin.as_deref())?;
+    let core_version = client.negotiate()?;
+    let response = client.check(
+        &project,
+        &entry,
+        &CheckOptions {
+            refs: args.refs,
+            timeout: None,
+        },
+    )?;
+    let check = match response {
+        CheckResponse {
+            success: false,
+            diagnostics,
+            exit_code,
+            ..
+        } => {
+            let first = diagnostics
+                .first()
+                .map(|diagnostic| {
+                    format!(
+                        "{}: {}",
+                        if diagnostic.code.is_empty() {
+                            "diagnostic"
+                        } else {
+                            &diagnostic.code
+                        },
+                        diagnostic.message
+                    )
+                })
+                .unwrap_or_else(|| "no diagnostic detail".to_string());
+            return Err(ViewError::AnalysisFailed {
+                detail: format!(
+                    "`marqdo check` failed with exit code {exit_code} ({} diagnostic(s)); first: {first}",
+                    diagnostics.len()
+                ),
+            });
+        }
+        CheckResponse {
+            analysis: Some(check),
+            ..
+        } => check,
+        CheckResponse { analysis: None, .. } => {
+            return Err(ViewError::AnalysisFailed {
+                detail: "`marqdo check` succeeded but emitted no Analysis".to_string(),
+            })
+        }
+    };
+    let verified = analysis_v2::verify_analysis(
+        &check.analysis_bytes,
+        &source,
+        &source_index,
+        entry.as_str(),
+    )?;
+    let projection = &verified.projection;
+
+    if args.json {
+        let doc = serde_json::json!({
+            "schema": "marqdo.view-verify",
+            "schema_version": 1,
+            "ok": true,
+            "core": {
+                "version": core_version.version.to_string(),
+                "supported_range": tool_v1::PRODUCT_RANGE,
+            },
+            "analysis": {
+                "schema": "marqdo.analysis",
+                "schema_version": tool_v1::ANALYSIS_PROTOCOL,
+                "digest": projection.analysis_digest,
+                "producer_version": projection.producer_version,
+                "markdown_profile": projection.markdown_profile,
+                "functions": projection.functions.len(),
+                "units": projection.units.len(),
+                "diagnostics": projection.diagnostics.len(),
+            },
+            "project": {
+                "root_id": projection.project_root_id,
+                "identity_kind": projection.identity_kind,
+                "lock_digest": projection.lock_digest,
+                "stdlib_version": projection.stdlib_version,
+            },
+            "document": {
+                "relative_path": entry.as_str(),
+                "module_id": projection.module_id,
+                "source_digest": projection.source_digest,
+                "source_digest_matches": true,
+            },
+            "result": "PASS",
+            "executed": false,
+            "note": "Static verification only; the document was not executed.",
+        });
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&doc).unwrap_or_else(|_| "{}".to_string())
+        );
+    } else {
+        println!(
+            "core: marqdo {} (supported {})",
+            core_version.version,
+            tool_v1::PRODUCT_RANGE
+        );
+        println!(
+            "project: {} ({})",
+            projection.project_root_id, projection.identity_kind
+        );
+        println!("document: {entry}");
+        println!(
+            "analysis: schema=marqdo.analysis v2 modules={} functions={} digest={}",
+            projection.modules.len(),
+            projection.functions.len(),
+            projection.analysis_digest
+        );
+        println!("source digest: match");
+        println!("result: PASS (static only; document not executed)");
+    }
+    Ok(0)
 }
 
 #[cfg(test)]
