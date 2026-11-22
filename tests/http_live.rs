@@ -383,7 +383,13 @@ fn run_api_rejects_missing_token_wrong_origin_and_bad_requests() {
         r#"{"path":"index.mq.md","mode":"project","confirm":true}"#,
     );
     assert_eq!(project_mode.status, 403);
-    assert!(project_mode.body.contains("pure"));
+    assert!(project_mode.body.contains("view.run_denied"));
+    // Public errors never leak absolute paths or raw subprocess text.
+    assert!(
+        !project_mode.body.contains("/root/"),
+        "{}",
+        project_mode.body
+    );
 
     let args = server._core.argv_lines();
     let run_calls = args

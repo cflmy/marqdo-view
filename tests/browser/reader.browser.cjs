@@ -115,6 +115,24 @@ function localHostOnly(url) {
   );
   await page.keyboard.press("Escape");
 
+  if (projectName === "security-project") {
+    // X-01: an adversarial document must not execute script or fetch anything.
+    let alertFired = false;
+    page.on("dialog", async (dialog) => {
+      alertFired = true;
+      await dialog.dismiss();
+    });
+    await page.reload({ waitUntil: "networkidle" });
+    check("adversarial doc has no alert dialog", !alertFired);
+    check("adversarial doc has no external requests", external.length === 0, external.join(", "));
+    check("raw HTML omitted note rendered", (await page.locator(".mq-raw-omitted").count()) > 0);
+    check("prose survives sanitization", (await page.locator(".mq-document").innerText()).includes("普通正文"));
+    check(
+      "javascript link neutralized",
+      (await page.locator('a[href^="javascript:"]').count()) === 0
+    );
+  }
+
   if (projectName === "welcome") {
     check("welcome hero only on configured page", (await page.locator(".mq-welcome").count()) === 1);
     check(

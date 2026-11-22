@@ -75,9 +75,29 @@ Protocol axes (Tool v1, Analysis v2, Trace v2) are versioned separately.
 - Meta CSP no longer carries the ignored `frame-ancestors` directive (the HTTP
   header still enforces framing).
 
+### Added (PR-05)
+
+- Static export (`marqdo view export PATH --out DIR`) through the same
+  `ReaderRenderer`: `index.html` + `pages/<relative>.html` + hash-named assets +
+  `manifest.json` (relative paths, per-file SHA-256, protocols, `executed:false`).
+- Pure read-only guarantee: export never calls Core `run`, never writes into the
+  project root, never overwrites unrelated non-empty directories; staging +
+  atomic rename, previous successful export replaced safely.
+- Offline by construction: same embedded asset bytes, data-URI images, no remote
+  fonts/CDN; relative internal links; `--no-annotations` hides semantic anchors
+  without changing prose.
+- HTTP hardening: bounded concurrent requests (503 beyond 32), detail-free
+  public error JSON/pages (no absolute paths or subprocess text), 30s page check
+  budget.
+- `tools/test-export.sh`, `tools/test-security.sh`, adversarial browser fixture
+  (`tests/fixtures/security-project`) proving no script execution and no
+  external requests; `tests/export.rs` export contracts; ADR-0005.
+
 ### Known limitations
 
-- `export` still returns `view.unsupported` (PR-05).
+- No incremental export or multi-project site; one project per invocation.
+- Export still requires a core for semantic status; without it pages are
+  exported as explicitly unverified prose.
 - `project`/`strict` grant UI, streaming output, cancellation and debugger are
   not implemented; variables/memory/proof states remain `UNSUPPORTED`.
 - Pixel-level comparison with the reference screenshot remains a manual

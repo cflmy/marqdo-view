@@ -12,6 +12,7 @@ pub mod cli;
 pub mod core_client;
 pub mod document;
 pub mod error;
+pub mod export;
 pub mod presentation;
 pub mod project;
 pub mod render;

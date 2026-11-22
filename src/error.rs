@@ -100,6 +100,42 @@ impl ViewError {
     /// JSON diagnostic with `source:"view"` so it can never masquerade as a
     /// Core diagnostic. Contains no absolute machine paths beyond what the
     /// caller already supplied.
+    /// Public, detail-free message for pages/JSON served to the browser. Never
+    /// contains absolute machine paths, scratch paths or raw subprocess text.
+    pub fn public_message(&self) -> &'static str {
+        match self.code() {
+            "view.core_missing" => "未找到可用的冻结核心（MARQDO_BIN）。",
+            "view.protocol_incompatible" => "核心或协议版本不兼容。",
+            "view.analysis_failed" => "Core 静态检查失败；正文仍可阅读，语义标注已撤销。",
+            "view.source_mismatch" => "当前源码与 Analysis 字节摘要不一致。",
+            "view.source_span_invalid" => "语义位置超出源码或不在 UTF-8 边界。",
+            "view.trace_stale" => "运行结果与当前 Analysis 不匹配，已标记为过期。",
+            "view.run_denied" => "运行请求未获授权或被拒绝。",
+            "view.path_forbidden" => "请求的路径超出允许的项目根目录。",
+            "view.bind_denied" => "拒绝绑定该网络地址。",
+            "view.asset_integrity" => "内嵌资源摘要不一致。",
+            "view.export_failed" => "静态导出失败（输出目录不安全或写入失败）。",
+            "view.resource_limit" => "超过配置的资源上限。",
+            "view.core_spawn" => "无法启动冻结核心。",
+            "view.core_timeout" => "冻结核心执行超时，已终止。",
+            "view.io" => "本地 I/O 失败。",
+            "view.unsupported" => "当前版本不支持该功能。",
+            _ => "View 内部错误。",
+        }
+    }
+
+    /// Browser-safe JSON diagnostic: stable code + public message only.
+    pub fn to_public_json(&self) -> serde_json::Value {
+        serde_json::json!({
+            "schema": "marqdo.view-error",
+            "schema_version": 1,
+            "code": self.code(),
+            "source": "view",
+            "message": self.public_message(),
+            "exit_code": self.exit_code(),
+        })
+    }
+
     pub fn to_json(&self) -> serde_json::Value {
         serde_json::json!({
             "schema": "marqdo.view-error",

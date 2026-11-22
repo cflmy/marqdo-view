@@ -43,6 +43,13 @@ cargo test --locked
 cargo build --release --locked
 ```
 
+静态导出（纯只读、离线可打开，永不执行文档）：
+
+```bash
+marqdo view export examples/welcome --out ./site
+# 或：marqdo-view export examples/welcome --out ./site --marqdo-bin /path/to/marqdo
+```
+
 本机浏览（默认只绑定 127.0.0.1，不自动执行）：
 
 ```bash
@@ -64,6 +71,8 @@ MARQDO_BIN=/absolute/path/to/marqdo
 ```bash
 (cd tests/browser && npm install && PLAYWRIGHT_BROWSERS_PATH="$PWD/../.cache/pw-browsers" npx playwright install chromium)
 MARQDO_BIN=/absolute/path/to/marqdo ./tools/test-browser.sh
+MARQDO_BIN=/absolute/path/to/marqdo ./tools/test-export.sh
+./tools/test-security.sh
 ```
 
 完整安装/验收步骤见 RFC §18，脚本位于 `tools/`。

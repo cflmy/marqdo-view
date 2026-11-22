@@ -66,6 +66,7 @@ pub fn serve(ctx: AppContext, opts: &RuntimeOpts) -> ViewResult<i32> {
         cache: Mutex::new(HashMap::new()),
         allowed_hosts: allowed_hosts(port),
         running: AtomicBool::new(false),
+        active_requests: std::sync::atomic::AtomicUsize::new(0),
         run_cache: Mutex::new(HashMap::new()),
         run_seq: AtomicU64::new(1),
     });
@@ -95,6 +96,8 @@ struct ServerState {
     allowed_hosts: Vec<String>,
     /// One active run per View session.
     running: AtomicBool,
+    /// Bounded concurrent request handling.
+    active_requests: std::sync::atomic::AtomicUsize,
     run_cache: Mutex<HashMap<String, CachedRun>>,
     run_seq: AtomicU64,
 }
@@ -161,6 +164,17 @@ impl ServerState {
 }
 
 fn handle(state: &ServerState, request: Request) -> ViewResult<()> {
+    if state.active_requests.fetch_add(1, Ordering::SeqCst) >= 32 {
+        state.active_requests.fetch_sub(1, Ordering::SeqCst);
+        return respond_text(
+            request,
+            StatusCode(503),
+            "text/plain; charset=utf-8",
+            "too many concurrent requests\n".as_bytes().to_vec(),
+            CacheKind::NoStore,
+        );
+    }
+    let _active = ActiveRequestGuard(&state.active_requests);
     let method = request.method().clone();
     let is_head = method == Method::Head;
     let is_get = method == Method::Get;
@@ -569,6 +583,14 @@ fn handle_clear_run_post(state: &ServerState, mut request: Request) -> ViewResul
     )
 }
 
+struct ActiveRequestGuard<'a>(&'a std::sync::atomic::AtomicUsize);
+
+impl Drop for ActiveRequestGuard<'_> {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
 struct RunningGuard<'a>(&'a AtomicBool);
 
 impl Drop for RunningGuard<'_> {
@@ -666,6 +688,7 @@ fn serve_page(
         live: true,
         csrf_token: Some(state.csrf_token.clone()),
         run_available: state.ctx.core().is_some() && model.can_offer_run(),
+        annotations: true,
     };
     let page = state.renderer.render(model, &ctx);
     respond_html(request, page.html.into_bytes(), is_head)
@@ -675,7 +698,7 @@ fn serve_error_page(request: Request, err: &ViewError, is_head: bool) -> ViewRes
     let html = format!(
         "<!DOCTYPE html><html lang=\"zh-CN\"><head><meta charset=\"utf-8\"/><title>Marqdo View · 错误</title><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/></head><body style=\"font:16px/1.6 system-ui,serif;background:#fcf9f5;color:#29251f;padding:2rem;max-width:46rem;margin:auto\"><h1>无法生成阅读页面</h1><p><code>{code}</code></p><p>{message}</p><p><a href=\"/\">返回入口</a></p></body></html>",
         code = escape_html(err.code()),
-        message = escape_html(&err.to_string()),
+        message = escape_html(err.public_message()),
     );
     respond_html(request, html.into_bytes(), is_head)
 }
@@ -797,7 +820,7 @@ fn respond_json(request: Request, status: StatusCode, value: &serde_json::Value)
 }
 
 fn respond_json_error(request: Request, status: StatusCode, err: &ViewError) -> ViewResult<()> {
-    respond_json(request, status, &err.to_json())
+    respond_json(request, status, &err.to_public_json())
 }
 
 fn respond_text(

@@ -95,6 +95,7 @@ case "$1" in
     exit 0
     ;;
   run)
+    : > "$dir/run-was-called"
     trace=""
     prev=""
     for a in "$@"; do

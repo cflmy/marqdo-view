@@ -9,6 +9,7 @@ use crate::core_client::{
 };
 use crate::document::{DocumentIdentity, DocumentModel};
 use crate::error::{ViewError, ViewResult};
+use crate::export::{export as run_export, ExportOptions};
 use crate::presentation::{self, BuildInput, Navigation, PresentationModel, SourceStatus};
 use crate::project::{Project, SafeRelativePath, ViewConfig};
 use crate::semantic::{self, CoreDiagnostic};
@@ -98,7 +99,14 @@ impl AppContext {
         let mut verified = None;
 
         if let Some(client) = &self.core {
-            match client.check(&self.project, relative, &CheckOptions::default())? {
+            match client.check(
+                &self.project,
+                relative,
+                &CheckOptions {
+                    refs: false,
+                    timeout: Some(std::time::Duration::from_secs(30)),
+                },
+            )? {
                 CheckResponse {
                     success: false,
                     diagnostics: raw_diagnostics,
@@ -400,11 +408,29 @@ pub fn browse(opts: &RuntimeOpts) -> ViewResult<i32> {
     crate::server::serve(context, opts)
 }
 
-pub fn export(_opts: &RuntimeOpts, _args: &ExportArgs) -> ViewResult<i32> {
-    Err(ViewError::Unsupported {
-        detail: "static export lands with PR-05; browse and verify are available in this build"
-            .to_string(),
-    })
+pub fn export(opts: &RuntimeOpts, args: &ExportArgs) -> ViewResult<i32> {
+    let path = args
+        .path
+        .clone()
+        .or_else(|| opts.path.clone())
+        .unwrap_or_else(|| std::path::PathBuf::from("."));
+    let context = AppContext::open(&path, opts.marqdo_bin.as_deref())?;
+    let summary = run_export(
+        &context,
+        &ExportOptions {
+            out: args.out.clone(),
+            no_annotations: args.no_annotations,
+        },
+    )?;
+    println!(
+        "marqdo view export: {} page(s), {} file(s) → {}",
+        summary.pages,
+        summary.files,
+        summary.out.display()
+    );
+    println!("manifest: sha256:{}", summary.manifest_sha256);
+    println!("executed: false (纯静态导出，未运行任何文档)");
+    Ok(0)
 }
 
 fn generic_core_note(err: &ViewError) -> String {

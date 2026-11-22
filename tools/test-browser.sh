@@ -77,6 +77,7 @@ run_suite() {
 mkdir -p "$repo_root/tests/.cache" "$MQ_SCREENSHOT_DIR"
 run_suite examples/welcome
 run_suite examples/control-flow
+run_suite tests/fixtures/security-project
 
 core_after="$(sha256sum "$MARQDO_BIN" | cut -d' ' -f1)"
 if [[ "$core_before" != "$core_after" ]]; then

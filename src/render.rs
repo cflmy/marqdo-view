@@ -69,6 +69,8 @@ pub struct RenderContext {
     /// Whether a Run control may be shown as available. False until the
     /// explicit-run flow exists; the button then explains that it is disabled.
     pub run_available: bool,
+    /// Static exports may hide semantic/run annotations without changing prose.
+    pub annotations: bool,
 }
 
 impl RenderContext {
@@ -78,6 +80,7 @@ impl RenderContext {
             live: true,
             csrf_token: None,
             run_available: false,
+            annotations: true,
         }
     }
 
@@ -87,7 +90,15 @@ impl RenderContext {
             live: false,
             csrf_token: None,
             run_available: false,
+            annotations: true,
         }
+    }
+
+    /// Static export with annotations optionally disabled.
+    pub fn static_export(page_depth: usize, annotations: bool) -> Self {
+        let mut context = Self::static_site(page_depth);
+        context.annotations = annotations;
+        context
     }
 }
 
@@ -145,7 +156,7 @@ impl ReaderRenderer {
 <link rel="stylesheet" href="{css}"/>
 <script defer src="{js}"></script>
 </head>
-<body class="mq-reader" data-mode="document" data-annotations="on" data-size="normal" data-source-status="{status}" data-run-state="{run_state}" data-run-available="{run_available}" data-live="{live}">
+<body class="mq-reader" data-mode="document" data-annotations="{annotations}" data-size="normal" data-source-status="{status}" data-run-state="{run_state}" data-run-available="{run_available}" data-live="{live}">
 <a class="mq-skip" href="#mq-main">跳到正文</a>
 "##,
             presentation_version = model.version,
@@ -156,6 +167,7 @@ impl ReaderRenderer {
             css = escape_attr(&format!("{asset_prefix}{css_name}")),
             js = escape_attr(&format!("{asset_prefix}{js_name}")),
             status = model.source_status.data_value(),
+            annotations = if ctx.annotations { "on" } else { "off" },
             run_state = model.run_state().data_value(),
             run_available = if ctx.run_available { "true" } else { "false" },
             live = if ctx.live { "true" } else { "false" },
@@ -1028,7 +1040,11 @@ fn render_inline(
             literal,
             ticks: _,
         } => {
-            let anchor = projection.and_then(|projection| projection.statement_for_inline(*span));
+            let anchor = if ctx.annotations {
+                projection.and_then(|projection| projection.statement_for_inline(*span))
+            } else {
+                None
+            };
             html.push_str("<code");
             if let Some((_, statement)) = anchor {
                 let id = source_id(
@@ -1052,7 +1068,11 @@ fn render_inline(
             }
         }
         Inline::Strong { span, children } => {
-            let anchor = projection.and_then(|projection| projection.statement_for_inline(*span));
+            let anchor = if ctx.annotations {
+                projection.and_then(|projection| projection.statement_for_inline(*span))
+            } else {
+                None
+            };
             html.push_str("<strong");
             if let Some((_, statement)) = anchor {
                 let id = source_id(
@@ -1076,7 +1096,11 @@ fn render_inline(
             }
         }
         Inline::Emph { span, children } => {
-            let anchor = projection.and_then(|projection| projection.statement_for_inline(*span));
+            let anchor = if ctx.annotations {
+                projection.and_then(|projection| projection.statement_for_inline(*span))
+            } else {
+                None
+            };
             html.push_str("<em");
             if let Some((_, statement)) = anchor {
                 let id = source_id(
