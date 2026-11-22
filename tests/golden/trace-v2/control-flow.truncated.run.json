@@ -4,7 +4,19 @@
   "stderr": "",
   "stdout": "0\n0\n2\n",
   "success": true,
-  "trace": [],
+  "trace": [
+    {
+      "duration_micros": 10,
+      "module": "root:control-flow@0.1.0::index.mq.md",
+      "op": "resource.open",
+      "result": "ok",
+      "seq": 4,
+      "span": {
+        "end": 304,
+        "start": 261
+      }
+    }
+  ],
   "value": {
     "decimal": "3",
     "type": "int"

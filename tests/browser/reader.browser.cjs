@@ -47,7 +47,11 @@ function localHostOnly(url) {
   const page = await context.newPage();
   const external = [];
   const consoleErrors = [];
+  let submittedRuns = 0;
   page.on("request", (request) => {
+    if (request.method() === "POST" && new URL(request.url()).pathname === "/api/runs") {
+      submittedRuns += 1;
+    }
     if (!localHostOnly(request.url()) && !request.url().startsWith("data:")) {
       external.push(request.url());
     }
@@ -166,15 +170,28 @@ function localHostOnly(url) {
     check("GFM table rendered", (await page.locator(".mq-document table").count()) >= 1);
   }
 
+  // Simple theme switch (RFC §1.2 MVP SMALL) persists and stays readable.
+  await page.click('.mq-dock-btn[data-action="settings"]');
+  await page.click('#mq-dialog-settings [data-action="theme"]');
+  check("dark theme applied", (await page.getAttribute("body", "data-theme")) === "dark");
+  await page.reload({ waitUntil: "networkidle" });
+  check(
+    "theme preference persisted",
+    (await page.getAttribute("body", "data-theme")) === "dark"
+  );
+  await page.click('.mq-dock-btn[data-action="settings"]');
+  await page.click('#mq-dialog-settings [data-action="theme"]');
+  check("paper theme restored", (await page.getAttribute("body", "data-theme")) === "light");
+
   // Responsive geometry: no horizontal overflow; dock inside viewport.
+  // RFC-VIEW-0002 §9.3 visual matrix: the source reference is 2048x1133.
   const widths = [
-    [390, 844],
-    [600, 800],
-    [900, 768],
-    [1280, 800],
+    [2048, 1133],
     [1664, 920],
-    [1920, 1080],
-    [2560, 1440],
+    [1440, 900],
+    [1024, 768],
+    [768, 1024],
+    [390, 844],
   ];
   for (const [width, height] of widths) {
     await page.setViewportSize({ width, height });
@@ -206,7 +223,11 @@ function localHostOnly(url) {
   await nojsPage.goto(base, { waitUntil: "load" });
   const nojsText = await nojsPage.locator(".mq-document").innerText();
   check("no-JS document remains readable", nojsText.trim().length > 20);
-  check("no-JS has no fake run panel", (await nojsPage.locator("#mq-run-panel").count()) === 0);
+  check(
+    "no-JS exposes no active run UI",
+    !(await nojsPage.locator("#mq-run-panel").isVisible()) &&
+      (await nojsPage.locator('.mq-dock-btn[data-action="run"]').count()) === 1
+  );
   await nojs.close();
 
   // Print hides chrome but keeps prose.
@@ -217,33 +238,143 @@ function localHostOnly(url) {
   check("print keeps prose", await page.locator(".mq-document").isVisible());
   await page.emulateMedia({ media: "screen" });
 
+  check("browsing, refresh, search and settings never submit runs", submittedRuns === 0);
+
   // Explicit run flow, only against the control-flow example.
   if (projectName === "control-flow") {
+    const runRequests = [];
+    let originalEventId;
+    let reconnectEventId;
+    page.on("request", (request) => {
+      const pathname = new URL(request.url()).pathname;
+      if (pathname.startsWith("/api/runs")) {
+        runRequests.push({ method: request.method(), pathname });
+      }
+    });
+    await page.route("**/api/runs/*/events", async (route) => {
+      if (originalEventId !== undefined) {
+        reconnectEventId = (await route.request().allHeaders())["last-event-id"];
+        await route.continue();
+        return;
+      }
+      // Ask the server to replay from the beginning even if the Core has
+      // already finished. Deliver one genuine nonterminal frame before ending
+      // the response so Chromium has an event ID to use for reconnection.
+      const headers = await route.request().allHeaders();
+      headers["last-event-id"] = "0";
+      const response = await route.fetch({ headers, timeout: 15000 });
+      const body = await response.text();
+      const first = body.split("\n\n").find((frame) => /^event: run\.state$/m.test(frame));
+      const id = first && /^id: (\d+)$/m.exec(first);
+      if (!response.ok() || !id) throw new Error("missing first View SSE event");
+      originalEventId = id[1];
+      await route.fulfill({
+        status: 200,
+        contentType: "text/event-stream; charset=utf-8",
+        body: first + "\n\nretry: 50\n\n",
+      });
+    });
     await page.click('.mq-dock-btn[data-action="run"]');
-    check("run confirm dialog opens", await page.locator("#mq-dialog-run-confirm").isVisible());
-    const dialogText = await page.locator("#mq-dialog-run-confirm").innerText();
-    check("confirm mentions pure mode", dialogText.includes("pure"));
+    check("run dialog opens", await page.locator("#mq-dialog-run").isVisible());
+    const dialogText = await page.locator("#mq-dialog-run").innerText();
+    check("run dialog mentions pure mode", dialogText.includes("pure"));
+    check(
+      "run dialog previews the command",
+      (await page.locator("#mq-run-command").innerText()).includes("marqdo run")
+    );
     await page.click('[data-action="run-confirm"]');
-    await page.waitForURL(/run=/, { timeout: 30000 });
-    await page.waitForLoadState("networkidle");
-    check("run state succeeded", (await page.getAttribute("body", "data-run-state")) === "succeeded");
-    check("run panel rendered", await page.locator("#mq-run-panel").isVisible());
+    await page.waitForSelector('body[data-run-state="succeeded"]', { timeout: 30000 });
+    // SSE delivered the terminal state without a page reload.
+    check("run state succeeded via SSE", (await page.getAttribute("body", "data-run-state")) === "succeeded");
+    check("run panel visible", await page.locator("#mq-run-panel").isVisible());
     check("run chips anchored", (await page.locator(".mq-run-chip").count()) > 0);
     check(
+      "observed chips carry trace provenance",
+      (await page.locator('.mq-run-chip[data-annotation-source="trace"]').count()) > 0
+    );
+    check(
+      "static statement anchors carry analysis provenance",
+      (await page.locator('[data-annotation-source="analysis"]').count()) > 0
+    );
+    check(
+      "at most one grouped chip per anchor",
+      (await page.locator(".mq-run-chip").count()) ===
+        (await page.locator(".mq-run-chip").evaluateAll((nodes) => {
+          const seen = new Set();
+          let unique = 0;
+          nodes.forEach((node) => {
+            const key = node.parentElement ? node.parentElement.dataset.sourceId : null;
+            if (key && !seen.has(key)) {
+              seen.add(key);
+              unique += 1;
+            }
+          });
+          return unique;
+        }))
+    );
+    check(
       "trace event list rendered",
-      (await page.locator(".mq-run-events li").count()) > 0
+      (await page.locator("#mq-run-events li").count()) > 0
     );
     check(
       "stdout rendered escaped",
-      (await page.locator(".mq-stdout").first().innerText()).includes("0")
+      (await page.locator("#mq-run-stdout").innerText()).includes("0")
+    );
+    check(
+      "Chromium reconnected with the original Last-Event-ID",
+      originalEventId !== undefined && reconnectEventId === originalEventId,
+      JSON.stringify({ originalEventId, reconnectEventId })
+    );
+    check(
+      "reconnect did not submit a second run or poll status",
+      runRequests.filter(({ method }) => method === "POST").length === 1 &&
+        runRequests.filter(({ method }) => method === "GET").length === 2 &&
+        runRequests.every(({ method, pathname }) =>
+          method === "POST" ? pathname === "/api/runs" : pathname.endsWith("/events")),
+      JSON.stringify(runRequests)
     );
     if (screenshotDir) {
       await page.screenshot({ path: path.join(screenshotDir, "control-flow-run.png") });
+      await page.click('.mq-dock-btn[data-action="settings"]');
+      await page.click('#mq-dialog-settings [data-action="theme"]');
+      await page.screenshot({ path: path.join(screenshotDir, "control-flow-run-dark.png") });
+      await page.click('.mq-dock-btn[data-action="settings"]');
+      await page.click('#mq-dialog-settings [data-action="theme"]');
     }
-    // Clear run removes the display and the URL marker.
-    await page.click('[data-action="clear-run"]');
-    await page.waitForURL((url) => !url.searchParams.has("run"), { timeout: 15000 });
-    check("clear run removes panel", (await page.locator("#mq-run-panel").count()) === 0);
+    // Clear run hides the display and keeps the project untouched.
+    await page.click('.mq-dock-btn[data-action="clear"]');
+    check("clear hides run panel", !(await page.locator("#mq-run-panel").isVisible()));
+    check("page was never reloaded by the run", (await page.title()).includes("Marqdo"));
+  }
+
+  if (projectName === "function-params.mq.md") {
+    await page.click('.mq-dock-btn[data-action="run"]');
+    check("no-main Dock opens the functions list", await page.locator("#mq-dialog-functions").isVisible());
+    check("no-main Dock did not submit a run", submittedRuns === 0);
+    const call = (name) => page.locator(`#mq-dialog-functions [data-action="call-function"][data-function-label="${name}"]`);
+    await call("double").click();
+    const n = page.locator('#mq-run-params [data-param-name="n"]');
+    check("Analysis marks n required and Int",
+      await n.getAttribute("aria-required") === "true" &&
+      (await n.locator("..").innerText()).includes("Int"));
+    await page.click('[data-action="run-confirm"]');
+    check("missing required parameter leaves the form open", await page.locator("#mq-dialog-run").isVisible());
+    check("missing required parameter did not submit", submittedRuns === 0);
+    await n.fill("5");
+    const argsPreview = page.locator("#mq-run-command");
+    check("call preview includes the chosen value", (await argsPreview.innerText()).includes("--arg n=5"));
+    await page.click('[data-action="run-confirm"]');
+    await page.waitForSelector('body[data-run-state="succeeded"]');
+    check("installed tool displays the real double(5) result",
+      await page.locator("#mq-run-summary").innerText().then((text) => text.includes("返回值：Int(10)")));
+
+    await page.click('.mq-tabs [data-action="functions"]');
+    await call("format_arguments").click();
+    await page.fill('[data-param-name="label"]', '"浏览器 "');
+    await page.fill('[data-param-name="items"]', '["列表", 7]');
+    await page.click('[data-action="run-confirm"]');
+    await page.getByText("返回值：Text(浏览器 列表 · 7)", { exact: true }).waitFor();
+    check("CLI round-tripped Unicode Text and a List through the form", submittedRuns === 2);
   }
 
   await browser.close();

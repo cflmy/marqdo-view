@@ -2,7 +2,7 @@
   "schema": "marqdo.cli-tool",
   "schema_version": 1,
   "name": "marqdo-view",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "command": "view",
   "entrypoint": "bin/marqdo-view",
   "compatibility": {

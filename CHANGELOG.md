@@ -4,7 +4,146 @@ All notable changes to `marqdo-view` are documented here. The format follows
 Keep a Changelog and the project uses SemVer for the View product version.
 Protocol axes (Tool v1, Analysis v2, Trace v2) are versioned separately.
 
-## [Unreleased]
+`0.2.0` is the first release implementing RFC-VIEW-0002 end to end (SSE execution
+loop, 7-route Live API, controlled project grants and Trace-bound annotations).
+The earlier `0.1.0` development line was never published; its verified reader /
+Analysis / export work is folded into this entry.
+
+## [0.2.0] - 2026-11-22
+
+### Fixed during issue #2 acceptance
+
+- Terminate the HTTP/1.1 SSE body after the terminal frame, including a
+  replayed terminal frame. Preserve View Run Events v1 and flush every frame.
+- Verify Chromium reconnects with the received event ID without resubmitting
+  the run. Exercise the installed Tool's Int, Unicode Text and List controls.
+- Pin the official Beta archive in CI. Run the installed Tool, browser trace,
+  no-side-effect and artifact integrity checks in the acceptance gate.
+
+### Added (RFC-VIEW-0002 PR-05)
+
+- Trace v2 evidence binding hardened end to end: the SSE trace summary carries
+  per-event `source_id` only for verified entry-module spans, observed chips are
+  marked `data-annotation-source="trace"`, static anchors
+  `data-annotation-source="analysis"`, and grouped chips collapse >3 events per
+  anchor with a real count in `title`.
+- Stale/invalid/truncated Trace semantics covered by tests: editing source during
+  a run yields `stale=true` with all anchors/source ids null; a mismatched Trace
+  digest yields `trace.status=invalid` while the run still succeeds; truncated
+  traces are reported without claiming complete coverage.
+- ADR-0010 records the annotation/staleness strategy (inline keyed chips instead
+  of SVG curves, per RFC §4.4's allowed degradation).
+- Browser regression at the RFC width matrix incl. 2048x1133, provenance/grouping
+  assertions, dark-theme run screenshot; evidence in `docs/evidence/PR-05/`.
+
+### Added (RFC-VIEW-0002 PR-04)
+
+- `src/server/{mod,routes,security,sse}.rs`: the fixed 7-route Live API with one
+  explicit execution entry. Removed `/api/health`, `/api/document`,
+  `/api/run` and `/api/clear-run`.
+- SSE transport writes the `text/event-stream` response directly to the socket
+  and flushes every frame/heartbeat (tiny_http's chunked writer would delay
+  frames); heartbeats, `Last-Event-ID` replay, authoritative snapshots, 128-event
+  ring, terminal close and a max of two observers per run.
+- Per-session `HttpOnly; SameSite=Strict` cookie + per-session CSRF token
+  (`X-View-CSRF`), exact same-origin `Origin`, loopback `Host` validation,
+  `Sec-Fetch-Site` cross-site rejection, JSON-only bounded run POSTs (64 KiB).
+- Reader front-end now runs through one POST + EventSource: target form built
+  from Analysis signatures, text-only command preview, pure/project mode with
+  explicit fs read/write globs and second confirmation, cancel button, live
+  result/stdout/stderr/Trace panel, keyed source anchors (skipped when stale),
+  and no status polling. Run shell is hidden until an explicit run.
+- New `tests/security/` suite (cookies/CSRF/CORS/symlink/Markdown/SSE session
+  isolation) and rewritten HTTP/SSE integration tests; browser suite updated for
+  EventSource, dark theme and the RFC width matrix (incl. 2048x1133).
+- ADR-0009 records the SSE transport, session model and route decisions; evidence
+  in `docs/evidence/PR-04/` includes real Chromium logs/screenshots and a real
+  frozen-CLI run (285 Trace v2 events).
+
+### Added (RFC-VIEW-0002 PR-03)
+
+- Execution layer: `src/execution/{request,process,controller,events}.rs`.
+  - request validation per §6.3 (size/path/target/parameter/mode/fs grants) and
+    exact `function_id` -> CLI name resolution from Analysis v2;
+  - one cancellable process adapter (explicit argv, process group,
+    SIGTERM→2s→SIGKILL, bounded stdout/stderr, spawn hook, wall clock); the
+    CoreClient now uses the same adapter for `check`/`--version`;
+  - single active job, `client_request_id` + payload digest idempotency/409,
+    unique terminal states, cancellation, 128-event ring buffer with
+    `Last-Event-ID` replay/snapshot, and `marqdo.view-run-events` v1 frames;
+  - Trace v2 verification against the exact pre-run Analysis bytes with safe
+    event summaries; missing/invalid trace is reported without faking evidence.
+- Explicit budgets on every run/call (`--fuel`, `--max-output`, `--timeout`,
+  trace limits) plus 4 MiB JSON/Trace bounded reads and `view.output_limit`.
+- New `--run-timeout` option clamped to 1..=120 seconds (default 30).
+- ADR-0008 records lifecycle/cancel-race/Trace-missing semantics.
+- Tests: `tests/integration/execution.rs` with a real fake-Core executable
+  (accepted/running/terminal SSE-ready events, call argv, dedupe, busy, cancel,
+  session isolation, stale digest, grants, unavailable trace).
+
+### Changed (RFC-VIEW-0002 PR-02)
+
+- Restructured the crate into the RFC-VIEW-0002 §5.3 layout: `src/protocol/
+  {analysis_v2,trace_v2,tool_v1}.rs`, `src/reader/{source,markdown,model,
+  assemble,render,assets}.rs`, `src/config.rs`; `lib.rs` is the composition
+  root and `app.rs`/`project.rs`/`semantic.rs`/`trace.rs`/`document.rs`/
+  `presentation.rs`/`source_map.rs`/`render.rs`/`assets.rs` are gone.
+- Replaced `GET /api/document` with the read-only `GET /api/documents`
+  (documents list + current outline/function/analysis summary).
+- Reading UI: removed variable/memory placeholder menu entries (one explicit
+  "unsupported capability" explanation remains), added a simple dark theme
+  toggle with a single token override layer and persisted preference.
+- Reorganized tests into Cargo `[[test]]` suites: `tests/contract/` (CLI/Tool/
+  Analysis/Trace/coupling/assets) and `tests/integration/` (Live HTTP/renderer/
+  Unicode/export); `tests/fixtures`, `tests/golden`, `tests/browser` unchanged.
+
+### Changed (RFC-VIEW-0002 PR-01)
+
+- View product version is now `0.2.0` (`Cargo.toml`, `tool.json`, binary
+  `--version`), still independent from the CLI product version.
+- Scripts moved from `tools/` to `scripts/` per RFC-VIEW-0002 §5.3; added
+  `scripts/verify-frozen-cli.sh` (records version/SHA and fails if the frozen
+  CLI changes across a command sequence).
+- Added `.github/workflows/ci.yml`: quality lane (fmt/clippy/test/build) plus a
+  frozen-CLI acceptance lane that verifies the release archive SHA, runs the
+  one-command acceptance and uploads evidence. `.woodpecker.yml` updated to the
+  new script paths.
+- Tool v1 packaging now emits `0.2.0`; install/dispatch/tamper behaviour is
+  re-verified against the frozen `3.0.0-beta.1` CLI.
+
+### Added (RFC-VIEW-0002 PR-06)
+
+- Five RFC §13.3 example documents at `examples/{welcome,branch-loop,
+  function-params,knowledge-only,unsafe-side-effect}.mq.md` plus explicit
+  `examples/view.json`; all are checked with the frozen CLI and recorded via
+  `scripts/check-examples.sh` (double(5)=Int 10, branch-loop=Int 0 with
+  loop/return Trace, knowledge-only has no main, unsafe-side-effect writes only
+  with explicit project grants).
+- `scripts/test-no-exec.sh`: opens/lists/searches/reloads/exports the
+  unsafe-side-effect document, hashes every example source and the lock file,
+  asserts no write sentinel appears and that exported HTML contains no run
+  controls, CSRF material or external URLs.
+- Static export no longer renders run controls: no run Dock button, no run tab,
+  no call buttons and no run dialog; only settings/more remain offline.
+- `scripts/acceptance.sh` extended with `examples_check` and `no_exec_suite`
+  gates and refreshed evidence manifest schema (`tests.examples`, `tests.no_exec`).
+- Final documentation closure: `docs/ACCEPTANCE.md` rewritten against
+  RFC-VIEW-0002 §9/§10, STATUS/CONFORMANCE/README/COMPATIBILITY updated, final
+  evidence manifest generated from the frozen CLI release (CLI SHA unchanged).
+
+### Changed (RFC-VIEW-0002 PR-00)
+
+- Adopted `docs/architecture/RFC-VIEW-0002.md` as the sole implementation
+  baseline for execution, scope, SSE, UI routes and release gates; RFC-0001 is
+  archived as historical design (ADR-0007).
+- Moved specs to `docs/architecture/` and decisions to `docs/decisions/`.
+- Added `docs/audits/legacy-view.md` (static legacy evidence with
+  `KEEP_ASSET/REIMPLEMENT/DROP/UNKNOWN` decisions and `LEGACY_RUNTIME_UNVERIFIED`
+  declaration), `docs/audits/protocol-contract-0002.md` (frozen CLI black-box
+  contract), `docs/CONFORMANCE.md` (living RFC-VIEW-0002 matrix) and refreshed
+  `docs/STATUS.md` with the remaining 0002 gaps.
+- No source behaviour changed in this step; the tracked 0001 implementation is
+  unchanged and still passes its tests while PR-02..PR-06 migration proceeds.
 
 ### Added
 
@@ -71,7 +210,7 @@ Protocol axes (Tool v1, Analysis v2, Trace v2) are versioned separately.
   search, settings, 7 viewport widths without horizontal overflow or dock
   clipping, no-JS reading, print mode, explicit run + clear.
 - Screenshot evidence for the Welcome page (1664×920, 390×844) and a real
-  Trace run page in `docs/evidence/PR-03/`.
+  Trace run page in `docs/evidence/0001-pr03/`.
 - Meta CSP no longer carries the ignored `frame-ancestors` directive (the HTTP
   header still enforces framing).
 

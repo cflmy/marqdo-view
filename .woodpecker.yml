@@ -1,68 +1,26 @@
-# Woodpecker CI for marqdo-view.
-#
-# The contract/export/browser lanes need the frozen marqdo release archive.
-# Provide it through a secret and extract it before the lane runs; the pipeline
-# deliberately never builds the CLI from source.
+# The published beta needs glibc 2.39. Use the matching Playwright image
+# so the installed-tool tests get both Ubuntu Noble and Chromium.
 when:
-  event: [push, pull_request, manual]
+  - event: [pull_request, manual]
+  - event: push
+    branch: master
 
 steps:
-  code:
-    image: rust:1.85-bookworm
-    commands:
-      - export PATH="$HOME/.cargo/bin:$PATH"
-      - cargo fmt --all -- --check
-      - cargo clippy --all-targets -- -D warnings
-      - cargo test --locked
-      - cargo build --release --locked
-
-  contract:
-    image: rust:1.85-bookworm
-    depends_on: [code]
-    environment:
-      MARQDO_ARCHIVE:
-        from_secret: marqdo_beta_archive
-    commands:
-      # CI maintainers must provide the official archive at $MARQDO_ARCHIVE or
-      # export MARQDO_BIN from a verified extracted release. Do not rebuild it.
-      - |
-        if [ -z "${MARQDO_ARCHIVE:-}" ]; then
-          echo "MARQDO_ARCHIVE secret missing; contract lane requires the frozen official archive" >&2
-          exit 1
-        fi
-        mkdir -p /tmp/marqdo && tar -xzf "$MARQDO_ARCHIVE" -C /tmp/marqdo
-      - export MARQDO_BIN="$(find /tmp/marqdo -maxdepth 2 -name marqdo -type f | head -1)"
-      - sha256sum "$MARQDO_BIN"
-      - MARQDO_BIN="$MARQDO_BIN" ./tools/test-contract.sh
-      - sha256sum "$MARQDO_BIN"
-
-  export:
-    image: rust:1.85-bookworm
-    depends_on: [code]
-    environment:
-      MARQDO_ARCHIVE:
-        from_secret: marqdo_beta_archive
-    commands:
-      - mkdir -p /tmp/marqdo && tar -xzf "$MARQDO_ARCHIVE" -C /tmp/marqdo
-      - export MARQDO_BIN="$(find /tmp/marqdo -maxdepth 2 -name marqdo -type f | head -1)"
-      - cargo build --release --locked
-      - MARQDO_BIN="$MARQDO_BIN" ./tools/test-export.sh
-
-  browser:
+  frozen-acceptance:
     image: mcr.microsoft.com/playwright:v1.49.0-noble
-    depends_on: [code]
+    environment:
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
+      RUST_MIN_STACK: "8388608"
     commands:
-      - apt-get update && apt-get install -y --no-install-recommends cargo rustc || true
+      - apt-get update
+      - apt-get install -y --no-install-recommends build-essential ca-certificates curl git python3
+      - curl -fsSL --retry 3 https://sh.rustup.rs -o /tmp/marqdo-view-rustup.sh
+      - sh /tmp/marqdo-view-rustup.sh -y --profile minimal --default-toolchain 1.89.0 --component rustfmt --component clippy --no-modify-path
       - export PATH="$HOME/.cargo/bin:$PATH"
-      - cargo build --release --locked
-      - (cd tests/browser && npm install --no-audit --no-fund)
-      - MARQDO_BIN="$(find /tmp/marqdo -maxdepth 2 -name marqdo -type f | head -1)" ./tools/test-browser.sh
-
-  release-bundle:
-    image: rust:1.85-bookworm
-    depends_on: [code]
-    commands:
-      - cargo build --release --locked
-      - MARQDO_BIN="" ./tools/package.sh
-      - sha256sum dist/marqdo-view-*.tar.gz
-      - tar -tzf dist/marqdo-view-*.tar.gz | sort
+      - (cd tests/browser && npm ci --no-audit --no-fund)
+      - |
+        frozen_dir="$(mktemp -d)"
+        MARQDO_BIN="$(scripts/frozen-beta.sh fetch "$frozen_dir")"
+        export MARQDO_BIN
+        scripts/acceptance.sh
+        cat dist/acceptance/manifest.json

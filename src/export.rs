@@ -1,15 +1,15 @@
 //! Pure static site export.
 //!
-//! Export uses the same `AppContext::load` (static `check` only) and the same
+//! Export uses the same `DocumentService::load` (static `check` only) and the same
 //! `ReaderRenderer` as Live; it never calls `run`, never starts a provider and
 //! never writes into the source project (RFC-VIEW-0001 §11.3).
 
-use crate::app::AppContext;
-use crate::assets::AssetBundle;
 use crate::error::{ViewError, ViewResult};
-use crate::project::SafeRelativePath;
-use crate::render::ReaderRenderer;
-use crate::source_map::sha256_hex;
+use crate::reader::assemble::DocumentService;
+use crate::reader::assets::AssetBundle;
+use crate::reader::render::ReaderRenderer;
+use crate::reader::source::sha256_hex;
+use crate::reader::source::SafeRelativePath;
 use std::path::{Path, PathBuf};
 
 const MANIFEST_SCHEMA: &str = "marqdo.view-export";
@@ -28,7 +28,7 @@ pub struct ExportSummary {
     pub manifest_sha256: String,
 }
 
-pub fn export(context: &AppContext, options: &ExportOptions) -> ViewResult<ExportSummary> {
+pub fn export(context: &DocumentService, options: &ExportOptions) -> ViewResult<ExportSummary> {
     let bundle = AssetBundle::get();
     let renderer = ReaderRenderer::new();
     let root = context.project().root().to_path_buf();
@@ -89,7 +89,7 @@ pub fn export(context: &AppContext, options: &ExportOptions) -> ViewResult<Expor
             let model = context.load(relative)?;
             let depth = relative.as_str().split('/').count();
             let context =
-                crate::render::RenderContext::static_export(depth, !options.no_annotations);
+                crate::reader::render::RenderContext::static_export(depth, !options.no_annotations);
             let page = renderer.render(&model, &context);
             let page_path = pages_dir.join(format!("{}.html", relative.as_str()));
             if let Some(parent) = page_path.parent() {
@@ -119,7 +119,8 @@ pub fn export(context: &AppContext, options: &ExportOptions) -> ViewResult<Expor
 
         // index.html is the same renderer output with site-root depth.
         let entry_model = context.load(&entry)?;
-        let entry_context = crate::render::RenderContext::static_export(0, !options.no_annotations);
+        let entry_context =
+            crate::reader::render::RenderContext::static_export(0, !options.no_annotations);
         let index_page = renderer.render(&entry_model, &entry_context);
         let index_path = staging.join("index.html");
         std::fs::write(&index_path, index_page.html.as_bytes())
@@ -145,10 +146,10 @@ pub fn export(context: &AppContext, options: &ExportOptions) -> ViewResult<Expor
                 "version": env!("CARGO_PKG_VERSION"),
             },
             "compatibility": {
-                "marqdo": crate::version::PRODUCT_RANGE,
-                "tool_protocol": crate::version::TOOL_PROTOCOL,
-                "analysis": crate::version::ANALYSIS_PROTOCOL,
-                "trace": crate::version::TRACE_PROTOCOL,
+                "marqdo": crate::protocol::tool_v1::PRODUCT_RANGE,
+                "tool_protocol": crate::protocol::tool_v1::TOOL_PROTOCOL,
+                "analysis": crate::protocol::tool_v1::ANALYSIS_PROTOCOL,
+                "trace": crate::protocol::tool_v1::TRACE_PROTOCOL,
                 "markdown_profile": "marqdo.md.v1",
             },
             "core_version": entry_model.core_version,

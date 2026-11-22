@@ -1,12 +1,12 @@
 {
   "analysis_protocol": 2,
-  "archive_sha256": "b482d26c7098178de520aad14d5ac9b7160265eaf9c98666b3e9785a3ddbeafc",
+  "archive_sha256": "a3fb28c8d025f44dee6c06da80c13d3f65b9c62d1f657c04b02ef360ff24fcf5",
   "cli_binary_sha256_after": "062cb56e226bee55c21d238e195920caa985e62bb3877ba7b07abcc04dc0fe3f",
   "cli_binary_sha256_before": "062cb56e226bee55c21d238e195920caa985e62bb3877ba7b07abcc04dc0fe3f",
   "cli_source_sha": "2c7c4f31e7a388d3fcfa717a77067e696ed13854",
   "commands": {
     "notes": "Generated from real command exit statuses; install/verify/export/run use the frozen CLI archive copied to an isolated tool home.",
-    "script": "tools/acceptance.sh"
+    "script": "scripts/acceptance.sh"
   },
   "gates": {
     "archive_install": "PASS",
@@ -16,9 +16,11 @@
     "bundle": "PASS",
     "clippy": "PASS",
     "core_sha": "PASS",
+    "examples_check": "PASS",
     "export": "PASS",
     "export_suite": "PASS",
     "fmt": "PASS",
+    "no_exec_suite": "PASS",
     "real_run": "PASS",
     "security_suite": "PASS",
     "test": "PASS",
@@ -26,18 +28,20 @@
     "verify": "PASS",
     "view_help": "PASS"
   },
-  "generated_at_utc": "2026-11-22T04:07:21.776009+00:00",
+  "generated_at_utc": "2026-11-22T06:55:13.151362+00:00",
   "schema": "marqdo.view-conformance",
   "schema_version": 1,
   "target": "x86_64-unknown-linux-gnu",
   "tests": {
     "browser": "PASS",
     "contract": "PASS",
+    "examples": "PASS",
     "export": "PASS",
+    "no_exec": "PASS",
     "security": "PASS"
   },
   "tool_protocol": 1,
   "trace_protocol": 2,
-  "view_binary_sha256": "97772ffefeb8df1f3dfbfe04c5112517ba3657497df4717ab85c6b026daf6bba",
-  "view_source_sha": "d641ca58ac77c69a15a98c8a1233ae6dbd83017f"
+  "view_binary_sha256": "eb19f79632457f37ae3573696d7db84d57358627b65e618819ff80f132b0026a",
+  "view_source_sha": "0fceb40088e728d481411c36a8d311aa3431b057"
 }

@@ -1,0 +1,538 @@
+==> fmt
+[acceptance] fmt: PASS
+==> clippy
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.03s
+[acceptance] clippy: PASS
+==> test
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.05s
+     Running unittests src/lib.rs (target/debug/build/marqdo-view/c349aa60d8df28c9/out/marqdo_view-c349aa60d8df28c9)
+
+running 63 tests
+test cli::tests::bind_policy_is_loopback_by_default ... ok
+test core_client::tests::check_args_are_plain_argv ... ok
+test core_client::tests::missing_bin_has_stable_code ... ok
+test core_client::tests::scratch_dir_is_private_and_removed ... ok
+test core_client::tests::run_args_are_explicit_argv_never_shell ... ok
+test cli::tests::parses_browse_defaults ... ok
+test core_client::tests::stderr_summary_is_bounded ... ok
+test cli::tests::export_requires_out ... ok
+test cli::tests::parses_verify_and_global_options_anywhere ... ok
+test execution::controller::tests::cli_errors_support_both_envelope_shapes ... ok
+test execution::controller::tests::run_ids_are_unguessable_and_unique ... ok
+test execution::events::tests::newest_cursor_replays_only_new_events ... ok
+test execution::events::tests::frames_have_event_id_and_matching_data_seq ... ok
+test execution::events::tests::states_have_stable_wire_values_and_terminals ... ok
+test cli::tests::parses_export_subcommand ... ok
+test execution::events::tests::utc_formatting_is_stable ... ok
+test execution::process::tests::bounded_capture_keeps_limit_and_drains ... ok
+test cli::tests::run_timeout_is_bounded_to_rfc_range ... ok
+test execution::process::tests::default_budget_matches_rfc ... ok
+test execution::controller::tests::wire_value_summary_is_safe_and_never_html ... ok
+test execution::events::tests::ring_is_bounded_and_old_cursor_gets_snapshot ... ok
+test execution::events::tests::terminal_job_replays_snapshot_and_closes ... ok
+test export::tests::export_target_outside_project_is_accepted ... ok
+test execution::request::tests::rejects_absolute_and_parent_globs ... ok
+test execution::request::tests::rejects_unknown_fields_and_bad_modes ... ok
+test export::tests::manifest_relative_paths_are_validated ... ok
+test protocol::analysis_v2::tests::rejects_digest_mismatch ... ok
+test protocol::analysis_v2::tests::projects_valid_analysis ... ok
+test execution::request::tests::canonical_names_and_targets_resolve ... ok
+test protocol::analysis_v2::tests::rejects_unknown_schema_major_and_profile ... ok
+test execution::request::tests::entry_without_main_is_explicitly_rejected ... ok
+test protocol::analysis_v2::tests::source_id_is_deterministic_and_bounded ... ok
+test protocol::tool_v1::tests::negotiates_known_protocols_only ... ok
+test execution::request::tests::unknown_parameter_names_are_rejected_before_execution ... ok
+test protocol::tool_v1::tests::parses_official_version_line ... ok
+test protocol::tool_v1::tests::rejects_stable_only_reinterpretation ... ok
+test protocol::trace_v2::tests::state_values_are_stable ... ok
+test protocol::trace_v2::tests::trace_kinds_are_additive_safe ... ok
+test reader::assets::tests::base64_matches_known_vectors ... ok
+test reader::markdown::tests::front_matter_is_not_rendered_as_a_block ... ok
+test reader::markdown::tests::heading_spans_are_exact ... ok
+test reader::markdown::tests::parses_gfm_and_preserves_utf8_spans ... ok
+test reader::markdown::tests::parses_math_and_code_as_inert_literals ... ok
+test reader::markdown::tests::parses_lists_quotes_and_task_items ... ok
+test reader::model::tests::heading_anchors_are_deterministic_and_collision_free ... ok
+test reader::model::tests::status_values_are_stable ... ok
+test reader::source::path_tests::normalizes_harmless_forms ... ok
+test reader::source::path_tests::rejects_unsafe_relative_paths ... ok
+test reader::source::tests::bom_is_still_indexed ... ok
+test reader::source::tests::maps_multibyte_and_emoji_offsets ... ok
+test reader::source::tests::digest_is_exact_bytes ... ok
+test reader::source::tests::rejects_out_of_range_and_misaligned_spans ... ok
+test server::routes::tests::percent_decode_is_single_pass_and_strict ... ok
+test server::routes::tests::run_route_matching_is_strict ... ok
+test server::routes::tests::status_mapping_covers_execution_errors ... ok
+test server::security::tests::constant_time_eq_is_strict ... ok
+test server::security::tests::random_tokens_are_lower_hex_and_unique ... ok
+test server::sse::tests::headers_are_the_sse_contract ... ok
+test server::security::tests::session_cookie_is_parsed_from_a_real_request ... ok
+test server::sse::tests::heartbeat_interval_is_fifteen_seconds_by_default ... ok
+test execution::process::tests::cancellation_terminates_the_process_group ... ok
+test reader::assets::tests::css_substitutes_images_and_keeps_one_asset ... ok
+test reader::assets::tests::bundle_digests_match_source_files ... ok
+
+test result: ok. 63 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running unittests src/main.rs (target/debug/build/marqdo-view/35e1f759375c2551/out/marqdo_view-35e1f759375c2551)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/contract/main.rs (target/debug/build/marqdo-view/8ae29fd710d6819e/out/contract-8ae29fd710d6819e)
+
+running 41 tests
+test asset_integrity::theme_has_one_token_layer_and_no_legacy_skin ... ok
+test cli_surface::degradation_without_core_keeps_prose_readable ... ok
+test cli_surface::browse_on_missing_path_fails_without_starting_a_server ... ok
+test cli_surface::missing_document_is_an_io_error ... ok
+test cli_surface::verify_without_core_is_an_argument_error ... ok
+test cli_surface::export_requires_an_output_directory ... ok
+test cli_surface::non_loopback_bind_is_refused_by_default ... ok
+test cli_surface::version_is_the_tool_version ... ok
+test cli_surface::help_comes_from_view_not_core ... ok
+test asset_integrity::reused_assets_match_their_recorded_hashes ... ok
+test core_contract::check_failure_preserves_core_stderr_and_code ... ok
+test core_contract::check_returns_exact_analysis_bytes_and_digest ... ok
+test core_contract::check_refs_is_forwarded_as_a_stricter_flag ... ok
+test core_contract::failed_check_normalizes_diagnostics_without_absolute_paths ... ok
+test core_contract::incompatible_product_version_is_rejected_before_any_work ... ok
+test asset_integrity::embedded_asset_bundle_matches_disk_and_has_one_theme ... ok
+test core_contract::missing_emit_after_success_is_an_analysis_failure ... ok
+test no_coupling::no_private_core_crate_dependencies ... ok
+test no_coupling::release_lockfile_is_committed ... ok
+test core_contract::run_invalid_json_is_a_protocol_io_error ... ok
+test no_coupling::tool_manifest_matches_package_and_protocols ... ok
+test core_contract::run_returns_json_and_raw_trace ... ok
+test core_contract::cli_verify_end_to_end_against_fake_core ... ok
+test no_coupling::exactly_one_reader_theme_and_script_entry ... ok
+test core_contract::run_without_trace_file_reports_no_trace ... ok
+test no_coupling::source_never_reads_or_links_the_legacy_repositories ... ok
+test trace_contract::failed_run_keeps_the_core_error_code ... ok
+test presentation_states::failed_check_keeps_prose_and_shows_core_diagnostics ... ok
+test presentation_states::invalid_core_span_is_dropped_with_an_explicit_warning ... ok
+test presentation_states::source_digest_mismatch_degrades_instead_of_misbinding ... ok
+test presentation_states::unknown_analysis_schema_is_a_hard_protocol_error ... ok
+test core_contract::cli_verify_rejects_schema_v3_and_digest_mismatch ... ok
+test trace_contract::golden_digest_is_really_sha256_of_analysis_bytes ... ok
+test trace_contract::truncated_trace_is_explicitly_marked ... ok
+test trace_contract::non_monotonic_sequence_is_rejected ... ok
+test core_contract::timeout_kills_the_process_group_and_reports_timeout ... ok
+test trace_contract::stale_analysis_bytes_are_rejected ... ok
+test trace_contract::unknown_schema_major_is_a_protocol_error_not_a_stale_trace ... ok
+test trace_contract::real_control_flow_trace_binds_and_projects_events ... ok
+test trace_contract::unknown_event_module_is_rejected ... ok
+test presentation_states::run_attached_to_changed_source_becomes_stale ... ok
+
+test result: ok. 41 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.67s
+
+     Running tests/integration/main.rs (target/debug/build/marqdo-view/09a14a21a5f580dd/out/integration-09a14a21a5f580dd)
+
+running 43 tests
+test execution::cross_session_observation_is_rejected ... ok
+test execution::same_client_request_id_is_idempotent_and_different_payload_conflicts ... ok
+test execution::run_without_a_trace_file_succeeds_but_reports_unavailable_trace ... ok
+test execution::explicit_entry_run_streams_accepted_running_and_succeeded_with_verified_trace ... ok
+test execution::second_run_is_busy_while_one_is_active_and_cancel_is_idempotent ... ok
+test execution::event_frames_use_the_view_run_events_schema_and_numeric_ids ... ok
+test execution::call_target_uses_the_call_subcommand_and_function_name ... ok
+test execution::project_grants_are_mapped_to_explicit_cli_flags_and_pure_grants_are_rejected ... ok
+test export::exported_html_has_no_remote_subresources ... ok
+test export::real_frozen_core_export_marks_both_pages_static_ok ... ok
+test export::no_annotations_keeps_prose_but_removes_anchors ... ok
+test export::refuses_to_export_inside_the_project_root ... ok
+test export::exports_offline_site_with_shared_renderer_and_relative_links ... ok
+test export::refuses_to_overwrite_unrelated_non_empty_directory ... ok
+test execution::stale_analysis_digest_is_rejected_before_any_process_starts ... ok
+test http_live::assets_are_immutable_and_carry_strict_headers ... ok
+test execution::trace_with_a_mismatched_digest_is_reported_invalid_but_the_run_still_succeeds ... ok
+test http_live::document_without_main_is_rejected_without_running_another_function ... ok
+test execution::truncated_trace_is_marked_without_claiming_complete_coverage ... ok
+test export::replaces_a_previous_export_atomically ... ok
+test http_live::pages_issue_a_session_cookie_and_never_execute_the_document ... ok
+test http_live::read_only_routes_are_the_target_contract_and_old_routes_are_gone ... ok
+test export::export_never_executes_side_effects ... ok
+test rendering::live_and_static_share_content_but_rewrite_links ... ok
+test rendering::malicious_markdown_cannot_inject_markup_or_scripts ... ok
+test rendering::page_has_exactly_one_theme_and_one_script ... ok
+test rendering::reader_exposes_simple_theme_toggle_and_no_variable_or_memory_tabs ... ok
+test rendering::rendering_is_deterministic ... ok
+test http_live::at_most_two_sse_observers_per_run ... ok
+test rendering::semantic_annotations_come_from_analysis_and_are_unique ... ok
+test rendering::static_pages_use_parent_relative_assets_and_links ... ok
+test rendering::tables_math_and_code_are_inert_and_readable ... ok
+test rendering::welcome_hero_only_when_configured ... ok
+test unicode_spans::crlf_source_keeps_exact_digest_and_line_mapping ... ok
+test unicode_spans::knowledge_emphasis_never_becomes_an_execution_anchor ... ok
+test unicode_spans::unicode_spans_are_exact_and_duplicate_returns_get_distinct_anchors ... ok
+test rendering::run_controls_are_explicitly_unavailable_before_pr04 ... ok
+test http_live::duplicate_request_id_is_idempotent_and_busy_or_conflict_never_starts_a_second_process ... ok
+test http_live::cancel_is_idempotent_and_yields_one_terminal_state ... ok
+test http_live::explicit_run_streams_sse_accepted_running_and_terminal_with_verified_trace ... ok
+test execution::source_edit_during_a_run_marks_the_result_stale_and_drops_anchor_ids ... ok
+test http_live::last_event_id_replays_only_newer_events_and_old_cursor_gets_snapshot ... ok
+test http_live::sse_heartbeats_keep_a_slow_job_connected ... ok
+
+test result: ok. 43 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.38s
+
+     Running tests/security/main.rs (target/debug/build/marqdo-view/a005d0c01f80685f/out/security-a005d0c01f80685f)
+
+running 11 tests
+test path_traversal_is_rejected_and_the_old_document_route_is_gone ... ok
+test adversarial_markdown_never_injects_markup_or_handlers ... ok
+test aggressive_markdown_links_cannot_become_a_file_read_api ... ok
+test session_cookie_and_headers_are_hardened ... ok
+test symlink_escape_outside_the_project_root_is_rejected ... ok
+test sec_fetch_site_cross_site_is_rejected_even_with_a_valid_token ... ok
+test oversized_and_unknown_fields_are_rejected_before_execution ... ok
+test host_origin_session_csrf_and_json_are_all_required_before_execution ... ok
+test cancel_cannot_be_replayed_to_start_a_new_process ... ok
+test sse_and_cancel_are_scoped_to_the_owning_session ... ok
+test sse_requires_a_session_and_only_the_owning_session_can_read_or_cancel ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.71s
+
+   Doc-tests marqdo_view
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+[acceptance] test: PASS
+==> build
+    Finished `release` profile [optimized] target(s) in 0.03s
+[acceptance] build: PASS
+==> bundle
+==> cargo build --release --locked
+    Finished `release` profile [optimized] target(s) in 0.03s
+==> smoke install against frozen core
+install-smoke: PASS (core sha256 062cb56e226bee55c21d238e195920caa985e62bb3877ba7b07abcc04dc0fe3f unchanged, tool home /root/work/marqdo-view/dist/smoke-tool-home.R8mnIg)
+bundle: /root/work/marqdo-view/dist/marqdo-view
+archive: /root/work/marqdo-view/dist/marqdo-view-0.2.0-x86_64-unknown-linux-gnu.tar.gz
+sha256: a3fb28c8d025f44dee6c06da80c13d3f65b9c62d1f657c04b02ef360ff24fcf5
+[acceptance] bundle: PASS
+==> archive_install
+installed tool `view` version 0.2.0 (marqdo-view)
+[acceptance] archive_install: PASS
+==> tool_list
+[acceptance] tool_list: PASS
+==> view_help
+[acceptance] view_help: PASS
+==> verify
+core: marqdo 3.0.0-beta.1 (supported >=3.0.0-beta.1,<4.0.0)
+project: root:mixed-modes@0.1.0 (manifest)
+document: index.mq.md
+analysis: schema=marqdo.analysis v2 modules=1 functions=1 digest=sha256:5b13d0cd2044cbe3d5d5f51145a9dd0015e2992400f803dad5f0e42214ce4959
+source digest: match
+result: PASS (static only; document not executed)
+[acceptance] verify: PASS
+==> export
+marqdo view export: 1 page(s), 8 file(s) → /root/work/marqdo-view/dist/acceptance/site
+manifest: sha256:74059e7274165cf341e576aac6f6a7fef0d8210261186b234fa85a2a2308bdb7
+executed: false (纯静态导出，未运行任何文档)
+[acceptance] export: PASS
+==> examples_check
+==> check all five example documents (no execution)
+==> call function-params.double(n=5) -> 10
+call double(5): PASS (Int 10)
+==> run branch-loop main -> Int 0 with loop/return trace
+run branch-loop: PASS (value 0, events: call.enter,call.exit,loop.iteration,return)
+==> knowledge-only has no main (truthful failure, no fallback)
+knowledge-only: PASS (explicit sem.no_entry_function)
+==> unsafe-side-effect writes nothing in pure mode
+unsafe-side-effect pure: PASS (permission.denied, no file)
+==> unsafe-side-effect writes only with explicit project grants
+unsafe-side-effect project+grants: PASS (sentinel written explicitly)
+examples: PASS (frozen CLI sha256 062cb56e226bee55c21d238e195920caa985e62bb3877ba7b07abcc04dc0fe3f unchanged)
+[acceptance] examples_check: PASS
+[acceptance] browse: PASS
+explicit real run: PASS (run_id=7b8adab46d3d5ba5d14affb44284ca82 events=285)
+[acceptance] real_run: PASS
+==> export_suite
+marqdo view export: 2 page(s), 9 file(s) → /root/work/marqdo-view/dist/test-export-site
+manifest: sha256:47c8931c864c86d7d5a4f7ec11a68fba56961f5f03d29d19eac447f9db7645a3
+executed: false (纯静态导出，未运行任何文档)
+export manifest: PASS (2 pages, 3 files)
+file:// offline browser check: PASS
+export: PASS (offline site at /root/work/marqdo-view/dist/test-export-site; core sha256 062cb56e226bee55c21d238e195920caa985e62bb3877ba7b07abcc04dc0fe3f unchanged)
+[acceptance] export_suite: PASS
+==> no_exec_suite
+==> Live read-only requests
+==> Static export
+no-exec: PASS (sources/lock unchanged, no sentinel, no run control in export; core sha unchanged)
+[acceptance] no_exec_suite: PASS
+==> security_suite
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.03s
+     Running tests/security/main.rs (target/debug/build/marqdo-view/a005d0c01f80685f/out/security-a005d0c01f80685f)
+
+running 11 tests
+test path_traversal_is_rejected_and_the_old_document_route_is_gone ... ok
+test aggressive_markdown_links_cannot_become_a_file_read_api ... ok
+test adversarial_markdown_never_injects_markup_or_handlers ... ok
+test session_cookie_and_headers_are_hardened ... ok
+test symlink_escape_outside_the_project_root_is_rejected ... ok
+test sec_fetch_site_cross_site_is_rejected_even_with_a_valid_token ... ok
+test host_origin_session_csrf_and_json_are_all_required_before_execution ... ok
+test oversized_and_unknown_fields_are_rejected_before_execution ... ok
+test cancel_cannot_be_replayed_to_start_a_new_process ... ok
+test sse_and_cancel_are_scoped_to_the_owning_session ... ok
+test sse_requires_a_session_and_only_the_owning_session_can_read_or_cancel ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.73s
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.03s
+     Running tests/integration/main.rs (target/debug/build/marqdo-view/09a14a21a5f580dd/out/integration-09a14a21a5f580dd)
+
+running 43 tests
+test execution::cross_session_observation_is_rejected ... ok
+test execution::run_without_a_trace_file_succeeds_but_reports_unavailable_trace ... ok
+test execution::same_client_request_id_is_idempotent_and_different_payload_conflicts ... ok
+test execution::second_run_is_busy_while_one_is_active_and_cancel_is_idempotent ... ok
+test execution::event_frames_use_the_view_run_events_schema_and_numeric_ids ... ok
+test execution::call_target_uses_the_call_subcommand_and_function_name ... ok
+test execution::explicit_entry_run_streams_accepted_running_and_succeeded_with_verified_trace ... ok
+test execution::project_grants_are_mapped_to_explicit_cli_flags_and_pure_grants_are_rejected ... ok
+test export::exported_html_has_no_remote_subresources ... ok
+test export::real_frozen_core_export_marks_both_pages_static_ok ... ok
+test export::refuses_to_export_inside_the_project_root ... ok
+test export::no_annotations_keeps_prose_but_removes_anchors ... ok
+test export::exports_offline_site_with_shared_renderer_and_relative_links ... ok
+test export::refuses_to_overwrite_unrelated_non_empty_directory ... ok
+test http_live::assets_are_immutable_and_carry_strict_headers ... ok
+test execution::stale_analysis_digest_is_rejected_before_any_process_starts ... ok
+test execution::trace_with_a_mismatched_digest_is_reported_invalid_but_the_run_still_succeeds ... ok
+test http_live::document_without_main_is_rejected_without_running_another_function ... ok
+test execution::truncated_trace_is_marked_without_claiming_complete_coverage ... ok
+test export::replaces_a_previous_export_atomically ... ok
+test http_live::pages_issue_a_session_cookie_and_never_execute_the_document ... ok
+test http_live::read_only_routes_are_the_target_contract_and_old_routes_are_gone ... ok
+test export::export_never_executes_side_effects ... ok
+test rendering::live_and_static_share_content_but_rewrite_links ... ok
+test rendering::malicious_markdown_cannot_inject_markup_or_scripts ... ok
+test rendering::page_has_exactly_one_theme_and_one_script ... ok
+test rendering::reader_exposes_simple_theme_toggle_and_no_variable_or_memory_tabs ... ok
+test rendering::rendering_is_deterministic ... ok
+test http_live::at_most_two_sse_observers_per_run ... ok
+test rendering::semantic_annotations_come_from_analysis_and_are_unique ... ok
+test rendering::static_pages_use_parent_relative_assets_and_links ... ok
+test rendering::tables_math_and_code_are_inert_and_readable ... ok
+test rendering::welcome_hero_only_when_configured ... ok
+test unicode_spans::crlf_source_keeps_exact_digest_and_line_mapping ... ok
+test unicode_spans::knowledge_emphasis_never_becomes_an_execution_anchor ... ok
+test unicode_spans::unicode_spans_are_exact_and_duplicate_returns_get_distinct_anchors ... ok
+test http_live::cancel_is_idempotent_and_yields_one_terminal_state ... ok
+test rendering::run_controls_are_explicitly_unavailable_before_pr04 ... ok
+test http_live::duplicate_request_id_is_idempotent_and_busy_or_conflict_never_starts_a_second_process ... ok
+test http_live::explicit_run_streams_sse_accepted_running_and_terminal_with_verified_trace ... ok
+test http_live::last_event_id_replays_only_newer_events_and_old_cursor_gets_snapshot ... ok
+test execution::source_edit_during_a_run_marks_the_result_stale_and_drops_anchor_ids ... ok
+test http_live::sse_heartbeats_keep_a_slow_job_connected ... ok
+
+test result: ok. 43 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.34s
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.03s
+     Running tests/contract/main.rs (target/debug/build/marqdo-view/8ae29fd710d6819e/out/contract-8ae29fd710d6819e)
+
+running 41 tests
+test cli_surface::degradation_without_core_keeps_prose_readable ... ok
+test asset_integrity::theme_has_one_token_layer_and_no_legacy_skin ... ok
+test cli_surface::browse_on_missing_path_fails_without_starting_a_server ... ok
+test cli_surface::help_comes_from_view_not_core ... ok
+test cli_surface::missing_document_is_an_io_error ... ok
+test cli_surface::non_loopback_bind_is_refused_by_default ... ok
+test cli_surface::export_requires_an_output_directory ... ok
+test cli_surface::verify_without_core_is_an_argument_error ... ok
+test cli_surface::version_is_the_tool_version ... ok
+test asset_integrity::reused_assets_match_their_recorded_hashes ... ok
+test core_contract::check_failure_preserves_core_stderr_and_code ... ok
+test core_contract::check_refs_is_forwarded_as_a_stricter_flag ... ok
+test core_contract::check_returns_exact_analysis_bytes_and_digest ... ok
+test core_contract::failed_check_normalizes_diagnostics_without_absolute_paths ... ok
+test core_contract::incompatible_product_version_is_rejected_before_any_work ... ok
+test asset_integrity::embedded_asset_bundle_matches_disk_and_has_one_theme ... ok
+test no_coupling::exactly_one_reader_theme_and_script_entry ... ok
+test core_contract::missing_emit_after_success_is_an_analysis_failure ... ok
+test no_coupling::no_private_core_crate_dependencies ... ok
+test no_coupling::release_lockfile_is_committed ... ok
+test no_coupling::tool_manifest_matches_package_and_protocols ... ok
+test core_contract::run_invalid_json_is_a_protocol_io_error ... ok
+test core_contract::run_returns_json_and_raw_trace ... ok
+test core_contract::cli_verify_end_to_end_against_fake_core ... ok
+test core_contract::run_without_trace_file_reports_no_trace ... ok
+test no_coupling::source_never_reads_or_links_the_legacy_repositories ... ok
+test trace_contract::failed_run_keeps_the_core_error_code ... ok
+test presentation_states::failed_check_keeps_prose_and_shows_core_diagnostics ... ok
+test presentation_states::invalid_core_span_is_dropped_with_an_explicit_warning ... ok
+test presentation_states::source_digest_mismatch_degrades_instead_of_misbinding ... ok
+test core_contract::cli_verify_rejects_schema_v3_and_digest_mismatch ... ok
+test presentation_states::unknown_analysis_schema_is_a_hard_protocol_error ... ok
+test trace_contract::golden_digest_is_really_sha256_of_analysis_bytes ... ok
+test trace_contract::real_control_flow_trace_binds_and_projects_events ... ok
+test core_contract::timeout_kills_the_process_group_and_reports_timeout ... ok
+test trace_contract::unknown_schema_major_is_a_protocol_error_not_a_stale_trace ... ok
+test trace_contract::stale_analysis_bytes_are_rejected ... ok
+test trace_contract::truncated_trace_is_explicitly_marked ... ok
+test trace_contract::non_monotonic_sequence_is_rejected ... ok
+test trace_contract::unknown_event_module_is_rejected ... ok
+test presentation_states::run_attached_to_changed_source_becomes_stale ... ok
+
+test result: ok. 41 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.68s
+
+note: MARQDO_FROZEN_BIN not set; skipped real-core export script
+security: PASS
+[acceptance] security_suite: PASS
+==> browser
+==> browser suite: examples/welcome
+ok   reader root rendered
+ok   document title has Marqdo
+ok   one stylesheet
+ok   one script
+ok   no external requests
+ok   no browser console errors
+ok   dock has all actions
+ok   dock run control present
+ok   interactive controls have accessible names
+ok   Tab reaches named controls
+ok   more dialog opens
+ok   source mode attribute
+ok   source pane visible
+ok   document hidden in source mode
+ok   document mode restored
+ok   search dialog opens
+ok   search returns local results
+ok   text size toggled
+ok   annotations toggled
+ok   welcome hero only on configured page
+ok   grammar statement is a real element
+ok   GFM table rendered
+ok   dark theme applied
+ok   theme preference persisted
+ok   paper theme restored
+ok   no horizontal overflow at 2048
+ok   dock inside viewport at 2048
+ok   no horizontal overflow at 1664
+ok   dock inside viewport at 1664
+ok   no horizontal overflow at 1440
+ok   dock inside viewport at 1440
+ok   no horizontal overflow at 1024
+ok   dock inside viewport at 1024
+ok   no horizontal overflow at 768
+ok   dock inside viewport at 768
+ok   no horizontal overflow at 390
+ok   dock inside viewport at 390
+ok   no-JS document remains readable
+ok   no-JS exposes no active run UI
+ok   print hides dock
+ok   print keeps prose
+
+browser: PASS
+==> browser suite: examples/control-flow
+ok   reader root rendered
+ok   document title has Marqdo
+ok   one stylesheet
+ok   one script
+ok   no external requests
+ok   no browser console errors
+ok   dock has all actions
+ok   dock run control present
+ok   interactive controls have accessible names
+ok   Tab reaches named controls
+ok   more dialog opens
+ok   source mode attribute
+ok   source pane visible
+ok   document hidden in source mode
+ok   document mode restored
+ok   search dialog opens
+ok   search returns local results
+ok   text size toggled
+ok   annotations toggled
+ok   dark theme applied
+ok   theme preference persisted
+ok   paper theme restored
+ok   no horizontal overflow at 2048
+ok   dock inside viewport at 2048
+ok   no horizontal overflow at 1664
+ok   dock inside viewport at 1664
+ok   no horizontal overflow at 1440
+ok   dock inside viewport at 1440
+ok   no horizontal overflow at 1024
+ok   dock inside viewport at 1024
+ok   no horizontal overflow at 768
+ok   dock inside viewport at 768
+ok   no horizontal overflow at 390
+ok   dock inside viewport at 390
+ok   no-JS document remains readable
+ok   no-JS exposes no active run UI
+ok   print hides dock
+ok   print keeps prose
+ok   run dialog opens
+ok   run dialog mentions pure mode
+ok   run dialog previews the command
+ok   run state succeeded via SSE
+ok   run panel visible
+ok   run chips anchored
+ok   observed chips carry trace provenance
+ok   static statement anchors carry analysis provenance
+ok   at most one grouped chip per anchor
+ok   trace event list rendered
+ok   stdout rendered escaped
+ok   no polling API was used
+ok   clear hides run panel
+ok   page was never reloaded by the run
+
+browser: PASS
+==> browser suite: tests/fixtures/security-project
+ok   reader root rendered
+ok   document title has Marqdo
+ok   one stylesheet
+ok   one script
+ok   no external requests
+ok   no browser console errors
+ok   dock has all actions
+ok   dock run control present
+ok   interactive controls have accessible names
+ok   Tab reaches named controls
+ok   more dialog opens
+ok   source mode attribute
+ok   source pane visible
+ok   document hidden in source mode
+ok   document mode restored
+ok   search dialog opens
+ok   search returns local results
+ok   text size toggled
+ok   annotations toggled
+ok   adversarial doc has no alert dialog
+ok   adversarial doc has no external requests
+ok   raw HTML omitted note rendered
+ok   prose survives sanitization
+ok   javascript link neutralized
+ok   dark theme applied
+ok   theme preference persisted
+ok   paper theme restored
+ok   no horizontal overflow at 2048
+ok   dock inside viewport at 2048
+ok   no horizontal overflow at 1664
+ok   dock inside viewport at 1664
+ok   no horizontal overflow at 1440
+ok   dock inside viewport at 1440
+ok   no horizontal overflow at 1024
+ok   dock inside viewport at 1024
+ok   no horizontal overflow at 768
+ok   dock inside viewport at 768
+ok   no horizontal overflow at 390
+ok   dock inside viewport at 390
+ok   no-JS document remains readable
+ok   no-JS exposes no active run UI
+ok   print hides dock
+ok   print keeps prose
+
+browser: PASS
+browser: PASS (core sha256 062cb56e226bee55c21d238e195920caa985e62bb3877ba7b07abcc04dc0fe3f unchanged; screenshots: /root/work/marqdo-view/tests/browser/artifacts)
+[acceptance] browser: PASS
+[acceptance] core_sha: PASS
+evidence manifest: /root/work/marqdo-view/docs/evidence/2c7c4f31e7a388d3fcfa717a77067e696ed13854/manifest.json
+
+acceptance: PASS
+evidence: /root/work/marqdo-view/docs/evidence/2c7c4f31e7a388d3fcfa717a77067e696ed13854/manifest.json
+archive sha256: a3fb28c8d025f44dee6c06da80c13d3f65b9c62d1f657c04b02ef360ff24fcf5

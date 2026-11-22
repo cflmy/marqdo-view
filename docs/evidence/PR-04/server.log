@@ -1,0 +1,7 @@
+marqdo view: http://127.0.0.1:40487/
+root: /root/work/marqdo-view/examples/control-flow
+1 .mq.md document(s). Ctrl+C to stop.
+core: marqdo 3.0.0-beta.1 (Analysis v2, Trace v2)
+run: explicit only (pure by default, one active job, 30s wall clock)
+JOB_DEBUG id=918359e1f4f5fd5155c86e6e55854b2c run_core elapsed=61.583791ms cancel=false
+JOB_DEBUG id=918359e1f4f5fd5155c86e6e55854b2c terminal state=Succeeded total=67.878533ms
