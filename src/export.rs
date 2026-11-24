@@ -29,8 +29,6 @@ pub struct ExportSummary {
 }
 
 pub fn export(context: &DocumentService, options: &ExportOptions) -> ViewResult<ExportSummary> {
-    let bundle = AssetBundle::get();
-    let renderer = ReaderRenderer::new();
     let root = context.project().root().to_path_buf();
     let out = absolute_export_target(&options.out)?;
     if out.starts_with(&root) {
@@ -44,147 +42,176 @@ pub fn export(context: &DocumentService, options: &ExportOptions) -> ViewResult<
     }
     validate_existing_target(&out)?;
 
-    let documents = context.project().list_documents()?;
-    if documents.is_empty() {
-        return Err(ViewError::ExportFailed {
-            detail: "项目内没有 .mq.md 文档可导出".to_string(),
-        });
-    }
-    let entry = context.project().entry().relative.clone();
     let staging = staging_dir(&out)?;
-
-    let result = (|| -> ViewResult<ExportSummary> {
-        let assets_dir = staging.join("assets");
-        let pages_dir = staging.join("pages");
-        std::fs::create_dir_all(&assets_dir)
-            .map_err(|err| ViewError::io(&format!("create {}", assets_dir.display()), err))?;
-        std::fs::create_dir_all(&pages_dir)
-            .map_err(|err| ViewError::io(&format!("create {}", pages_dir.display()), err))?;
-
-        // Assets: the exact same bytes Live serves.
-        let mut asset_manifest = Vec::new();
-        for asset in bundle.all() {
-            let name = if asset.extension == "css" && asset.name == "reader" {
-                bundle.hashed_css_name()
-            } else {
-                asset.hashed_name()
-            };
-            let bytes = if asset.extension == "css" && asset.name == "reader" {
-                bundle.css_bytes().to_vec()
-            } else {
-                asset.bytes.to_vec()
-            };
-            std::fs::write(assets_dir.join(&name), &bytes)
-                .map_err(|err| ViewError::io(&format!("write asset {name}"), err))?;
-            asset_manifest.push(serde_json::json!({
-                "path": format!("assets/{name}"),
-                "sha256": sha256_hex(&bytes),
-                "size": bytes.len(),
-            }));
-        }
-
-        let mut pages = Vec::new();
-        let mut file_manifest: Vec<serde_json::Value> = Vec::new();
-        for relative in &documents {
-            let model = context.load(relative)?;
-            let depth = relative.as_str().split('/').count();
-            let context =
-                crate::reader::render::RenderContext::static_export(depth, !options.no_annotations);
-            let page = renderer.render(&model, &context);
-            let page_path = pages_dir.join(format!("{}.html", relative.as_str()));
-            if let Some(parent) = page_path.parent() {
-                std::fs::create_dir_all(parent)
-                    .map_err(|err| ViewError::io(&format!("create {}", parent.display()), err))?;
-            }
-            std::fs::write(&page_path, page.html.as_bytes())
-                .map_err(|err| ViewError::io(&format!("write {}", page_path.display()), err))?;
-            let page_sha = sha256_hex(page.html.as_bytes());
-            let page_rel = format!("pages/{}.html", relative.as_str());
-            file_manifest.push(serde_json::json!({
-                "path": page_rel,
-                "sha256": page_sha,
-                "size": page.html.len(),
-            }));
-            pages.push(serde_json::json!({
-                "relative_path": relative.as_str(),
-                "module_id": model.document.identity.module_id,
-                "source_sha256": sha256_hex(model.document.source.as_bytes()),
-                "source_status": model.source_status.data_value(),
-                "analysis_digest": model.semantic.as_ref().map(|semantic| semantic.analysis_digest.clone()),
-                "file": page_rel,
-                "sha256": page_sha,
-                "annotations": !options.no_annotations,
-            }));
-        }
-
-        // index.html is the same renderer output with site-root depth.
-        let entry_model = context.load(&entry)?;
-        let entry_context =
-            crate::reader::render::RenderContext::static_export(0, !options.no_annotations);
-        let index_page = renderer.render(&entry_model, &entry_context);
-        let index_path = staging.join("index.html");
-        std::fs::write(&index_path, index_page.html.as_bytes())
-            .map_err(|err| ViewError::io(&format!("write {}", index_path.display()), err))?;
-        let index_sha = sha256_hex(index_page.html.as_bytes());
-        file_manifest.push(serde_json::json!({
-            "path": "index.html",
-            "sha256": index_sha,
-            "size": index_page.html.len(),
-        }));
-
-        file_manifest.sort_by(|a, b| {
-            a["path"]
-                .as_str()
-                .unwrap_or("")
-                .cmp(b["path"].as_str().unwrap_or(""))
-        });
-        let manifest = serde_json::json!({
-            "schema": MANIFEST_SCHEMA,
-            "schema_version": 1,
-            "view": {
-                "name": "marqdo-view",
-                "version": env!("CARGO_PKG_VERSION"),
-            },
-            "compatibility": {
-                "marqdo": crate::protocol::tool_v1::PRODUCT_RANGE,
-                "tool_protocol": crate::protocol::tool_v1::TOOL_PROTOCOL,
-                "analysis": crate::protocol::tool_v1::ANALYSIS_PROTOCOL,
-                "trace": crate::protocol::tool_v1::TRACE_PROTOCOL,
-                "markdown_profile": "marqdo.md.v1",
-            },
-            "core_version": entry_model.core_version,
-            "entry": {
-                "relative_path": entry.as_str(),
-                "file": "index.html",
-                "sha256": index_sha,
-            },
-            "pages": pages,
-            "assets": asset_manifest,
-            "files": file_manifest,
-            "executed": false,
-            "note": "Static export only; reading or exporting never executes the document.",
-        });
-        let manifest_bytes =
-            serde_json::to_vec_pretty(&manifest).map_err(|err| ViewError::ExportFailed {
-                detail: format!("serialize export manifest: {err}"),
-            })?;
-        let manifest_path = staging.join("manifest.json");
-        std::fs::write(&manifest_path, &manifest_bytes)
-            .map_err(|err| ViewError::io(&format!("write {}", manifest_path.display()), err))?;
-
+    let result = (|| {
+        let entry = context.load(&context.project().entry().relative)?;
+        let site = build_site(context, &entry, &staging, !options.no_annotations)?;
         publish(&staging, &out)?;
         Ok(ExportSummary {
             out,
-            pages: documents.len(),
-            files: file_manifest.len() + asset_manifest.len() + 1,
-            manifest_sha256: sha256_hex(&manifest_bytes),
+            pages: site.pages,
+            files: site.entries.len(),
+            manifest_sha256: site.manifest_sha256,
         })
     })();
-
     if result.is_err() {
         let _ = std::fs::remove_dir_all(&staging);
     }
     result
+}
+
+struct Site {
+    pages: usize,
+    entries: Vec<String>,
+    manifest_sha256: String,
+}
+
+struct SiteWriter<'a> {
+    root: &'a Path,
+    entries: std::collections::BTreeSet<String>,
+    remaining_bytes: usize,
+}
+
+impl SiteWriter<'_> {
+    fn write(&mut self, relative: &str, bytes: &[u8]) -> ViewResult<serde_json::Value> {
+        if relative.contains([':', '\\'])
+            || SafeRelativePath::parse(relative).is_err()
+            || relative
+                .split('/')
+                .any(|part| part.is_empty() || part == ".")
+        {
+            return Err(ViewError::ExportFailed {
+                detail: "unsafe static asset path".into(),
+            });
+        }
+        if self.entries.insert(relative.to_string()) {
+            self.remaining_bytes =
+                self.remaining_bytes
+                    .checked_sub(bytes.len())
+                    .ok_or_else(|| ViewError::ResourceLimit {
+                        detail: "static package size limit exceeded".into(),
+                    })?;
+            if self.entries.len() > 6_000 {
+                return Err(ViewError::ResourceLimit {
+                    detail: "static package file limit exceeded".into(),
+                });
+            }
+            let path = self.root.join(relative);
+            if let Some(parent) = path.parent() {
+                std::fs::create_dir_all(parent)
+                    .map_err(|err| ViewError::io("create static package directory", err))?;
+            }
+            std::fs::write(path, bytes)
+                .map_err(|err| ViewError::io("write static package file", err))?;
+        }
+        Ok(serde_json::json!({"path": relative, "sha256": sha256_hex(bytes), "size": bytes.len()}))
+    }
+}
+
+fn build_site(
+    context: &DocumentService,
+    entry_model: &crate::reader::model::PresentationModel,
+    staging: &Path,
+    annotations: bool,
+) -> ViewResult<Site> {
+    let documents = context.project().list_documents()?;
+    let entry = SafeRelativePath::parse(&entry_model.document.identity.relative_path)?;
+    if !documents.contains(&entry) {
+        return Err(ViewError::ExportFailed {
+            detail: "entry document is missing".into(),
+        });
+    }
+    let mut writer = SiteWriter {
+        root: staging,
+        entries: Default::default(),
+        remaining_bytes: 96 * 1024 * 1024,
+    };
+    let bundle = AssetBundle::get();
+    let renderer = ReaderRenderer::new();
+    let mut assets = Vec::new();
+    for asset in bundle.all() {
+        let (name, bytes) = if asset.name == "reader" && asset.extension == "css" {
+            (bundle.hashed_css_name(), bundle.css_bytes())
+        } else {
+            (asset.hashed_name(), asset.bytes)
+        };
+        assets.push(writer.write(&format!("assets/{name}"), bytes)?);
+    }
+
+    let mut pages = Vec::new();
+    let mut files = Vec::new();
+    let mut media_files = std::collections::BTreeMap::new();
+    for relative in &documents {
+        let loaded;
+        let model = if *relative == entry {
+            entry_model
+        } else {
+            loaded = context.load(relative)?;
+            &loaded
+        };
+        for media in model.media.values() {
+            let path = format!("media/{}", media.filename());
+            if !media_files.contains_key(&path) {
+                let mut record = writer.write(&path, &media.bytes)?;
+                record["mime"] = serde_json::json!(media.mime);
+                media_files.insert(path, record);
+            }
+        }
+        let depth = relative.as_str().split('/').count();
+        let settings = crate::reader::render::RenderContext::static_export(depth, annotations);
+        let page = renderer.render(model, &settings);
+        let path = format!("pages/{}.html", relative.as_str());
+        let file = writer.write(&path, page.html.as_bytes())?;
+        pages.push(serde_json::json!({
+            "relative_path": relative.as_str(),
+            "module_id": model.document.identity.module_id,
+            "source_sha256": sha256_hex(model.document.source.as_bytes()),
+            "source_status": model.source_status.data_value(),
+            "analysis_digest": model.semantic.as_ref().map(|semantic| &semantic.analysis_digest),
+            "file": path,
+            "sha256": file["sha256"],
+            "annotations": annotations,
+        }));
+        files.push(file);
+    }
+    files.extend(media_files.values().cloned());
+
+    let index_context = crate::reader::render::RenderContext::static_export(0, annotations);
+    let index_page = renderer.render(entry_model, &index_context);
+    let index_file = writer.write("index.html", index_page.html.as_bytes())?;
+    let index_sha = index_file["sha256"].clone();
+    files.push(index_file);
+    files.sort_by(|a, b| a["path"].as_str().cmp(&b["path"].as_str()));
+    let manifest = serde_json::json!({
+        "schema": MANIFEST_SCHEMA,
+        "schema_version": 1,
+        "view": {"name": "marqdo-view", "version": env!("CARGO_PKG_VERSION")},
+        "compatibility": {
+            "marqdo": crate::protocol::tool_v1::PRODUCT_RANGE,
+            "tool_protocol": crate::protocol::tool_v1::TOOL_PROTOCOL,
+            "analysis": crate::protocol::tool_v1::ANALYSIS_PROTOCOL,
+            "analysis_supported": crate::protocol::tool_v1::ANALYSIS_PROTOCOLS,
+            "trace": crate::protocol::tool_v1::TRACE_PROTOCOL,
+            "markdown_profile": "marqdo.md.v1",
+        },
+        "core_version": entry_model.core_version,
+        "entry": {"relative_path": entry.as_str(), "file": "index.html", "sha256": index_sha},
+        "pages": pages,
+        "assets": assets,
+        "files": files,
+        "executed": false,
+        "note": "Static export only; reading or exporting never executes the document.",
+    });
+    let manifest_bytes =
+        serde_json::to_vec_pretty(&manifest).map_err(|err| ViewError::ExportFailed {
+            detail: format!("serialize export manifest: {err}"),
+        })?;
+    writer.write("manifest.json", &manifest_bytes)?;
+    Ok(Site {
+        pages: documents.len(),
+        entries: writer.entries.into_iter().collect(),
+        manifest_sha256: sha256_hex(&manifest_bytes),
+    })
 }
 
 fn absolute_export_target(raw: &Path) -> ViewResult<PathBuf> {

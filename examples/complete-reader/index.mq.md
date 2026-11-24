@@ -1,9 +1,9 @@
 # @knowledge 小型统计实验
 
-样本的均值 $\\bar{x}$ 可用下式计算：
+样本的均值 $\bar{x}$ 可用下式计算：
 
 $$
-\\bar{x} = \\frac{1}{n} \\sum_{i=1}^{n} x_i
+\bar{x} = \frac{1}{n} \sum_{i=1}^{n} x_i
 $$
 
 ![样本数据图](media/flow.png)
