@@ -49,7 +49,7 @@ def post(browser, base, route, token, body, status=200, origin=None):
         return error.read(), error.headers
 
 
-def verify_zip(payload, destination):
+def verify_zip(payload, destination, expected_digest):
     with zipfile.ZipFile(io.BytesIO(payload)) as archive:
         names = archive.namelist()
         assert len(names) == len(set(names))
@@ -57,7 +57,9 @@ def verify_zip(payload, destination):
             path = PurePosixPath(item.filename)
             assert not path.is_absolute() and ".." not in path.parts
             assert item.compress_type == zipfile.ZIP_STORED and item.file_size <= 16 * 1024 ** 2
-        manifest = json.loads(archive.read("manifest.json"))
+        raw_manifest = archive.read("manifest.json")
+        assert sha(raw_manifest) == expected_digest
+        manifest = json.loads(raw_manifest)
         assert manifest["schema_version"] == 2 and not manifest["executed_during_export"]
         assert manifest["execution"]["source_verified"] and manifest["execution"]["status"] == "succeeded"
         assert manifest["execution"]["parameters"] == "omitted"
@@ -81,17 +83,31 @@ def verify_zip(payload, destination):
 def check(root):
     project = root / "project"
     shutil.copytree(ROOT / "examples/complete-reader", project)
+    attack_text = b"<script>bad()</script><img onerror=bad()>"
+    lines = ["", "## @exec write_markup", "", f"`buffer = memory.new(1, {len(attack_text)})`", ""]
+    for index, byte in enumerate(attack_text):
+        lines.extend([f"`buffer[{index}] = {byte}`", ""])
+    lines.extend(['`out = resource.open("stdio", "stdout", ["write"])`', "",
+                  f"`resource.write(out, buffer, 0, {len(attack_text)})`", "",
+                  "`resource.close(out)`", "", "`return 1`", ""])
+    with (project / "index.mq.md").open("a") as source:
+        source.write("\n".join(lines))
     scratch = root / "scratch"
     scratch.mkdir()
     count = root / "runs"
     wrapper = root / "core"
     wrapper.write_text(
         "#!/usr/bin/env python3\n"
-        "import os, sys\n"
+        "import os, subprocess, sys, time\n"
         f"core, count = {str(CORE)!r}, {str(count)!r}\n"
         "if sys.argv[1] in ('run', 'call'):\n"
         "    assert '--event-stream' in sys.argv and '--json' not in sys.argv\n"
         "    with open(count, 'a') as f: f.write(sys.argv[1]+'\\n')\n"
+        "    if sys.argv[1] == 'call' and sys.argv[3] == 'write_markup':\n"
+        "        result = subprocess.run([core, *sys.argv[1:]], check=False)\n"
+        "        os.unlink(sys.argv[sys.argv.index('--trace-file') + 1])\n"
+        "        sys.exit(result.returncode)\n"
+        "    if sys.argv[1] == 'call' and sys.argv[3] == 'scan': time.sleep(2)\n"
         "os.execv(core, [core, *sys.argv[1:]])\n"
     )
     wrapper.chmod(0o700)
@@ -121,7 +137,7 @@ def check(root):
                 raise AssertionError("unauthenticated project media was accessible")
             original = {path: sha(path.read_bytes()) for path in project.rglob("*") if path.is_file()}
 
-            def run(function, request_id, parameters=None):
+            def submit(function, request_id, parameters=None):
                 body = {
                     "document": "index.mq.md",
                     "target": {"kind": "function", "function_id": f"root:complete-reader@0.1.0::index.mq.md::计算.{function}"},
@@ -130,12 +146,14 @@ def check(root):
                     "client_request_id": request_id,
                 }
                 payload, _ = post(browser, base, "/api/runs", token, body, 202)
-                accepted = json.loads(payload)
+                return json.loads(payload)
+
+            def observe(accepted):
                 with browser.open(base + accepted["events_url"], timeout=20) as response:
                     events = [json.loads(line[6:]) for line in response.read().decode().splitlines() if line.startswith("data: ")]
                 return accepted["run_id"], events[-1]
 
-            run_id, terminal = run("write_output", "one")
+            run_id, terminal = observe(submit("write_output", "one"))
             assert terminal["state"] == "succeeded" and terminal["result"]["stdout"] == "4\n", terminal
             assert terminal["result"]["trace_status"] == "verified"
             assert count.read_text().splitlines() == ["call"]
@@ -160,7 +178,7 @@ def check(root):
             payload, headers = post(browser, base, "/api/exports", token, selection)
             assert headers.get_content_type() == "application/zip" and "attachment" in headers["Content-Disposition"]
             assert headers["Cache-Control"] == "no-store" and headers["X-Content-Type-Options"] == "nosniff"
-            verify_zip(payload, os.environ.get("SNAPSHOT_ZIP"))
+            verify_zip(payload, os.environ.get("SNAPSHOT_ZIP"), headers["X-Marqdo-Manifest-SHA256"])
             subprocess.run([*args, "export", str(project), "--out", str(root / "pure")], check=True, env=env)
             assert "本次执行快照" not in (root / "pure/index.html").read_text()
             assert count.read_text().splitlines() == ["call"]
@@ -179,12 +197,67 @@ def check(root):
             post(browser, base, "/api/exports", token, selection, 409)
             image.unlink()
             image.write_bytes(original_image)
+            dependency = project / "docs/explanation.mq.md"
+            dependency_bytes = dependency.read_bytes()
+            dependency.write_bytes(dependency_bytes + b"\nDependency changed.\n")
+            post(browser, base, "/api/exports", token, selection, 409)
+            dependency.write_bytes(dependency_bytes)
+            lock = project / "marqdo.lock"
+            assert not lock.exists()
+            lock.write_text("changed lock bytes")
+            post(browser, base, "/api/exports", token, selection, 409)
+            lock.unlink()
             assert count.read_text().splitlines() == ["call"]
-            print("pure and selected export both leave execution count at 1; source and media staleness denied")
+            print("pure and selected export leave execution count at 1; source, lock, dependency and media staleness denied")
+
+            pending = submit("scan", "cancelled")
+            pending_selection = {**selection, "run_id": pending["run_id"]}
+            post(browser, base, "/api/exports", token, pending_selection, 409)
+            bare_cancel = urllib.request.Request(base + pending["cancel_url"], b"", {
+                "Origin": base, "X-View-CSRF": token
+            }, method="POST")
+            with browser.open(bare_cancel, timeout=10) as response:
+                assert response.status in (200, 202)
+            _, cancelled = observe(pending)
+            assert cancelled["state"] == "cancelled", cancelled
+            post(browser, base, "/api/exports", token, pending_selection, 409)
+
+            failed_id, failed = observe(submit("fail", "failed", [{"name": "divisor", "expression": "0"}]))
+            assert failed["state"] == "failed", failed
+            failed_selection = {**selection, "run_id": failed_id}
+            post(browser, base, "/api/exports", token, failed_selection, 400)
+            failed_zip, _ = post(browser, base, "/api/exports", token, {**failed_selection, "confirm_partial": True})
+            with zipfile.ZipFile(io.BytesIO(failed_zip)) as archive:
+                assert json.loads(archive.read("manifest.json"))["execution"]["status"] == "failed"
+
+            text_id, text = observe(submit("write_markup", "markup"))
+            assert text["state"] == "succeeded" and text["result"]["trace_status"] == "unavailable", text
+            assert text["result"]["stdout"] == attack_text.decode()
+            text_zip, _ = post(browser, base, "/api/exports", token, {**selection, "run_id": text_id})
+            with zipfile.ZipFile(io.BytesIO(text_zip)) as archive:
+                html = archive.read("index.html").decode()
+                assert "<script>" not in html and "&lt;script&gt;bad()" in html
+                assert json.loads(archive.read("manifest.json"))["execution"]["trace_status"] == "unavailable"
+            print("active/cancelled export denied, verified failure gated, stdout escaped, missing Trace separate")
+            calls = count.read_text().splitlines()
+            assert calls == ["call"] * 4, calls
+            print("run/call count matches four explicit submissions:", calls)
         finally:
             server.terminate()
             server.wait(timeout=5)
+    with subprocess.Popen(
+        [*args, str(project), "--port", "0", "--no-open"],
+        stderr=subprocess.PIPE, text=True, env=env,
+    ) as restarted:
+        try:
+            base = restarted.stderr.readline().split()[-1].rstrip("/")
+            fresh, fresh_token, _, _ = session(base)
+            post(fresh, base, "/api/exports", fresh_token, selection, 404)
+        finally:
+            restarted.terminate()
+            restarted.wait(timeout=5)
     assert not list(scratch.iterdir()), list(scratch.iterdir())
+    print("restarted View cannot recover the previous job; private scratch directories are empty")
 
 
 if __name__ == "__main__":

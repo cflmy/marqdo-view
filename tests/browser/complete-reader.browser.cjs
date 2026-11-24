@@ -83,8 +83,13 @@ async function verifyOffline(browser, url) {
   assert.match(await page.locator(".mq-snapshot pre[aria-label=返回值]").innerText(), /4\.0|Float\(4\)/);
   assert.equal(await page.locator(".mq-snapshot [aria-label=stdout]").count(), 0);
   await screenshot(page, "offline-snapshot.png");
+  await page.locator(".mq-snapshot").scrollIntoViewIfNeeded();
+  await screenshot(page, "offline-result.png");
+  await page.emulateMedia({ media: "print" });
+  assert.equal(await page.locator(".mq-snapshot").isVisible(), true);
+  await page.emulateMedia({ media: "screen" });
   await page.getByRole("link", { name: "误差说明", exact: true }).click();
-  await imagesLoaded(page, 2);
+  await imagesLoaded(page, 3);
   assert.equal(decodeURIComponent(new URL(page.url()).hash), "#误差-1");
   assert.equal(await page.locator(":target").textContent(), "误差");
   assert.equal(await page.locator(".mq-snapshot").count(), 0);
@@ -114,7 +119,7 @@ async function verifyOffline(browser, url) {
     await imagesLoaded(page, 1);
     assert.equal(await page.locator("math mfrac").count(), 1);
     await page.getByRole("link", { name: "误差说明", exact: true }).click();
-    await imagesLoaded(page, 2);
+    await imagesLoaded(page, 3);
     assert.equal(await page.locator(":target").textContent(), "误差");
     assert.equal(decodeURIComponent(new URL(page.url()).hash), "#误差-1");
     await page.getByRole("link", { name: "返回计算均值", exact: true }).click();
@@ -138,6 +143,9 @@ async function verifyOffline(browser, url) {
     assert.equal(await page.locator("#mq-export-fields [name=arguments]").isChecked(), false);
     assert.equal(await page.locator("#mq-export-fields [name=stdout]").isChecked(), false);
     await screenshot(page, "export-preview.png");
+    await page.keyboard.press("Escape");
+    assert.equal(await page.locator("#mq-dialog-export").isVisible(), false);
+    await result.locator("[data-action=export-result]").click();
     await page.locator("#mq-export-confirm").check();
     const downloading = page.waitForEvent("download");
     await page.locator("#mq-export-download").click();

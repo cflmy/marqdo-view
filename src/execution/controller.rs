@@ -198,6 +198,25 @@ impl ExecutionController {
         }
     }
 
+    /// Sweep inactive jobs even if the browser never makes another request.
+    pub fn start_expiry_sweep(self: &Arc<Self>) {
+        let weak = Arc::downgrade(self);
+        let period = self
+            .config
+            .terminal_ttl
+            .min(Duration::from_secs(30))
+            .max(Duration::from_millis(100));
+        std::thread::spawn(move || loop {
+            std::thread::sleep(period);
+            let Some(controller) = weak.upgrade() else {
+                break;
+            };
+            if let Ok(mut state) = controller.state.lock() {
+                controller.purge_locked(&mut state);
+            };
+        });
+    }
+
     pub fn config(&self) -> &ExecutionConfig {
         &self.config
     }
@@ -1178,6 +1197,40 @@ fn unique_counter() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn expired_terminal_job_is_never_returned_for_export() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/welcome");
+        let service = Arc::new(DocumentService::open(&root, None).unwrap());
+        let config = ExecutionConfig {
+            terminal_ttl: Duration::ZERO,
+            ..Default::default()
+        };
+        let controller = ExecutionController::new(service, config);
+        let job = Arc::new(Job::new(
+            "expired".into(),
+            "owner".into(),
+            "index.mq.md".into(),
+        ));
+        {
+            let mut inner = job.inner.lock().unwrap();
+            inner.log.publish_state(RunState::Succeeded);
+            inner.terminal_at = Some(Instant::now());
+        }
+        {
+            let mut state = controller.state.lock().unwrap();
+            state.jobs.insert(job.run_id.clone(), Arc::clone(&job));
+            state.order.push_back(job.run_id.clone());
+        }
+        assert_eq!(
+            controller
+                .get_export_candidate("owner", &job.run_id)
+                .unwrap_err()
+                .code(),
+            "view.run_not_found"
+        );
+        assert!(controller.state.lock().unwrap().jobs.is_empty());
+    }
 
     #[test]
     fn wire_value_summary_is_safe_and_never_html() {

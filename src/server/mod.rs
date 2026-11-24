@@ -41,6 +41,7 @@ pub fn serve(service: DocumentService, opts: &RuntimeOpts) -> ViewResult<i32> {
         Arc::clone(&service),
         ExecutionConfig::default().with_timeout(opts.run_timeout_secs),
     ));
+    controller.start_expiry_sweep();
     let state = Arc::new(ServerState {
         service,
         controller,

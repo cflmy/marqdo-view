@@ -187,7 +187,7 @@ fn consume(
         "run.completed" => {
             let value = payload
                 .get("value")
-                .filter(|value| value["type"].is_string())
+                .filter(|value| super::value_wire_v1::valid(value))
                 .ok_or(())?;
             if text(payload, "status") != Some("ok") || (!*entry_frame_seen && !stream.truncated) {
                 return Err(());

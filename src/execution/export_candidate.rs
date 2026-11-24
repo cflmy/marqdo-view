@@ -56,9 +56,29 @@ impl TerminalExportCandidate {
             .functions
             .iter()
             .find(|function| function.id == plan.function_id)?;
-        let (stdout, stdout_complete) = bounded_text(&result["stdout"]);
-        let (stderr, stderr_complete) = bounded_text(&result["stderr"]);
-        let (value, value_complete) = bounded_text(&result["value_text"]);
+        let (stdout, stdout_complete) = bounded_text(result["stdout"].as_str());
+        let (stderr, stderr_complete) = bounded_text(result["stderr"].as_str());
+        let wire = &result["value"];
+        let value_is_scalar = matches!(
+            wire["type"].as_str(),
+            Some("int" | "float" | "bool" | "unit" | "none" | "text")
+        );
+        let value_text = match state {
+            RunState::Succeeded if value_is_scalar => {
+                result["value_text"].as_str().map(str::to_string)
+            }
+            RunState::Succeeded if crate::protocol::value_wire_v1::transferable(wire) => {
+                Some(wire.to_string())
+            }
+            _ => None,
+        };
+        let (value, value_complete) = match value_text {
+            Some(text) => {
+                let (text, complete) = bounded_text(Some(&text));
+                (Some(text), complete)
+            }
+            None => (None, false),
+        };
         let trace_status = match &result["trace_status"] {
             Value::String(status) if status == "verified" => {
                 if trace.is_some_and(|trace| !trace["truncated"].is_null()) {
@@ -79,15 +99,7 @@ impl TerminalExportCandidate {
                     .filter_map(|(kind, count)| Some((kind.clone(), count.as_u64()?)))
                     .collect()
             });
-        let value_is_public_scalar = matches!(
-            result["value"]["type"].as_str(),
-            Some("int" | "float" | "bool" | "unit")
-        );
-        let value = if state == RunState::Succeeded && !value.is_empty() {
-            Some(value)
-        } else {
-            None
-        };
+        let value_is_public_scalar = value_is_scalar && wire["type"] != "text";
         Some(Self {
             document: plan.document.to_string(),
             function_id: function.id.clone(),
@@ -123,6 +135,7 @@ impl TerminalExportCandidate {
         json!({
             "label": self.label,
             "value_bytes": self.value.as_ref().map(String::len),
+            "value": self.value,
             "value_is_public_scalar": self.value_is_public_scalar,
             "stdout_bytes": self.stdout.len(),
             "stderr_bytes": self.stderr.len(),
@@ -136,8 +149,8 @@ impl TerminalExportCandidate {
     }
 }
 
-fn bounded_text(value: &Value) -> (String, bool) {
-    let Some(text) = value.as_str() else {
+fn bounded_text(value: Option<&str>) -> (String, bool) {
+    let Some(text) = value else {
         return (String::new(), true);
     };
     let mut end = text.len().min(MAX_TEXT);

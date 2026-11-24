@@ -1,3 +1,8 @@
+---
+import:
+  notes: "./docs/explanation.mq.md"
+---
+
 # @knowledge 小型统计实验
 
 样本的均值 $\bar{x}$ 可用下式计算：

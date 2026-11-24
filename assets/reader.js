@@ -799,7 +799,7 @@
       (exportNeedsPartial(data) ? " · 部分观察" : "");
     fields.textContent = "";
     [
-      ["result_value", "返回值", preview.value_bytes, preview.value_is_public_scalar, previewBytes(result.value_text, preview.value_bytes)],
+      ["result_value", "返回值", preview.value_bytes, preview.value_is_public_scalar, preview.value],
       ["stdout", "stdout", preview.stdout_bytes, false, previewBytes(result.stdout, preview.stdout_bytes)],
       ["stderr", "stderr", preview.stderr_bytes, false, previewBytes(result.stderr, preview.stderr_bytes)],
       ["trace_summary", "轨迹摘要", counts ? new TextEncoder().encode(JSON.stringify(counts)).length : null, true, counts && JSON.stringify(counts, null, 2)],

@@ -7,3 +7,4 @@ pub mod analysis_v2;
 pub mod execution_events_v1;
 pub mod tool_v1;
 pub mod trace_v2;
+pub mod value_wire_v1;

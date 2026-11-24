@@ -1496,3 +1496,16 @@
   .mq-export-result { margin-block-start: .75rem; }
   #mq-export-error { color: var(--mq-error); }
 }
+
+@layer layout {
+  .mq-snapshot-topbar .mq-brand { grid-column: 2; }
+}
+
+@layer overlays {
+  .mq-export-dialog input[type="checkbox"] { accent-color: var(--mq-gold); }
+  .mq-export-dialog button[disabled] { opacity: .55; cursor: default; }
+}
+
+@layer semantics {
+  .mq-snapshot-notice a { color: var(--mq-focus); }
+}

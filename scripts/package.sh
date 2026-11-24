@@ -66,6 +66,7 @@ import sys
 
 bundle = pathlib.Path(sys.argv[1])
 version, target, source_sha = sys.argv[2], sys.argv[3], sys.argv[4]
+tool = json.loads((bundle / 'tool.json').read_text())
 files = []
 for path in sorted(bundle.rglob('*')):
     if not path.is_file():
@@ -89,7 +90,7 @@ info = {
     'source_sha': source_sha,
     'compatibility': {
         'marqdo': '>=3.0.0-beta.1,<4.0.0',
-        'analysis': [2],
+        'analysis': tool['compatibility']['analysis'],
         'trace': [2],
         'tool_protocol': 1,
         'markdown_profile': 'marqdo.md.v1',

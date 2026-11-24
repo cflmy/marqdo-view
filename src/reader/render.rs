@@ -227,7 +227,7 @@ impl ReaderRenderer {
         if navigation.welcome {
             self.render_welcome(&mut html, navigation);
         }
-        self.render_document_meta(&mut html, model);
+        self.render_document_meta(&mut html, model, ctx.overlay.is_some());
         if ctx.overlay.is_some() {
             let prefix = match ctx.links {
                 LinkPolicy::StaticRelative { page_depth } => "../".repeat(page_depth),
@@ -278,7 +278,7 @@ impl ReaderRenderer {
         navigation: &crate::reader::model::Navigation,
     ) {
         if ctx.snapshot_package {
-            let _ = write!(html, "<header class=\"mq-topbar\"><a class=\"mq-brand\" href=\"#mq-main\"><img class=\"mq-brand-logo\" src=\"{}\" width=\"44\" height=\"44\" alt=\"\"><span class=\"mq-brand-word\">{}</span></a></header>",
+            let _ = write!(html, "<header class=\"mq-topbar mq-snapshot-topbar\"><a class=\"mq-brand\" href=\"#mq-main\"><img class=\"mq-brand-logo\" src=\"{}\" width=\"44\" height=\"44\" alt=\"\"><span class=\"mq-brand-word\">{}</span></a></header>",
                 escape_attr(&self.assets.logo().data_uri()), escape_text(&navigation.site_title));
             return;
         }
@@ -343,7 +343,12 @@ impl ReaderRenderer {
         );
     }
 
-    fn render_document_meta(&self, html: &mut String, model: &PresentationModel) {
+    fn render_document_meta(
+        &self,
+        html: &mut String,
+        model: &PresentationModel,
+        has_snapshot: bool,
+    ) {
         let status = model.source_status;
         let _ = write!(
             html,
@@ -353,7 +358,11 @@ impl ReaderRenderer {
 "##,
             file = escape_text(&model.document.identity.relative_path),
             status_value = status.data_value(),
-            label = escape_text(status.label()),
+            label = if has_snapshot {
+                "静态文档 · 含执行快照".into()
+            } else {
+                escape_text(status.label())
+            },
         );
         if let Some(run) = &model.run {
             let _ = write!(
