@@ -1,0 +1,52 @@
+{
+  "schema": "marqdo.view-complete-reader-acceptance",
+  "schema_version": 1,
+  "date": "2026-11-24",
+  "view": {
+    "code_sha": "574036288008c15dea3cc2ca3682dc489ec3f13c",
+    "test_sha": "748e1cc491492f1f65d2720d750861d059ba4fe3",
+    "binary_sha256": "183ac19424107950bbfd977e4736c1f8c24c4456b6bd55ede17246ad5fa004d1",
+    "tool_archive_sha256": "91df6bb0f4c408dae8a0d63a55025fdaa26dcc288ac2c4d722eebb0ad80acead"
+  },
+  "core": {
+    "version": "3.0.0-rc.2",
+    "tag_sha": "9149ee40a48fcda692c5c112f66c465487d13dfb",
+    "linux_archive_sha256": "e32e6426caf023fc813ebdbf5a171ec164ee2ffb843ae5594b8e7b9780f496ea",
+    "binary_sha256": "5caa90b8f6a282aef5bb301443ede6cd3bdcf5f64c88969e6d71cb324b03dc5b"
+  },
+  "platform": {
+    "kernel": "7.0.0-31-generic",
+    "architecture": "x86_64",
+    "libc": [
+      "glibc",
+      "2.43"
+    ],
+    "chromium": "131.0.6778.33"
+  },
+  "checks": {
+    "fmt": "PASS",
+    "clippy": "PASS",
+    "rust_tests": 160,
+    "installed_tool": "PASS",
+    "http_and_zip": "PASS",
+    "chromium_new": "PASS",
+    "chromium_existing": "PASS",
+    "offline_no_js": "PASS",
+    "snapshot_manifest_schema": "PASS",
+    "manual_screen_reader": "UNVERIFIED"
+  },
+  "snapshot": {
+    "archive_sha256": "11d0f11828bc1a971e4173943781fcc0fb6bddaecd9df6014af3b3e44de838e7",
+    "manifest_sha256": "7fdc11d812a619382068198bb3f3f27b46f9713c7b1f75d7d82c63220cacfbb0"
+  },
+  "artifacts": {
+    "browser.log": "2330a995605e0c792a8e73f6eacec2f0018408699d7d9f413afc27b7b5794d86",
+    "checks.log": "8848f9398bd1eb44fd8aa91183298d85537b06eac79ca1588814ad479b7b9a1a",
+    "export-preview.png": "2fb98536a6ef1b77e3b96f1d9564ff1e60e7d259f59975944c5326d89590656f",
+    "http.log": "6a662683268e29116d416f8af75110bba3de55b7bdbb3c2c8bc64ed47abbe57f",
+    "live-result.png": "c1a843f5e697256d2953a3074318f05a260bbf6624ed61f60920b3ae4e3f5d18",
+    "mobile-reader.png": "7678a211f82b502321d2da3302ede5a29f4775f48e86faf927d3364a11cf1c49",
+    "offline-result.png": "b0a5aa3b11480ad0a7914f2cdc81d187577113e37efab716ec9c2a98993760fb",
+    "offline-snapshot.png": "f18661b2a086e039e00c2292356957c667afb0abd6ce0d44c6d8138072b4b30a"
+  }
+}

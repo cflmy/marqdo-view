@@ -1,7 +1,21 @@
 # marqdo-view 现状（STATUS）
 
-> 唯一现状来源。规范见 `docs/architecture/RFC-VIEW-0002.md`；本文只记录
-> **实际完成、证据与限制**。最后更新：2026-11-22（Issue #2 复验）
+> 最后更新：2026-11-24。工单 #3 实施规范见 [完整阅读与静态结果导出](architecture/RFC-VIEW-0001-complete-reader.md)。
+
+## 完整阅读与结果 ZIP（工单 #3）
+
+| 能力 | 当前状态 |
+|---|---|
+| Markdown / GFM / 链接和锚点 | 同页与跨文档支持百分号编码、Unicode 与稳定重复标题编号 |
+| 本地媒体与离线数学 | PNG/JPEG/GIF/WebP、静态 SVG、MathML 与内嵌 Noto Sans Math 字体 |
+| 分析和运行 | Analysis v2/v3；RC.2 Events v1 → View SSE；Trace v2 独立校验 |
+| 函数旁交互 | 默认参数、显式确认、实时 stdout、可折叠终态与来源信息 |
+| 普通导出 | 正文、媒体、字体、文件哈希；零运行、零执行结果 |
+| 结果导出 | 当前会话内选定一次可信终态，展示隐私预览后下载只读 ZIP |
+| 可导出终态 | 成功；来源一致的失败或截断观察需另行确认。无真实 Core 终态的任务可以在 Live 显示状态 |
+| 证据 | [官方 RC.2 和 Chromium 验收](evidence/issue-3/README.md) |
+
+以下里程碑记录 RFC-VIEW-0002 交付基线。
 
 ## 版本与基线
 
@@ -29,7 +43,7 @@
 | PR-05 Trace 绑定/原文标注/浏览器回归 | **完成** | Controller Trace 摘要/`source_id`/stale、ADR-0010、`docs/evidence/PR-05/` |
 | PR-06 静态导出/发布包/示例/文档闭环 | **完成** | `examples/*.mq.md`、`scripts/check-examples.sh`、`scripts/test-no-exec.sh`、`docs/ACCEPTANCE.md`、最终 evidence manifest |
 
-## 能力现状
+## RFC-VIEW-0002 能力基线
 
 | 能力 | 状态 |
 |---|---|

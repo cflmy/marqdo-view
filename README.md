@@ -1,11 +1,12 @@
 # marqdo-view
 
 Marqdo View（`0.2.0`）是一个独立的可执行文档阅读器：以**原始 Markdown 为阅读主体**，把冻结
-`marqdo` CLI 的静态语义（Analysis v2）与用户显式触发的真实运行轨迹（Trace v2）
+`marqdo` CLI 的静态语义（Analysis v2/v3）与用户显式触发的真实运行事件（Execution Events v1、Trace v2）
 附着回原文，而不是把文档翻译成另一套语言。
 
 - 状态（唯一现状来源）：[`docs/STATUS.md`](docs/STATUS.md)
-- **实施规范（当前）**：[`docs/architecture/RFC-VIEW-0002.md`](docs/architecture/RFC-VIEW-0002.md)
+- **完整阅读与结果导出**：[实施 RFC](docs/architecture/RFC-VIEW-0001-complete-reader.md) · [设计图](docs/design/complete-reader.png) · [验收](docs/evidence/issue-3/README.md)
+- **执行基础规范**：[`docs/architecture/RFC-VIEW-0002.md`](docs/architecture/RFC-VIEW-0002.md)
 - 0002 合规矩阵：[`docs/CONFORMANCE.md`](docs/CONFORMANCE.md)
 - 历史基础设计：[`docs/architecture/RFC-VIEW-0001.md`](docs/architecture/RFC-VIEW-0001.md)
 - 旧 View 静态审计：[`docs/audits/legacy-view.md`](docs/audits/legacy-view.md)
@@ -13,21 +14,18 @@ Marqdo View（`0.2.0`）是一个独立的可执行文档阅读器：以**原始
 - 兼容性：[`COMPATIBILITY.md`](COMPATIBILITY.md) / 变更：[`CHANGELOG.md`](CHANGELOG.md)
 - 决策记录：[`docs/decisions/`](docs/decisions/)
 
-> **当前状态**：RFC-VIEW-0002 PR-00～PR-06 已完成，按 §10 发布门禁验收
-> **PASS**（真实冻结 CLI + 真实 Chromium；见
-> [`docs/ACCEPTANCE.md`](docs/ACCEPTANCE.md) 与
-> `docs/evidence/<CLI-SHA>/manifest.json`）。像素级人工比对与完整
-> screen-reader 走查仍为 `UNVERIFIED`，见 `docs/STATUS.md`。
+> 阅读、函数调用和单次结果 ZIP 可用。实时执行事件和结果 ZIP 需要官方
+> `marqdo 3.0.0-rc.2` 或更新的兼容版本。Beta 仍可使用旧版运行与 Trace 流程。
 
 ## 能力
 
 | 能力 | 状态 |
 |---|---|
-| 原始 Markdown + GFM 阅读、源码态、文档态 | ✅ |
-| Analysis v2 静态语义（函数/Unit/签名/诊断/导入/引用/资源） | ✅ 严格校验，span 无效则降级 |
+| Markdown + GFM、源码态、项目图片、跨页锚点、离线数学 | ✅ |
+| Analysis v2/v3 静态语义（函数/Unit/签名/诊断/导入/引用/资源） | ✅ 严格校验，span 无效则降级 |
 | 本机 Live 阅读（默认 `127.0.0.1`，只读 API + 显式执行端点） | ✅ |
-| 显式确认后运行 + SSE 状态/取消 + 真实 Trace v2 | ✅ 单任务、无轮询、断线重放 |
-| 纯只读静态导出（离线 `file://`、manifest/哈希、原子发布） | ✅ |
+| 显式确认后运行、SSE 实时输出与取消、真实 Trace v2 | ✅ RC.2；单任务、断线重放 |
+| 只读静态导出（离线 `file://`、媒体/字体/哈希） | ✅ 普通站点与显式结果 ZIP |
 | 单函数参数表单 + 受控 `project` fs grants | ✅ 参数来自 Analysis 签名；project 需显式 glob 二次确认 |
 | SSE 状态推送 / 取消 / 断线重放（禁止轮询） | ✅ `POST /api/runs` + `GET …/events` + `POST …/cancel` |
 | 逐语句变量值 / 参数值 / 内存快照 | ❌ UNSUPPORTED（协议不提供，绝不伪造） |
@@ -70,10 +68,17 @@ marqdo view export examples/mixed-modes --out ./site --no-annotations
 ```
 
 开发期可直接运行 `marqdo-view`（用 `--marqdo-bin` 指定冻结核心）。运行只有一个入口：
-Live 页面点击 Dock “运行”（执行 `main`）或函数面板的“调用”（执行 `call`），
+Live 页面点击 Dock “运行”（执行 `main`）或函数标题旁的“调用”（执行 `call`），
 阅读命令预览与权限说明后点击“确认执行”，服务端才 `POST /api/runs` 启动一个
 CLI 子进程；状态与结果通过 SSE 推送，可取消，断线可重放。页面刷新/打开/搜索/
 切换/导出都不会运行，也没有状态轮询。
+
+在函数旁的“本次执行”中选择“导出文档（含本次结果）”，检查预览和选项，
+确认后下载 ZIP。默认勾选标量返回值和可用的 Trace 摘要。stdout、stderr、
+已提交的参数和非标量返回值由用户选择。ZIP 解压后直接打开 `index.html`，
+可离线阅读、打印和通过清单校验文件。可导出结果在当前会话的任务内保留
+15 分钟。普通 `view export` 始终只导出文档。
+
 
 ## 架构（强制约束）
 
@@ -86,7 +91,7 @@ ReaderRenderer（唯一模板，Live/Export 共用）
       │
 PresentationModel（reader::assemble / reader::model）
       │
-CoreClient ─ MARQDO_BIN 子进程 + 公开 JSON（check --emit / run/call --trace-file）
+CoreClient ─ MARQDO_BIN 公开协议（check --emit / Events v1 / Trace v2）
       │
 ExecutionController ─ 单任务、取消、SSE 事件（仅 POST /api/runs 可达）
       │
@@ -94,9 +99,9 @@ ExecutionController ─ 单任务、取消、SSE 事件（仅 POST /api/runs 可
 ```
 
 - 单一 Rust package、单一渲染入口、单一主题文件；没有第二个 Markdown→语义管线。
-- 服务端只有 7 条固定路由；SSE 只推送 View 自有 `run.*` 生命周期事件。
-- Analysis v2 是唯一语义权威：函数/语句/分支/循环/诊断均来自 `check --emit`，
-  源码字节 span 只用于绑定视觉位置。
+- View SSE 推送任务状态与已校验的实时输出。受保护的 `POST /api/exports` 从当前会话的终态生成只读 ZIP。
+- Analysis v2/v3 是唯一语义权威：函数/语句/分支/循环/诊断均来自 `check --emit`，
+  源码字节 span 用于绑定视觉位置。文档跳转采用确定性的标题锚点。
 - Trace v2 与 Analysis 字节摘要严格绑定；`STALE/TRUNCATED/FAILED/UNSUPPORTED`
   状态显式呈现，不猜测未公开值。
 - Live/Export 内容同源；导出绝不执行、绝不覆盖项目源文件或无关目录。
@@ -105,6 +110,8 @@ ExecutionController ─ 单任务、取消、SSE 事件（仅 POST /api/runs 可
   `tests/security/` 覆盖 CSRF/Origin/Cookie/路径/symlink/XSS/跨会话 SSE。
 
 ## 开发与验收
+
+完整阅读和结果导出的复验命令见 [工单 #3 验收](docs/evidence/issue-3/README.md)。
 
 ```bash
 export PATH="$HOME/.cargo/bin:$PATH"
@@ -147,8 +154,8 @@ MARQDO_BIN=... ./scripts/test-browser.sh    # 真实 Chromium 视觉/交互/响�
 - 运行仅 `pure`（默认）与受控 `project` fs read/write；`strict`、网络/进程/环境/
   plugin/provider/kernel 授权不在首版 UI，必须使用终端 CLI。
 - `project` 不是 OS 沙箱；View 不继承 `marqdo.yaml` 的 capability 请求。
-- SSE 只推送 View 生命周期与终态数据，不承诺逐字 stdout/Token 流；Trace v2 不含
-  参数实际值/逐语句变量/内存快照。
+- RC.2 之前的兼容 Core 使用终态 JSON 与 Trace v2。尚未收到真实 Core 终态的取消或超时可在 Live 阅读，结果 ZIP 只向来源匹配的成功或失败终态开放。
+- Linux 项目媒体使用 `openat2`（Linux 5.6+）。每个图片最多 4 MiB、约 1600 万像素。SVG 只接受静态图形元素。
 - 平台：仅 Linux x86_64 正式验证；Windows/macOS 不支持声明。
 - 远端 CI 配置已提供（`.github/workflows/ci.yml`），本环境未实际运行远端 CI；
   验收证据来自本地真实命令。

@@ -1,0 +1,10 @@
+marqdo view export: 2 page(s), 15 file(s) → <临时目录>/pure
+manifest: sha256:254974d424a6def3b7f8b45b7511bf73ff85586b85e2bbac32d66113a969320d
+executed: false (纯静态导出，未运行任何文档)
+snapshot manifest sha256 7fdc11d812a619382068198bb3f3f27b46f9713c7b1f75d7d82c63220cacfbb0
+pure and selected export leave execution count at 1; source, lock, dependency and media staleness denied
+snapshot manifest sha256 7fdc11d812a619382068198bb3f3f27b46f9713c7b1f75d7d82c63220cacfbb0
+active/cancelled export denied, verified failure gated, stdout escaped, missing Trace separate
+selected IDs remain isolated, tampering detected, oversized request denied, failed and aborted packages cleaned
+run/call count matches four explicit submissions: ['call', 'call', 'call', 'call']
+restarted View cannot recover the previous job; timed-out execution is not exportable; private scratch directories are empty

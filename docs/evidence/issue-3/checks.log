@@ -1,0 +1,11 @@
+cargo fmt --all -- --check: PASS
+cargo clippy --locked --all-targets -- -D warnings: PASS
+test result: ok. 65 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 41 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+test result: ok. 43 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.23s
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+install-smoke: PASS (core sha256 5caa90b8f6a282aef5bb301443ede6cd3bdcf5f64c88969e6d71cb324b03dc5b unchanged)
+Installed Tool: verify examples/complete-reader --json emitted Analysis v3, result PASS and executed=false
+Draft 2020-12 schema definitions and generated v2 manifest: PASS

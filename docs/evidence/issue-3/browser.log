@@ -1,0 +1,11 @@
+Chromium 131.0.6778.33
+Live media, cross-document anchors, confirmed call, pre-terminal stdout, private download and offline ZIP: PASS
+==> browser suite: examples/welcome
+browser: PASS
+==> browser suite: examples/control-flow
+browser: PASS
+==> browser suite: examples/function-params.mq.md
+browser: PASS
+==> browser suite: tests/fixtures/security-project
+browser: PASS
+browser: PASS (core sha256 5caa90b8f6a282aef5bb301443ede6cd3bdcf5f64c88969e6d71cb324b03dc5b unchanged; screenshots: /tmp/marqdo-view-regression)

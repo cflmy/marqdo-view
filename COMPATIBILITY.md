@@ -7,7 +7,8 @@
 | View 产品版本 | `0.2.0` | 独立 SemVer，与 CLI 不共用 |
 | `marqdo` 产品范围 | `>=3.0.0-beta.1,<4.0.0` | 安装与分发时由 CLI 强制校验 |
 | CLI Tool Protocol | `1` | `tool.json` 清单/整包摘要/分发 |
-| Analysis | `2` | 未知 major 直接拒绝，不回退 |
+| Analysis | `2`、`3` | 按实际信封版本验证，未知 major 拒绝 |
+| Execution Events | `1` | RC.2 起提供实时输出与可验证的导出终态 |
 | Trace | `2` | 与 Analysis 精确字节摘要绑定 |
 | Markdown profile | `marqdo.md.v1` | 与冻结 CLI 相同选项集 |
 
@@ -17,7 +18,7 @@ Beta 版 CLI 必须使用 prerelease 范围（`>=3.0.0-beta.1,<4.0.0`）；`>=3.
 
 | 平台 | 状态 | 说明 |
 |---|---|---|
-| Linux x86_64 (glibc 2.39+) | **Supported** | 完整验收使用官方 CLI Beta |
+| Linux x86_64 (glibc 2.39+) | **Supported** | 完整阅读和结果 ZIP 使用官方 RC.2 验收；媒体需要 Linux 5.6+ |
 | Linux aarch64 | 未构建 | 未验证 |
 | macOS / Windows | 未验证 | 不声明支持；路径/进程组逻辑留有平台分支，但未做实测 |
 
@@ -25,13 +26,13 @@ Beta 版 CLI 必须使用 prerelease 范围（`>=3.0.0-beta.1,<4.0.0`）；`>=3.
 
 | 能力 | 状态 |
 |---|---|
-| 原始 Markdown 只读浏览（GFM 表/列表/引用/代码围栏/数学文本） | **已实现**（PR-02） |
-| Analysis v2 静态语义（函数/Unit/诊断/引用/资源） | **已实现**（PR-02） |
+| 原始 Markdown 只读浏览（GFM 表/列表/引用/代码围栏/MathML/本地图片） | **已实现**（PR-02） |
+| Analysis v2/v3 静态语义（函数/Unit/诊断/引用/资源） | **已实现**（PR-02） |
 | 文档态 / 源码态切换 | **已实现**（PR-02） |
 | 暖纸 Reader 视觉（单一 CSS/JS） | 已实现并经 Chromium 验收 |
 | 用户显式触发运行 + SSE + Trace v2 事件可视化 | **已实现**（0002 PR-04；`pure`/受控 `project`，显式确认 + 会话 CSRF） |
-| Live 本机安全 API（7 路由） | **已实现**（0002 PR-04；Cookie/CSRF/Origin/CSP/单任务/SSE） |
-| 静态离线导出（纯只读） | **已实现**（PR-05，同一渲染器） |
+| Live 本机安全 API（含媒体和 ZIP） | **已实现**（0002 PR-04；Cookie/CSRF/Origin/CSP/单任务/SSE） |
+| 静态离线导出 | 普通导出与显式单次结果 ZIP 共用渲染器 |
 | 逐语句变量值 / 参数实际值 / 内存快照 | **UNSUPPORTED**（Trace v2 不提供，绝不伪造） |
 | 知识“已证明”状态 | **UNSUPPORTED**（需要独立 Prove 协议与证书） |
 | `project` 运行与 fs grants | **已实现（受控）**：仅相对项目根 read/write glob，显式二次确认；其它权限拒绝 |
@@ -44,6 +45,7 @@ Beta 版 CLI 必须使用 prerelease 范围（`>=3.0.0-beta.1,<4.0.0`）；`>=3.
 
 ## 消费者契约
 
+- 新 Core 使用 `--event-stream jsonl` 与 Trace v2。兼容的旧 Core 继续使用 `--json` 与 Trace v2。
 - 未知 `schema_version` → `view.protocol_incompatible`，不回退猜测。
 - `sha256(exact analysis.json bytes) == trace.source.analysis_digest`；不匹配 → `view.trace_stale`。
 - `trace.source.root_id == analysis.project.root_id`；事件 `module_id` 必须存在于 Analysis。

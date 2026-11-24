@@ -9,6 +9,13 @@ loop, 7-route Live API, controlled project grants and Trace-bound annotations).
 The earlier `0.1.0` development line was never published; its verified reader /
 Analysis / export work is folded into this entry.
 
+## [Unreleased]
+
+- Read safe project-local images, standard Markdown fragments and equations rendered as offline MathML.
+- Consume Analysis v2/v3 and stream source-bound Execution Events v1 from the published RC.2 Core.
+- Call functions beside their headings and inspect the current result inline.
+- Download one selected, session-owned result as a script-free static ZIP after reviewing the included fields. Ordinary export retains its document-only behavior.
+
 ## [0.2.0] - 2026-11-22
 
 ### Fixed during issue #2 acceptance
