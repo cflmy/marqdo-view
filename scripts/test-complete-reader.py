@@ -206,6 +206,11 @@ def check(root):
             while list(scratch.iterdir()) and time.monotonic() < deadline:
                 time.sleep(.01)
             assert not list(scratch.iterdir()), list(scratch.iterdir())
+            forbidden_entry = project / "bad:archive-name.mq.md"
+            forbidden_entry.write_text("# @knowledge Archive path fixture\n")
+            post(browser, base, "/api/exports", token, selection, 500)
+            forbidden_entry.unlink()
+            assert not list(scratch.iterdir()), list(scratch.iterdir())
             subprocess.run([*args, "export", str(project), "--out", str(root / "pure")], check=True, env=env)
             assert "本次执行快照" not in (root / "pure/index.html").read_text()
             assert count.read_text().splitlines() == ["call"]
@@ -268,7 +273,7 @@ def check(root):
             first, headers = post(browser, base, "/api/exports", token, selection)
             verify_zip(first, None, headers["X-Marqdo-Manifest-SHA256"])
             print("active/cancelled export denied, verified failure gated, stdout escaped, missing Trace separate")
-            print("selected IDs remain isolated, tampering detected, oversized request denied, aborted ZIP cleaned")
+            print("selected IDs remain isolated, tampering detected, oversized request denied, failed and aborted packages cleaned")
             calls = count.read_text().splitlines()
             assert calls == ["call"] * 4, calls
             print("run/call count matches four explicit submissions:", calls)
