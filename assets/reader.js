@@ -598,6 +598,14 @@
     };
     closeAllDialogs();
     clearRunOutput();
+    var panel = runPanel();
+    var slot = $$(".mq-result-slot").find(function (element) {
+      return element.dataset.resultFor === payload.target.function_id ||
+        (payload.target.kind === "entry" && element.dataset.resultFor.split(".").pop().split("::").pop() === "main");
+    });
+    if (slot && panel) slot.appendChild(panel);
+    else if (panel) $("#mq-document").after(panel);
+    if (panel) panel.open = true;
     showRunPanel();
     setRunBusy(true);
     setRunStatus("正在提交运行请求…");
@@ -698,6 +706,8 @@
       output.append(document.createTextNode(decoders[stream].decode(bytes, { stream: true })));
       output.hidden = false;
     } else if (/^(branch|loop|control|call)\./.test(observation.kind)) {
+      var wrap = $("#mq-run-trace-wrap");
+      if (wrap) wrap.hidden = false;
       var events = $("#mq-run-events");
       if (events && events.childElementCount < 100) {
         appendLine(events, "li", "", observation.kind +

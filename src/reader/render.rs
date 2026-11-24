@@ -275,6 +275,7 @@ impl ReaderRenderer {
 </header>
 <nav class="mq-tabs" aria-label="阅读导航">
   <button type="button" class="mq-tab" data-action="mode-document" aria-current="page">文档</button>
+  <button type="button" class="mq-tab" data-action="mode-source">源码</button>
   <button type="button" class="mq-tab" data-action="functions">函数</button>
 {run_tab}
 </nav>
@@ -420,17 +421,10 @@ impl ReaderRenderer {
                         == entry.anchor
                 })
             });
-            let (function_id, params, callable) = match function {
-                Some(function) => (function.id.clone(), function_params_json(function), true),
-                None => (String::new(), "[]".to_string(), false),
-            };
-            let call_button = if callable && ctx.core_available {
-                format!(
-                    "<button type=\"button\" class=\"mq-fn-call\" data-action=\"call-function\" data-function-id=\"{id}\" data-function-label=\"{label}\" data-params=\"{params}\">调用</button>",
-                    id = escape_attr(&function_id),
-                    label = escape_attr(&entry.label),
-                    params = escape_attr(&params)
-                )
+            let call_button = if ctx.live && ctx.core_available {
+                function
+                    .map(|function| function_call_button(function, &entry.label))
+                    .unwrap_or_default()
             } else {
                 String::new()
             };
@@ -451,14 +445,27 @@ impl ReaderRenderer {
         let current = SafeRelativePath::parse(&model.document.identity.relative_path).ok();
         match &current {
             Some(current) => {
-                render_blocks(
-                    html,
-                    &model.document.blocks,
-                    model,
-                    ctx,
-                    current,
-                    self.assets,
-                );
+                let mut section = None;
+                let place_result = |html: &mut String, function: &crate::protocol::analysis_v2::SemanticFunction| {
+                    if ctx.live {
+                        let _ = write!(html, "<div class=\"mq-result-slot\" data-result-for=\"{}\"></div>", escape_attr(&function.id));
+                    }
+                };
+                for block in &model.document.blocks {
+                    if let DocBlock::Heading {
+                        level: 1 | 2, span, ..
+                    } = block
+                    {
+                        if let Some(function) = section.take() {
+                            place_result(html, function);
+                        }
+                        section = function_at(model, *span);
+                    }
+                    render_block(html, block, model, ctx, current, self.assets);
+                }
+                if let Some(function) = section {
+                    place_result(html, function);
+                }
             }
             None => {
                 let _ = write!(
@@ -522,8 +529,8 @@ impl ReaderRenderer {
     /// exists until the user explicitly submits one (RFC-VIEW-0002 §7.1).
     fn render_live_run_shell(&self, html: &mut String, _ctx: &RenderContext) {
         html.push_str(
-            r##"<section class="mq-run-panel" id="mq-run-panel" data-run-state="idle" aria-labelledby="mq-run-title" hidden>
-  <h2 id="mq-run-title">本次运行</h2>
+            r##"<details class="mq-run-panel" id="mq-run-panel" data-run-state="idle" aria-labelledby="mq-run-title" open hidden>
+  <summary id="mq-run-title">本次执行</summary>
   <p id="mq-run-status" class="mq-run-status" role="status" aria-live="polite">尚未运行。点击 Dock 的“运行”执行 main，或在函数面板选择函数。</p>
   <div id="mq-run-actions" class="mq-run-actions" hidden>
     <button type="button" class="mq-secondary" data-action="cancel-run">取消运行</button>
@@ -535,8 +542,7 @@ impl ReaderRenderer {
     <summary>真实 Trace v2 事件</summary>
     <ol id="mq-run-events" class="mq-run-events"></ol>
   </details>
-  <p id="mq-run-note" class="mq-colophon">结果只来自本次显式运行的 CLI --json 与经摘要校验的 Trace v2；不提供参数实际值、逐语句变量或内存快照。</p>
-</section>
+</details>
 "##,
         );
     }
@@ -619,7 +625,7 @@ impl ReaderRenderer {
   <ul class="mq-menu-list">
     <li><button type="button" data-action="mode-document">文档态 <span class="mq-menu-hint">原始 Markdown 阅读</span></button></li>
     <li><button type="button" data-action="mode-source">源码态 <span class="mq-menu-hint">逐行原文，含标记</span></button></li>
-    <li><button type="button" data-action="functions">函数大纲 <span class="mq-menu-hint">来自 Analysis v2</span></button></li>
+    <li><button type="button" data-action="functions">函数大纲 <span class="mq-menu-hint">来自 Analysis v2/v3</span></button></li>
     <li><button type="button" data-action="unsupported">未提供的能力 <span class="mq-menu-hint">变量 / 内存 / 调试 / 证明</span></button></li>
     <li><button type="button" data-action="print">打印 <span class="mq-menu-hint">隐藏交互与装饰</span></button></li>
     <li><button type="button" data-action="about">关于 Marqdo View <span class="mq-menu-hint">版本与协议</span></button></li>
@@ -637,7 +643,7 @@ impl ReaderRenderer {
 {run_dialog}
 <dialog class="mq-dialog" id="mq-dialog-about" aria-labelledby="mq-about-title">
   <div class="mq-dialog-head"><h2 id="mq-about-title">关于 Marqdo View</h2><button type="button" class="mq-icon-btn mq-close" data-action="close-dialog" aria-label="关闭关于">×</button></div>
-  <p>版本 {view_version} · Tool Protocol v1 · Analysis v2 · Trace v2。</p>
+  <p>版本 {view_version} · Tool Protocol v1 · Analysis v2/v3 · Trace v2。</p>
   <p>冻结核心：{core}。</p>
   <p class="mq-colophon">本页面只渲染原始 Markdown 与已校验的静态语义；打开、刷新、搜索、导出都不会执行文档。运行需要用户显式确认。</p>
 </dialog>
@@ -870,6 +876,11 @@ fn render_block(
                 );
             }
             render_inlines(html, &cleaned, model, ctx, current, assets);
+            if ctx.live && ctx.core_available {
+                if let Some(function) = function_at(model, *span) {
+                    html.push_str(&function_call_button(function, &function.local_name));
+                }
+            }
             let _ = write!(html, "</h{level}>\n");
         }
         DocBlock::Paragraph { content, .. } => {
@@ -1465,6 +1476,29 @@ fn render_run_chips(html: &mut String, model: &PresentationModel, statement_span
         detail = escape_text(&summary.detail),
         suffix = escape_text(&suffix)
     );
+}
+
+fn function_at(
+    model: &PresentationModel,
+    span: SourceSpan,
+) -> Option<&crate::protocol::analysis_v2::SemanticFunction> {
+    model
+        .semantic
+        .as_ref()?
+        .functions
+        .iter()
+        .find(|function| function.heading_span == span)
+}
+
+fn function_call_button(
+    function: &crate::protocol::analysis_v2::SemanticFunction,
+    label: &str,
+) -> String {
+    format!(
+        "<button type=\"button\" class=\"mq-fn-call\" data-action=\"call-function\" data-function-id=\"{id}\" data-function-label=\"{label}\" data-params=\"{params}\">调用</button>",
+        id = escape_attr(&function.id), label = escape_attr(label),
+        params = escape_attr(&function_params_json(function)),
+    )
 }
 
 fn function_params_json(function: &crate::protocol::analysis_v2::SemanticFunction) -> String {

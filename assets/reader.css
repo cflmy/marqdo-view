@@ -1382,3 +1382,29 @@
   .mq-heading-anchor { display: block; }
   .mq-document math { font-family: "Noto Sans Math", math; }
 }
+
+@layer semantics {
+  .mq-document h2 .mq-fn-call {
+    margin-inline-start: .8rem;
+    vertical-align: middle;
+    border-color: var(--mq-gold);
+    color: var(--mq-focus);
+  }
+
+  .mq-result-slot:empty { display: none; }
+
+  .mq-result-slot .mq-run-panel {
+    border-color: var(--mq-olive);
+    background: var(--mq-surface);
+    margin-block: 1.25rem 1.75rem;
+  }
+
+  .mq-run-panel > summary {
+    cursor: pointer;
+    font-weight: 650;
+    color: var(--mq-olive);
+    margin-block-end: .6rem;
+  }
+
+  .mq-run-panel[hidden] { display: none; }
+}
