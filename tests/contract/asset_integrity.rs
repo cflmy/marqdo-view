@@ -81,7 +81,7 @@ fn theme_has_one_token_layer_and_no_legacy_skin() {
         "the theme must not rely on !important overrides"
     );
     // No remote font/CDN requests.
-    for banned in ["@font-face", "fonts.googleapis", "https://"] {
+    for banned in ["fonts.googleapis", "https://"] {
         assert!(!css.contains(banned), "remote resource marker {banned}");
     }
 }

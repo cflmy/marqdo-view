@@ -71,6 +71,18 @@ impl AssetBundle {
                 "image/webp",
                 include_bytes!("../../assets/feather.webp"),
             ),
+            asset(
+                "noto-math",
+                "ttf",
+                "font/ttf",
+                include_bytes!("../../assets/NotoSansMath-Regular.ttf"),
+            ),
+            asset(
+                "noto-math-license",
+                "txt",
+                "text/plain; charset=utf-8",
+                include_bytes!("../../assets/licenses/NOTO-MATH-LICENSE.txt"),
+            ),
         ];
         let mut by_hashed_name = HashMap::new();
         for (index, asset) in assets.iter().enumerate() {
@@ -79,7 +91,8 @@ impl AssetBundle {
         let css_text = std::str::from_utf8(assets[0].bytes).expect("reader.css is UTF-8");
         let css_with_images = css_text
             .replace("__BLOSSOM__", &assets[3].data_uri())
-            .replace("__FEATHER__", &assets[4].data_uri());
+            .replace("__FEATHER__", &assets[4].data_uri())
+            .replace("__MATH_FONT__", &assets[5].hashed_name());
         let css_served_sha256 = sha256_hex(css_with_images.as_bytes());
         Self {
             assets,

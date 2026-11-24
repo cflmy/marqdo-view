@@ -6,7 +6,10 @@
 
 pub mod assemble;
 pub mod assets;
+pub mod links;
 pub mod markdown;
+pub mod math;
+pub mod media;
 pub mod model;
 pub mod render;
 pub mod source;

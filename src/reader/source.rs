@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 /// Half-open byte span `[start, end)` into one module's exact source bytes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub struct SourceSpan {
     pub start: u64,
     pub end: u64,
@@ -402,6 +402,8 @@ pub struct DocumentRef {
 #[derive(Debug, Clone)]
 pub struct Project {
     root: PathBuf,
+    #[cfg(target_os = "linux")]
+    root_handle: std::sync::Arc<std::fs::File>,
     entry: DocumentRef,
 }
 
@@ -419,6 +421,8 @@ impl Project {
         if metadata.is_file() {
             let root = discover_project_root(&canonical);
             let project = Self {
+                #[cfg(target_os = "linux")]
+                root_handle: Self::open_root(&root)?,
                 entry: DocumentRef {
                     relative: SafeRelativePath("placeholder".to_string()),
                     absolute: canonical.clone(),
@@ -428,6 +432,8 @@ impl Project {
             let relative = project.relative_for(&canonical)?;
             Ok(Self {
                 root: project.root,
+                #[cfg(target_os = "linux")]
+                root_handle: project.root_handle,
                 entry: DocumentRef {
                     relative,
                     absolute: canonical,
@@ -436,6 +442,8 @@ impl Project {
         } else if metadata.is_dir() {
             let project = Self {
                 root: canonical.clone(),
+                #[cfg(target_os = "linux")]
+                root_handle: Self::open_root(&canonical)?,
                 entry: DocumentRef {
                     relative: SafeRelativePath("placeholder".to_string()),
                     absolute: canonical.clone(),
@@ -444,14 +452,30 @@ impl Project {
             let documents = project.list_documents()?;
             let chosen = choose_entry(&project.root, &documents)?;
             Ok(Self {
-                root: project.root,
                 entry: chosen,
+                ..project
             })
         } else {
             Err(ViewError::PathForbidden {
                 detail: format!("{} is not a regular file or directory", path.display()),
             })
         }
+    }
+
+    #[cfg(target_os = "linux")]
+    fn open_root(path: &Path) -> ViewResult<std::sync::Arc<std::fs::File>> {
+        use std::os::unix::fs::OpenOptionsExt;
+        std::fs::OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW)
+            .open(path)
+            .map(std::sync::Arc::new)
+            .map_err(|err| ViewError::io("open project root", err))
+    }
+
+    #[cfg(target_os = "linux")]
+    pub(super) fn root_handle(&self) -> &std::fs::File {
+        &self.root_handle
     }
 
     pub fn root(&self) -> &Path {

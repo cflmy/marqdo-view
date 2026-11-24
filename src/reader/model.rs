@@ -91,6 +91,8 @@ pub struct PresentationModel {
     pub version: u32,
     pub title: String,
     pub document: DocumentModel,
+    pub heading_slugs: std::collections::HashMap<crate::reader::source::SourceSpan, String>,
+    pub media: std::collections::BTreeMap<String, std::sync::Arc<super::media::Media>>,
     pub semantic: Option<SemanticProjection>,
     pub source_status: SourceStatus,
     /// Human-readable reason for a degraded status (already normalized: no

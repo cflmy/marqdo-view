@@ -50,21 +50,29 @@ impl ServerState {
     /// bytes are unchanged. This path performs the read-only `check` only.
     pub fn load(&self, relative: &SafeRelativePath) -> ViewResult<PresentationModel> {
         let digest = self.service.project().source_digest(relative)?;
-        if let Ok(cache) = self.cache.lock() {
-            if let Some(entry) = cache.get(relative.as_str()) {
-                if entry.source_digest == digest {
-                    return Ok(entry.model.clone());
-                }
-            }
+        let cached = self.cache.lock().ok().and_then(|cache| {
+            let entry = cache.get(relative.as_str())?;
+            (entry.source_digest == digest).then(|| entry.model.clone())
+        });
+        if let Some(mut model) = cached {
+            model.media = crate::reader::media::collect(
+                self.service.project(),
+                relative,
+                &model.document.blocks,
+            );
+            model.navigation.documents = self.service.project().list_documents()?;
+            return Ok(model);
         }
         let model = self.service.load(relative)?;
         if let Ok(mut cache) = self.cache.lock() {
             if cache.len() < 64 {
+                let mut cached = model.clone();
+                cached.media.clear();
                 cache.insert(
                     relative.as_str().to_string(),
                     CacheEntry {
                         source_digest: digest,
-                        model: model.clone(),
+                        model: cached,
                     },
                 );
             }
@@ -101,6 +109,9 @@ pub fn handle(state: &ServerState, request: Request) -> ViewResult<()> {
     if is_get {
         if let Some(hashed_name) = path.strip_prefix("/assets/") {
             return serve_asset(request, hashed_name);
+        }
+        if let Some(name) = path.strip_prefix("/media/") {
+            return serve_media(state, request, name, query);
         }
         if path == "/" || path == "/index.html" {
             return serve_page(state, request, None);
@@ -385,6 +396,43 @@ fn cancel_run(state: &ServerState, request: Request, run_id: &str) -> ViewResult
         ),
         Err(err) => respond_error(request, status_for(&err), &err),
     }
+}
+
+fn serve_media(state: &ServerState, request: Request, name: &str, query: &str) -> ViewResult<()> {
+    if let Err(err) = state.security.require_session(&request) {
+        return respond_error(request, status_for(&err), &err);
+    }
+    let Some(path) =
+        query_param(query, "path").and_then(|path| SafeRelativePath::parse(&path).ok())
+    else {
+        return respond_text(
+            request,
+            StatusCode(404),
+            "media not found\n",
+            CacheKind::NoStore,
+        );
+    };
+    let Some(media) = crate::reader::media::load(state.service.project(), &path)
+        .filter(|media| media.filename() == name)
+    else {
+        return respond_text(
+            request,
+            StatusCode(404),
+            "media not found\n",
+            CacheKind::NoStore,
+        );
+    };
+    respond_bytes(
+        request,
+        StatusCode(200),
+        media.mime,
+        media.bytes,
+        CacheKind::NoStore,
+        vec![
+            Header::from_bytes("Content-Security-Policy", "default-src 'none'; sandbox")
+                .expect("valid media CSP"),
+        ],
+    )
 }
 
 fn serve_asset(request: Request, hashed_name: &str) -> ViewResult<()> {

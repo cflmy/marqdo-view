@@ -41,7 +41,23 @@ impl LinkPolicy {
                 for _ in 0..*page_depth {
                     prefix.push_str("../");
                 }
-                format!("{prefix}pages/{}.html", target.as_str())
+                format!(
+                    "{prefix}pages/{}.html",
+                    percent_encode_path(target.as_str())
+                )
+            }
+        }
+    }
+
+    fn media_href(&self, media: &super::media::Media) -> String {
+        match self {
+            LinkPolicy::LocalServer => format!(
+                "/media/{}?path={}",
+                media.filename(),
+                percent_encode_path(media.path.as_str())
+            ),
+            LinkPolicy::StaticRelative { page_depth } => {
+                format!("{}media/{}", "../".repeat(*page_depth), media.filename())
             }
         }
     }
@@ -814,6 +830,18 @@ fn render_block(
         } => {
             let unit = resolve_heading_unit(model, *span, *level);
             let anchor = anchor_for_span(span.start, span.end);
+            let slug = model
+                .heading_slugs
+                .get(span)
+                .map(String::as_str)
+                .unwrap_or(&anchor);
+            if slug != anchor {
+                let _ = write!(
+                    html,
+                    "<span class=\"mq-heading-anchor\" id=\"{}\" aria-hidden=\"true\"></span>",
+                    escape_attr(&anchor)
+                );
+            }
             let (badge, cleaned) = display_heading_content(content, unit);
             let data_semantic = if let Some((_, data)) = badge {
                 data
@@ -830,7 +858,7 @@ fn render_block(
                 html,
                 "<h{} id=\"{}\" data-source-id=\"{}\" data-semantic=\"{}\">",
                 level,
-                escape_attr(&anchor),
+                escape_attr(slug),
                 source_id_id(model, *span),
                 data_semantic,
             );
@@ -979,13 +1007,13 @@ fn render_block(
         DocBlock::MathBlock { span, literal } => {
             let _ = write!(
                 html,
-                "<div class=\"mq-math-block\" data-resource-kind=\"formula\" data-source-id=\"{}\"><code>{}</code><span class=\"mq-math-note\">公式原文 · 未渲染数学</span></div>\n",
+                "<div class=\"mq-math-block\" data-resource-kind=\"formula\" data-source-id=\"{}\">{}</div>\n",
                 escape_attr(&source_id(
                     &model.document.identity.module_id,
                     *span,
                     "resource-formula"
                 )),
-                escape_text(literal)
+                render_math(literal, true)
             );
         }
         DocBlock::ThematicBreak { .. } => html.push_str("<hr/>\n"),
@@ -1220,7 +1248,7 @@ fn render_inline(
         } => {
             let reference = projection.and_then(|projection| projection.reference_for_span(*span));
             let state = reference.map(|reference| reference.state.as_str());
-            let target = resolve_link(url, current, &ctx.links);
+            let target = resolve_link(url, current, model, &ctx.links);
             match target {
                 Some(href) => {
                     let _ = write!(html, "<a href=\"{href}\"", href = escape_attr(&href));
@@ -1246,17 +1274,14 @@ fn render_inline(
         Inline::Image {
             url, alt, title, ..
         } => {
-            // Remote or unverified images are never loaded implicitly.
-            let _ = (url, title);
-            let _ = write!(
-                html,
-                "<span class=\"mq-raw-omitted\" role=\"note\">[图片已阻止自动加载：{}]</span>",
-                escape_text(if alt.is_empty() {
-                    "无替代文本"
-                } else {
-                    alt
-                })
-            );
+            if let Some(media) = model.media.get(url) {
+                let _ = write!(html, "<img class=\"mq-document-image\" src=\"{}\" alt=\"{}\" width=\"{}\" height=\"{}\" title=\"{}\">",
+                    escape_attr(&ctx.links.media_href(media)), escape_attr(alt),
+                    media.width, media.height, escape_attr(title));
+            } else {
+                let _ = write!(html, "<span class=\"mq-raw-omitted\" role=\"note\" title=\"{}\">[图片已阻止自动加载：{}]</span>",
+                    escape_attr(url), escape_text(if alt.is_empty() { "无替代文本" } else { alt }));
+            }
         }
         Inline::Math {
             span,
@@ -1277,9 +1302,8 @@ fn render_inline(
                         ))
                     ))
                     .unwrap_or_default(),
-                escape_text(literal)
+                render_math(literal, *display)
             );
-            let _ = display;
         }
         Inline::HtmlInline { .. } => {
             html.push_str("<span class=\"mq-raw-omitted\">已忽略原始行内 HTML</span>");
@@ -1362,49 +1386,62 @@ fn percent_encode_path(raw: &str) -> String {
 /// Sanitize one Markdown link destination. Returns `None` for schemes the
 /// reader must never expose (`javascript:`, `data:`, `file:`, ...) and for
 /// console-control-looking payloads.
-fn resolve_link(raw: &str, current: &SafeRelativePath, policy: &LinkPolicy) -> Option<String> {
+fn resolve_link(
+    raw: &str,
+    current: &SafeRelativePath,
+    model: &PresentationModel,
+    policy: &LinkPolicy,
+) -> Option<String> {
     let url = raw.trim();
-    if url.is_empty() {
+    if url.is_empty()
+        || url.chars().any(char::is_control)
+        || url.contains('\\')
+        || url.starts_with('/')
+    {
         return None;
     }
-    if url.chars().any(|ch| ch.is_control() || ch == '\u{7f}') {
-        return None;
+    let (path_with_query, fragment) = url
+        .split_once('#')
+        .map_or((url, None), |(path, fragment)| (path, Some(fragment)));
+    let path = path_with_query.split('?').next()?;
+    if let Some((scheme, _)) = path.split_once(':') {
+        return matches!(
+            scheme.to_ascii_lowercase().as_str(),
+            "http" | "https" | "mailto"
+        )
+        .then(|| url.to_string());
     }
-    // Explicit scheme: only http/https/mailto are navigable. A single-letter
-    // prefix is a Windows drive, not a scheme.
-    if let Some(colon) = url.find(':') {
-        let scheme = &url[..colon];
-        if scheme.len() > 1 && scheme.chars().all(|ch| ch.is_ascii_alphabetic()) {
-            return match scheme.to_ascii_lowercase().as_str() {
-                "http" | "https" | "mailto" => Some(url.to_string()),
-                _ => None,
-            };
+    let fragment = fragment
+        .map(super::links::decode)
+        .unwrap_or_else(|| Some(String::new()))?;
+    let suffix = if fragment.is_empty() {
+        String::new()
+    } else {
+        format!("#{}", percent_encode_path(&fragment))
+    };
+    if path.is_empty() {
+        return Some(suffix);
+    }
+    let target = super::links::relative_url(current, path)?;
+    if target.as_str().ends_with(".mq.md") {
+        if !model.navigation.documents.contains(&target) {
+            return None;
         }
-    }
-    if url.starts_with("//") {
-        return None;
-    }
-    if url.starts_with('#') {
-        return Some(url.to_string());
-    }
-    if url.starts_with('/') {
-        return match policy {
-            LinkPolicy::LocalServer => Some(url.to_string()),
-            LinkPolicy::StaticRelative { .. } => None,
-        };
-    }
-    let path_part = url.split(['?', '#']).next().unwrap_or(url);
-    if path_part.ends_with(".mq.md") {
-        let joined = match current.parent() {
-            Some(dir) => format!("{dir}/{path_part}"),
-            None => path_part.to_string(),
-        };
-        if let Ok(target) = SafeRelativePath::parse(&joined) {
-            return Some(policy.document_href(current, &target));
-        }
-        return None;
+        return Some(format!(
+            "{}{suffix}",
+            policy.document_href(current, &target)
+        ));
     }
     Some(url.to_string())
+}
+
+fn render_math(literal: &str, display: bool) -> String {
+    super::math::render(literal, display).unwrap_or_else(|| {
+        format!(
+            "<code title=\"公式无法排版\">{}</code>",
+            escape_text(literal)
+        )
+    })
 }
 
 fn render_run_chips(html: &mut String, model: &PresentationModel, statement_span: SourceSpan) {

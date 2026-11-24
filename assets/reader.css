@@ -1370,3 +1370,15 @@
     overflow-wrap: anywhere;
   }
 }
+
+@font-face {
+  font-family: "Noto Sans Math";
+  src: url("__MATH_FONT__") format("truetype");
+  font-display: swap;
+}
+
+@layer typography {
+  .mq-document-image { max-inline-size: 100%; block-size: auto; }
+  .mq-heading-anchor { display: block; }
+  .mq-document math { font-family: "Noto Sans Math", math; }
+}

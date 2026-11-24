@@ -70,6 +70,8 @@ pub fn build(input: BuildInput<'_>) -> PresentationModel {
     PresentationModel {
         version: PRESENTATION_VERSION,
         title: document.title(),
+        heading_slugs: super::links::heading_slugs(&document.blocks),
+        media: Default::default(),
         document,
         semantic,
         source_status: status,
@@ -313,7 +315,8 @@ impl DocumentService {
             (None, _) => None,
         };
 
-        Ok(build(BuildInput {
+        let media = super::media::collect(&self.project, relative, &document.blocks);
+        let mut model = build(BuildInput {
             document,
             analysis: verified.as_ref(),
             status,
@@ -322,7 +325,9 @@ impl DocumentService {
             navigation,
             core_version: self.core_version.clone(),
             run: attached_run.as_ref(),
-        }))
+        });
+        model.media = media;
+        Ok(model)
     }
 }
 
