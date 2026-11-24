@@ -9,8 +9,11 @@ import os
 from pathlib import Path, PurePosixPath
 import re
 import shutil
+import socket
+import struct
 import subprocess
 import tempfile
+import time
 import urllib.error
 import urllib.request
 import zipfile
@@ -179,6 +182,30 @@ def check(root):
             assert headers.get_content_type() == "application/zip" and "attachment" in headers["Content-Disposition"]
             assert headers["Cache-Control"] == "no-store" and headers["X-Content-Type-Options"] == "nosniff"
             verify_zip(payload, os.environ.get("SNAPSHOT_ZIP"), headers["X-Marqdo-Manifest-SHA256"])
+            manifest_digest = headers["X-Marqdo-Manifest-SHA256"]
+            with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+                manifest = json.loads(archive.read("manifest.json"))
+                assert sha(archive.read("manifest.json") + b" ") != manifest_digest
+                for entry in manifest["files"] + manifest["assets"]:
+                    assert sha(archive.read(entry["path"]) + b" ") != entry["sha256"]
+            post(browser, base, "/api/exports", token, {**selection, "unknown": "x" * 8192}, 429)
+
+            auth = next(handler.cookiejar for handler in browser.handlers if hasattr(handler, "cookiejar"))
+            cookies = "; ".join(f"{cookie.name}={cookie.value}" for cookie in auth)
+            body = json.dumps(selection).encode()
+            host, port = base.removeprefix("http://").rsplit(":", 1)
+            request = (f"POST /api/exports HTTP/1.1\r\nHost: {host}:{port}\r\n"
+                       f"Origin: {base}\r\nX-View-CSRF: {token}\r\nCookie: {cookies}\r\n"
+                       f"Content-Type: application/json\r\nContent-Length: {len(body)}\r\n\r\n").encode()
+            with socket.create_connection((host, int(port)), timeout=10) as abandoned:
+                abandoned.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 4096)
+                abandoned.sendall(request + body)
+                assert abandoned.recv(16).startswith(b"HTTP/1.1 200")
+                abandoned.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
+            deadline = time.monotonic() + 5
+            while list(scratch.iterdir()) and time.monotonic() < deadline:
+                time.sleep(.01)
+            assert not list(scratch.iterdir()), list(scratch.iterdir())
             subprocess.run([*args, "export", str(project), "--out", str(root / "pure")], check=True, env=env)
             assert "本次执行快照" not in (root / "pure/index.html").read_text()
             assert count.read_text().splitlines() == ["call"]
@@ -238,7 +265,10 @@ def check(root):
                 html = archive.read("index.html").decode()
                 assert "<script>" not in html and "&lt;script&gt;bad()" in html
                 assert json.loads(archive.read("manifest.json"))["execution"]["trace_status"] == "unavailable"
+            first, headers = post(browser, base, "/api/exports", token, selection)
+            verify_zip(first, None, headers["X-Marqdo-Manifest-SHA256"])
             print("active/cancelled export denied, verified failure gated, stdout escaped, missing Trace separate")
+            print("selected IDs remain isolated, tampering detected, oversized request denied, aborted ZIP cleaned")
             calls = count.read_text().splitlines()
             assert calls == ["call"] * 4, calls
             print("run/call count matches four explicit submissions:", calls)
@@ -246,18 +276,21 @@ def check(root):
             server.terminate()
             server.wait(timeout=5)
     with subprocess.Popen(
-        [*args, str(project), "--port", "0", "--no-open"],
+        [*args, str(project), "--port", "0", "--no-open", "--run-timeout", "1"],
         stderr=subprocess.PIPE, text=True, env=env,
     ) as restarted:
         try:
             base = restarted.stderr.readline().split()[-1].rstrip("/")
-            fresh, fresh_token, _, _ = session(base)
-            post(fresh, base, "/api/exports", fresh_token, selection, 404)
+            browser, token, digest, _ = session(base)
+            post(browser, base, "/api/exports", token, selection, 404)
+            timed_id, timed = observe(submit("scan", "timeout"))
+            assert timed["state"] == "timed_out", timed
+            post(browser, base, "/api/exports", token, {**selection, "run_id": timed_id}, 409)
         finally:
             restarted.terminate()
             restarted.wait(timeout=5)
     assert not list(scratch.iterdir()), list(scratch.iterdir())
-    print("restarted View cannot recover the previous job; private scratch directories are empty")
+    print("restarted View cannot recover the previous job; timed-out execution is not exportable; private scratch directories are empty")
 
 
 if __name__ == "__main__":
