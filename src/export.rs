@@ -158,10 +158,10 @@ fn build_site(
         };
         for media in model.media.values() {
             let path = format!("media/{}", media.filename());
-            if !media_files.contains_key(&path) {
-                let mut record = writer.write(&path, &media.bytes)?;
+            if let std::collections::btree_map::Entry::Vacant(entry) = media_files.entry(path) {
+                let mut record = writer.write(entry.key(), &media.bytes)?;
                 record["mime"] = serde_json::json!(media.mime);
-                media_files.insert(path, record);
+                entry.insert(record);
             }
         }
         let depth = relative.as_str().split('/').count();
@@ -243,6 +243,7 @@ fn build_site(
 pub struct SnapshotArchive {
     pub file: std::fs::File,
     pub len: usize,
+    pub manifest_sha256: String,
     _scratch: ScratchDir,
 }
 
@@ -290,6 +291,7 @@ pub fn snapshot(
     Ok(SnapshotArchive {
         file,
         len,
+        manifest_sha256: site.manifest_sha256,
         _scratch: scratch,
     })
 }

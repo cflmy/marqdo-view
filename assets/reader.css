@@ -1441,3 +1441,58 @@
 
   .mq-snapshot-counts dd { margin: 0; }
 }
+
+@layer overlays {
+  .mq-export-dialog {
+    max-inline-size: min(36rem, calc(100vw - 2rem));
+    max-block-size: calc(100dvh - 2rem);
+    overflow: auto;
+  }
+
+  .mq-export-target {
+    background: var(--mq-surface-2);
+    border: 1px solid var(--mq-line);
+    border-radius: .45rem;
+    padding: .65rem .85rem;
+  }
+
+  .mq-export-fields {
+    padding: 0;
+    border: 0;
+    margin: 0 0 1rem;
+    min-inline-size: 0;
+  }
+
+  .mq-export-fields legend { font-weight: 650; }
+
+  .mq-export-fields label {
+    display: grid;
+    grid-template-columns: 1.25rem minmax(0, 1fr) auto;
+    align-items: center;
+    gap: .55rem;
+    border-block-start: 1px solid var(--mq-line);
+    padding: .65rem 0 .4rem;
+  }
+
+  .mq-export-fields small { color: var(--mq-muted); }
+
+  .mq-export-fields details {
+    margin-inline-start: 1.8rem;
+    margin-block-end: .6rem;
+    font-size: .86rem;
+  }
+
+  .mq-export-fields pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    overflow: auto;
+    max-block-size: 12rem;
+    background: var(--mq-surface-2);
+    padding: .65rem;
+  }
+
+  .mq-export-confirm { display: block; margin-block: .75rem; }
+  .mq-export-confirm[hidden], .mq-export-result[hidden] { display: none; }
+  .mq-export-result { margin-block-start: .75rem; }
+  #mq-export-error { color: var(--mq-error); }
+}

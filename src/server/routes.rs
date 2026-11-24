@@ -366,12 +366,16 @@ fn submit_export(state: &ServerState, mut request: Request) -> ViewResult<()> {
         ),
         ("Content-Security-Policy", "default-src 'none'; sandbox"),
     ]);
-    let headers = headers
+    let mut headers: Vec<Header> = headers
         .into_iter()
         .map(|(name, value)| {
             Header::from_bytes(name, value).expect("valid snapshot download header")
         })
         .collect();
+    headers.push(
+        Header::from_bytes("X-Marqdo-Manifest-SHA256", archive.manifest_sha256.as_str())
+            .expect("valid manifest digest header"),
+    );
     let response = Response::new(
         StatusCode(200),
         headers,

@@ -195,7 +195,7 @@ impl ReaderRenderer {
 <link rel="stylesheet" href="{css}"/>
 {script}
 </head>
-<body class="mq-reader" data-mode="document" data-theme="light" data-annotations="{annotations}" data-size="normal" data-source-status="{status}" data-run-state="{run_state}" data-run-available="{run_available}" data-has-main="{has_main}" data-core-available="{core_available}" data-document="{document}" data-analysis-digest="{analysis_digest}" data-run-timeout="{run_timeout}" data-live="{live}">
+<body class="mq-reader" data-mode="document" data-theme="light" data-annotations="{annotations}" data-size="normal" data-source-status="{status}" data-run-state="{run_state}" data-run-available="{run_available}" data-has-main="{has_main}" data-core-available="{core_available}" data-execution-events="{execution_events}" data-document="{document}" data-analysis-digest="{analysis_digest}" data-run-timeout="{run_timeout}" data-live="{live}">
 <a class="mq-skip" href="#mq-main">跳到正文</a>
 "##,
             presentation_version = model.version,
@@ -210,6 +210,10 @@ impl ReaderRenderer {
             run_available = if ctx.run_available { "true" } else { "false" },
             has_main = if has_main { "true" } else { "false" },
             core_available = if ctx.core_available { "true" } else { "false" },
+            execution_events = model
+                .core_version
+                .as_deref()
+                .is_some_and(crate::protocol::tool_v1::supports_execution_events),
             document = escape_attr(&relative_path),
             analysis_digest = escape_attr(&analysis_digest),
             run_timeout = ctx.run_timeout_secs,
@@ -573,9 +577,10 @@ impl ReaderRenderer {
   <pre id="mq-run-stdout" class="mq-stdout" aria-label="程序标准输出" hidden></pre>
   <pre id="mq-run-stderr" class="mq-stdout mq-stderr" aria-label="程序标准错误" hidden></pre>
   <details id="mq-run-trace-wrap" class="mq-run-events-wrap" hidden>
-    <summary>真实 Trace v2 事件</summary>
+    <summary id="mq-run-trace-title">实时结构事件</summary>
     <ol id="mq-run-events" class="mq-run-events"></ol>
   </details>
+  <button type="button" class="mq-fn-call mq-export-result" data-action="export-result" id="mq-export-result" hidden>导出文档（含本次结果）</button>
 </details>
 "##,
         );
@@ -675,6 +680,7 @@ impl ReaderRenderer {
   <div id="mq-unsupported-body"></div>
 </dialog>
 {run_dialog}
+{export_dialog}
 <dialog class="mq-dialog" id="mq-dialog-about" aria-labelledby="mq-about-title">
   <div class="mq-dialog-head"><h2 id="mq-about-title">关于 Marqdo View</h2><button type="button" class="mq-icon-btn mq-close" data-action="close-dialog" aria-label="关闭关于">×</button></div>
   <p>版本 {view_version} · Tool Protocol v1 · Analysis v2/v3 · Trace v2。</p>
@@ -683,6 +689,11 @@ impl ReaderRenderer {
 </dialog>
 "##,
             csrf = csrf,
+            export_dialog = if ctx.live && ctx.core_available {
+                EXPORT_DIALOG
+            } else {
+                ""
+            },
             files = self.render_file_list(model, ctx),
             run_dialog = if ctx.core_available {
                 render_run_form_dialog(model, ctx)
@@ -1610,6 +1621,23 @@ fn function_params_json(function: &crate::protocol::analysis_v2::SemanticFunctio
         .collect::<Vec<_>>())
     .to_string()
 }
+
+const EXPORT_DIALOG: &str = r##"<dialog class="mq-dialog mq-export-dialog" id="mq-dialog-export" aria-labelledby="mq-export-title">
+  <div class="mq-dialog-head"><h2 id="mq-export-title">导出文档（含本次结果）</h2><button type="button" class="mq-icon-btn mq-close" data-action="close-dialog" aria-label="关闭导出">×</button></div>
+  <p id="mq-export-target" class="mq-export-target"></p>
+  <fieldset class="mq-export-fields">
+    <legend>导出内容</legend>
+    <div id="mq-export-fields"></div>
+  </fieldset>
+  <p class="mq-colophon">输出和参数可能包含令牌、路径或个人信息。请检查所选内容。</p>
+  <label class="mq-export-confirm"><input type="checkbox" id="mq-export-confirm"> 我已检查选中的内容，可以将其写入 ZIP。</label>
+  <label class="mq-export-confirm" id="mq-export-partial-row" hidden><input type="checkbox" id="mq-export-partial"> 我确认导出带有失败或截断标记的部分观察。</label>
+  <p id="mq-export-error" role="alert" hidden></p>
+  <div class="mq-dialog-actions">
+    <button type="button" class="mq-secondary" data-action="close-dialog">取消</button>
+    <button type="button" class="mq-primary" id="mq-export-download" data-action="download-result" disabled>下载 ZIP</button>
+  </div>
+</dialog>"##;
 
 fn render_run_form_dialog(model: &PresentationModel, ctx: &RenderContext) -> String {
     let path = &model.document.identity.relative_path;

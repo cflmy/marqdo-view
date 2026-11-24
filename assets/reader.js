@@ -310,6 +310,12 @@
       case "cancel-run":
         cancelRun();
         break;
+      case "export-result":
+        openExportPreview();
+        break;
+      case "download-result":
+        downloadSnapshot();
+        break;
       case "call-function":
         if (trigger) {
           var params = [];
@@ -409,6 +415,7 @@
         button.disabled = false;
       }
     }
+    $$(".mq-fn-call[data-action=call-function]").forEach(function (call) { call.disabled = busy; });
     var cancel = $("#mq-run-actions");
     if (cancel) cancel.hidden = !busy;
   }
@@ -430,6 +437,10 @@
     if (stdout) stdout.hidden = true;
     var stderr = $("#mq-run-stderr");
     if (stderr) stderr.hidden = true;
+    var exportButton = $("#mq-export-result");
+    if (exportButton) exportButton.hidden = true;
+    var traceTitle = $("#mq-run-trace-title");
+    if (traceTitle) traceTitle.textContent = "实时结构事件";
     var traceWrap = $("#mq-run-trace-wrap");
     if (traceWrap) traceWrap.hidden = true;
     $$(".mq-run-chip[data-view-chip]").forEach(function (chip) {
@@ -474,12 +485,15 @@
     var preview = $("#mq-run-command");
     if (!preview || !pendingRun) return;
     var mode = selectedMode();
+    var protocol = reader.dataset.executionEvents === "true" ? ["--event-stream", "jsonl"] : ["--json"];
+    var args = ["--mode", mode].concat(protocol, ["--trace-file", "<临时文件>"]);
     var parts = [];
     if (pendingRun.kind === "entry") {
-      parts = ["marqdo", "run", reader.dataset.document, "--mode", mode, "--json", "--trace-file", "<临时文件>"];
+      parts = ["marqdo", "run", reader.dataset.document].concat(args);
     } else {
-      parts = ["marqdo", "call", reader.dataset.document, "<函数 " + pendingRun.label + ">", "--mode", mode, "--json", "--trace-file", "<临时文件>"];
+      parts = ["marqdo", "call", reader.dataset.document, "<函数 " + pendingRun.label + ">"].concat(args);
       rawParams().forEach(function (param) {
+        if (!param.required && param.expression.trim() === "") return;
         parts.push("--arg");
         parts.push(param.name + "=" + (param.expression || "<常量表达式>"));
       });
@@ -588,7 +602,9 @@
       target: pendingRun.kind === "entry"
         ? { kind: "entry" }
         : { kind: "function", function_id: pendingRun.functionId },
-      parameters: params.map(function (param) {
+      parameters: params.filter(function (param) {
+        return param.required || param.expression.trim() !== "";
+      }).map(function (param) {
         return { name: param.name, expression: param.expression };
       }),
       analysis_digest: reader.dataset.analysisDigest,
@@ -631,7 +647,7 @@
           toast("运行未启动：" + reason);
           return;
         }
-        subscribeRun(result.data, pendingRun ? pendingRun.label : "运行");
+        subscribeRun(result.data, pendingRun ? pendingRun.label : "运行", payload.parameters);
       })
       .catch(function (error) {
         setRunBusy(false);
@@ -640,7 +656,7 @@
       });
   }
 
-  function subscribeRun(job, targetLabel) {
+  function subscribeRun(job, targetLabel, parameters) {
     closeActiveObserver();
     activeRun = {
       runId: job.run_id,
@@ -649,6 +665,7 @@
       source: null,
       lastSeq: -1,
       targetLabel: targetLabel || "运行",
+      parameters: parameters,
       terminal: false
     };
     clearRunOutput();
@@ -669,7 +686,7 @@
       } catch (error) {
         return;
       }
-      if (!data ||
+      if (!data || !activeRun || activeRun.runId !== job.run_id ||
           data.schema !== "marqdo.view-run-events" ||
           data.schema_version !== 1 ||
           data.run_id !== job.run_id ||
@@ -728,15 +745,146 @@
       setRunBusy(true);
       return;
     }
-    if (activeRun) activeRun.terminal = true;
+    if (activeRun) {
+      activeRun.terminal = true;
+      activeRun.exportData = data.result && data.result.export_preview ? data : null;
+      var exportButton = $("#mq-export-result");
+      if (exportButton) exportButton.hidden = !activeRun.exportData;
+    }
     closeActiveObserver();
     setRunBusy(false);
     if (data.result) renderRunResult(data.result, data.state, data.error);
     else if (data.error) renderRunResult(null, data.state, data.error);
-    if (data.trace) renderTrace(data.trace);
+    if (data.trace) {
+      var traceTitle = $("#mq-run-trace-title");
+      if (traceTitle && data.trace.status === "verified") traceTitle.textContent = "已验证的 Trace v2 事件";
+      renderTrace(data.trace);
+    }
     else if (data.result && data.result.trace_status) renderTraceStatus(data.result.trace_status);
     if (data.state === "succeeded") toast("运行完成");
     else toast("运行" + stateLabel(data.state));
+  }
+
+  function previewBytes(text, count) {
+    if (!text || !count) return "";
+    return new TextDecoder().decode(new TextEncoder().encode(text).slice(0, count));
+  }
+
+  function exportNeedsPartial(data) {
+    var preview = data.result.export_preview;
+    return data.state !== "succeeded" || !preview.output_complete ||
+      !preview.result_complete || preview.observation_truncated ||
+      preview.trace_status === "truncated";
+  }
+
+  function updateExportConfirm() {
+    var button = $("#mq-export-download");
+    var data = activeRun && activeRun.exportData;
+    if (!button || !data) return;
+    button.disabled = button.dataset.busy === "true" || !$("#mq-export-confirm").checked ||
+      (exportNeedsPartial(data) && !$("#mq-export-partial").checked);
+  }
+
+  function openExportPreview() {
+    var data = activeRun && activeRun.exportData;
+    if (!data) return;
+    var result = data.result;
+    var preview = result.export_preview;
+    var fields = $("#mq-export-fields");
+    var counts = preview.trace_summary && data.trace && data.trace.counts;
+    var argumentsText = (activeRun.parameters || []).map(function (parameter) {
+      return parameter.name + " = " + parameter.expression;
+    }).join("\n");
+    $("#mq-export-target").textContent = preview.label + " · " + stateLabel(data.state) +
+      (exportNeedsPartial(data) ? " · 部分观察" : "");
+    fields.textContent = "";
+    [
+      ["result_value", "返回值", preview.value_bytes, preview.value_is_public_scalar, previewBytes(result.value_text, preview.value_bytes)],
+      ["stdout", "stdout", preview.stdout_bytes, false, previewBytes(result.stdout, preview.stdout_bytes)],
+      ["stderr", "stderr", preview.stderr_bytes, false, previewBytes(result.stderr, preview.stderr_bytes)],
+      ["trace_summary", "轨迹摘要", counts ? new TextEncoder().encode(JSON.stringify(counts)).length : null, true, counts && JSON.stringify(counts, null, 2)],
+      ["arguments", "已提交的参数", preview.arguments_count ? new TextEncoder().encode(argumentsText).length : null, false, argumentsText]
+    ].forEach(function (field) {
+      var label = document.createElement("label");
+      var input = document.createElement("input");
+      input.type = "checkbox";
+      input.name = field[0];
+      input.disabled = !field[2];
+      input.checked = field[3] && !input.disabled;
+      label.appendChild(input);
+      appendLine(label, "span", "", field[1]);
+      appendLine(label, "small", "", field[2] ? field[2] + " B" : "无内容");
+      fields.appendChild(label);
+      if (field[4]) {
+        var disclosure = document.createElement("details");
+        appendLine(disclosure, "summary", "", "查看" + field[1]);
+        appendLine(disclosure, "pre", "", field[4]);
+        fields.appendChild(disclosure);
+      }
+    });
+    $("#mq-export-confirm").checked = false;
+    $("#mq-export-partial").checked = false;
+    $("#mq-export-partial-row").hidden = !exportNeedsPartial(data);
+    $("#mq-export-error").hidden = true;
+    updateExportConfirm();
+    openDialog("mq-dialog-export");
+  }
+
+  async function downloadSnapshot() {
+    var button = $("#mq-export-download");
+    var data = activeRun && activeRun.exportData;
+    if (!data || button.disabled) return;
+    var include = {};
+    $$("#mq-export-fields input").forEach(function (input) {
+      include[input.name] = input.checked;
+    });
+    var error = $("#mq-export-error");
+    error.hidden = true;
+    button.dataset.busy = "true";
+    updateExportConfirm();
+    try {
+      var response = await fetch("/api/exports", {
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json", "Accept": "application/zip", "X-View-CSRF": csrfToken() },
+        body: JSON.stringify({
+          schema: "marqdo.view-static-export-request",
+          schema_version: 1,
+          run_id: data.run_id,
+          document: data.result.document,
+          analysis_digest: data.result.analysis_digest,
+          scope: "document",
+          include: include,
+          confirm_sensitive_output: $("#mq-export-confirm").checked,
+          confirm_partial: $("#mq-export-partial").checked,
+          client_export_request_id: randomId()
+        })
+      });
+      if (!response.ok) {
+        var failure = await response.json();
+        throw new Error(failure.message || "导出请求未完成");
+      }
+      if (!(response.headers.get("Content-Type") || "").startsWith("application/zip")) {
+        throw new Error("服务返回的文件格式无效");
+      }
+      var url = URL.createObjectURL(await response.blob());
+      var link = document.createElement("a");
+      link.href = url;
+      link.download = "marqdo-execution-snapshot.zip";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      closeAllDialogs();
+      toast("执行快照已下载");
+    } catch (failure) {
+      error.textContent = failure.message;
+      error.hidden = false;
+    } finally {
+      delete button.dataset.busy;
+      updateExportConfirm();
+    }
   }
 
   function renderRunResult(result, state, error) {
@@ -892,6 +1040,7 @@
   function clearRun() {
     closeAllDialogs();
     closeActiveObserver();
+    activeRun = null;
     var panel = runPanel();
     if (panel) {
       panel.hidden = true;
@@ -934,6 +1083,9 @@
     }
   });
   document.addEventListener("change", function (event) {
+    if (event.target && (event.target.id === "mq-export-confirm" || event.target.id === "mq-export-partial")) {
+      updateExportConfirm();
+    }
     if (event.target && event.target.name === "mq-mode") {
       var grants = $("#mq-run-grants");
       if (grants) grants.hidden = event.target.value !== "project";

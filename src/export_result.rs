@@ -111,6 +111,7 @@ impl ExportSelection {
         }
         if (candidate.state != RunState::Succeeded
             || !candidate.output_complete
+            || !candidate.result_complete
             || candidate.observation_truncated
             || candidate.trace_status == "truncated")
             && !self.confirm_partial

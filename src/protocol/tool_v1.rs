@@ -63,6 +63,12 @@ pub fn product_is_compatible(version: &Version) -> bool {
     version.major == 3 && version >= &min
 }
 
+/// RC.2 is the first public Core release with Execution Events v1.
+pub fn supports_execution_events(version: &str) -> bool {
+    let first = Version::parse("3.0.0-rc.2").expect("valid Core version");
+    Version::parse(version).is_ok_and(|version| version >= first)
+}
+
 /// Validate the negotiated environment for Tool Protocol v1.
 ///
 /// Absence of `MARQDO_PROTOCOL_*` is allowed for a directly-run development

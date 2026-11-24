@@ -174,12 +174,12 @@ struct ControllerState {
     jobs: HashMap<String, Arc<Job>>,
     order: VecDeque<String>,
     active: Option<String>,
-    dedupe: HashMap<String, DedupeEntry>,
+    dedupe: HashMap<(String, String), DedupeEntry>,
 }
 
 struct CoreRun {
     process: ProcessOutcome,
-    trace: Option<Vec<u8>>,
+    trace: ViewResult<Option<Vec<u8>>>,
     stream: Option<core_events::Stream>,
 }
 
@@ -208,13 +208,13 @@ impl ExecutionController {
     pub fn submit(self: &Arc<Self>, session_id: &str, body: &[u8]) -> ViewResult<AcceptedRun> {
         let validated = request::validate_request(body)?;
         let digest = payload_digest(body);
-        let client_request_id = validated.client_request_id.clone();
+        let request_identity = (session_id.to_string(), validated.client_request_id.clone());
         let mut state = self.state.lock().map_err(|_| ViewError::Io {
             detail: "execution controller lock poisoned".to_string(),
         })?;
         self.purge_locked(&mut state);
 
-        if let Some(entry) = state.dedupe.get(&client_request_id) {
+        if let Some(entry) = state.dedupe.get(&request_identity) {
             if entry.digest != digest {
                 return Err(ViewError::RunConflict {
                     detail: "同一 client_request_id 携带了不同请求内容；拒绝执行以避免偷换任务"
@@ -262,7 +262,7 @@ impl ExecutionController {
         state.jobs.insert(run_id.clone(), Arc::clone(&job));
         state.active = Some(run_id.clone());
         state.dedupe.insert(
-            client_request_id,
+            request_identity,
             DedupeEntry {
                 digest,
                 run_id: run_id.clone(),
@@ -372,10 +372,7 @@ impl ExecutionController {
         let mut options = self.run_options(plan);
         let projection = &static_doc.verified.projection;
         options.event_stream =
-            semver::Version::parse(&projection.producer_version).is_ok_and(|version| {
-                version >= semver::Version::new(3, 0, 0)
-                    || version >= semver::Version::parse("3.0.0-rc.2").expect("valid Core version")
-            });
+            crate::protocol::tool_v1::supports_execution_events(&projection.producer_version);
         let args = match &plan.target {
             ExecutionTarget::Entry => build_run_args(&entry, &trace_path, &options),
             ExecutionTarget::Function { cli_name, .. } => {
@@ -437,7 +434,7 @@ impl ExecutionController {
             Some(Arc::clone(&job.cancel)),
             hooks,
         )?;
-        let trace = read_trace_limited(&trace_path)?;
+        let trace = read_trace_limited(&trace_path);
         Ok(CoreRun {
             process: outcome,
             trace,
@@ -630,13 +627,16 @@ impl ExecutionController {
             .unwrap_or_default();
         let stale = sha256_hex(&current_source) != static_doc.source_sha256;
 
-        let (mut trace, mut trace_status) = build_trace_summary(
-            trace_bytes.as_deref(),
-            static_doc,
-            &json,
-            outcome.exit_code.unwrap_or(-1),
-            stale,
-        );
+        let (mut trace, mut trace_status) = match trace_bytes {
+            Ok(trace_bytes) => build_trace_summary(
+                trace_bytes.as_deref(),
+                static_doc,
+                &json,
+                outcome.exit_code.unwrap_or(-1),
+                stale,
+            ),
+            Err(_) => (None, "invalid".into()),
+        };
         let mut result = build_cli_result(plan, static_doc, duration_ms, &json, &outcome);
         result["stale"] = serde_json::json!(stale);
         if let Some(stream) = stream {
@@ -820,18 +820,22 @@ impl ExecutionController {
 }
 
 fn read_trace_limited(path: &std::path::Path) -> ViewResult<Option<Vec<u8>>> {
-    match std::fs::read(path) {
-        Ok(bytes) if bytes.is_empty() => Ok(None),
-        Ok(bytes) if bytes.len() > MAX_TRACE_FILE_BYTES => Err(ViewError::OutputLimit {
-            detail: format!("Trace 文件超过 {} 字节上限", MAX_TRACE_FILE_BYTES),
-        }),
-        Ok(bytes) => Ok(Some(bytes)),
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(err) => Err(ViewError::io(
-            &format!("read trace {}", path.display()),
-            err,
-        )),
+    use std::io::Read;
+    let file = match std::fs::File::open(path) {
+        Ok(file) => file,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(err) => return Err(ViewError::io("open Core Trace", err)),
+    };
+    let mut bytes = Vec::new();
+    file.take(MAX_TRACE_FILE_BYTES as u64 + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|err| ViewError::io("read Core Trace", err))?;
+    if bytes.len() > MAX_TRACE_FILE_BYTES {
+        return Err(ViewError::OutputLimit {
+            detail: "Trace v2 byte limit exceeded".into(),
+        });
     }
+    Ok((!bytes.is_empty()).then_some(bytes))
 }
 
 fn base_result(
