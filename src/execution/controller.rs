@@ -8,6 +8,7 @@
 use crate::core_client::{build_call_args, build_run_args, RunOptions, SandboxMode, ScratchDir};
 use crate::error::{ViewError, ViewResult};
 use crate::execution::events::{EventLog, RunEvent, RunState, Subscription};
+use crate::execution::export_candidate::TerminalExportCandidate;
 use crate::execution::process::{
     run_bounded_with_hook, Captured, ProcessBudget, ProcessHooks, ProcessOutcome,
 };
@@ -126,6 +127,7 @@ pub struct Job {
 struct JobInner {
     log: EventLog,
     terminal_at: Option<Instant>,
+    export_candidate: Option<Arc<TerminalExportCandidate>>,
     connections: usize,
 }
 
@@ -140,6 +142,7 @@ impl Job {
             inner: Mutex::new(JobInner {
                 log: EventLog::new(),
                 terminal_at: None,
+                export_candidate: None,
                 connections: 0,
             }),
         }
@@ -308,6 +311,16 @@ impl ExecutionController {
         let (state, result, trace, trace_status, error_code, error_message) = terminal;
         let mut result = result;
         result["trace_status"] = serde_json::json!(trace_status.clone());
+        if let Some(candidate) = TerminalExportCandidate::from_terminal(
+            state,
+            &plan,
+            &static_doc,
+            &result,
+            trace.as_ref(),
+        ) {
+            result["export_preview"] = candidate.preview();
+            inner.export_candidate = Some(Arc::new(candidate));
+        }
         match state {
             RunState::Succeeded => {
                 inner.log.publish_complete(result, trace);
@@ -633,9 +646,13 @@ impl ExecutionController {
             result["observation_truncated"] = serde_json::json!(stream.truncated);
             result["stdout_bytes"] = serde_json::json!(stream.stdout.len());
             result["stderr_bytes"] = serde_json::json!(stream.stderr.len());
-            result["output_complete"] = serde_json::json!(!json["error"]["code"]
-                .as_str()
-                .is_some_and(|code| code.contains("output_limit")));
+            result["output_complete"] = serde_json::json!(
+                std::str::from_utf8(&stream.stdout).is_ok()
+                    && std::str::from_utf8(&stream.stderr).is_ok()
+                    && !json["error"]["code"]
+                        .as_str()
+                        .is_some_and(|code| code.contains("output_limit"))
+            );
             if trace_status == "verified"
                 && trace
                     .as_ref()
@@ -731,10 +748,28 @@ impl ExecutionController {
         Ok(self.lookup(session_id, run_id)?.state())
     }
 
+    pub fn get_export_candidate(
+        &self,
+        session_id: &str,
+        run_id: &str,
+    ) -> ViewResult<Arc<TerminalExportCandidate>> {
+        let job = self.lookup(session_id, run_id)?;
+        let inner = job.inner.lock().map_err(|_| ViewError::Io {
+            detail: "job lock poisoned".into(),
+        })?;
+        inner
+            .export_candidate
+            .clone()
+            .ok_or_else(|| ViewError::ExportUnavailable {
+                detail: "job has no verified exportable terminal observation".into(),
+            })
+    }
+
     fn lookup(&self, session_id: &str, run_id: &str) -> ViewResult<Arc<Job>> {
-        let state = self.state.lock().map_err(|_| ViewError::Io {
+        let mut state = self.state.lock().map_err(|_| ViewError::Io {
             detail: "execution controller lock poisoned".to_string(),
         })?;
+        self.purge_locked(&mut state);
         let job = state
             .jobs
             .get(run_id)
@@ -744,7 +779,7 @@ impl ExecutionController {
             })?;
         if job.session_id != session_id {
             return Err(ViewError::RunNotFound {
-                detail: "运行任务不属于当前会话".to_string(),
+                detail: "运行任务不存在或已过期".to_string(),
             });
         }
         Ok(job)

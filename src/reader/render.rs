@@ -77,7 +77,7 @@ impl LinkPolicy {
 }
 
 /// Everything the renderer needs beyond the model.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct RenderContext {
     pub links: LinkPolicy,
     pub live: bool,
@@ -91,6 +91,8 @@ pub struct RenderContext {
     pub run_timeout_secs: u64,
     /// Whether a frozen Core was negotiated (an explicit run form can exist).
     pub core_available: bool,
+    pub snapshot_package: bool,
+    pub overlay: Option<std::sync::Arc<super::snapshot::ExportResultOverlay>>,
 }
 
 impl RenderContext {
@@ -103,6 +105,8 @@ impl RenderContext {
             annotations: true,
             run_timeout_secs: 30,
             core_available: false,
+            snapshot_package: false,
+            overlay: None,
         }
     }
 
@@ -115,6 +119,8 @@ impl RenderContext {
             annotations: true,
             run_timeout_secs: 0,
             core_available: false,
+            snapshot_package: false,
+            overlay: None,
         }
     }
 
@@ -153,12 +159,14 @@ impl ReaderRenderer {
         let logo_uri = self.assets.logo().data_uri();
 
         let navigation = &model.navigation;
-        let document_href = format!(
-            "{prefix}reader.{hash}.css",
-            prefix = asset_prefix,
-            hash = &self.assets.css_served_sha256()[..16]
-        );
-        let _ = document_href;
+        let script = if ctx.snapshot_package {
+            String::new()
+        } else {
+            format!(
+                "<script defer src=\"{}\"></script>",
+                escape_attr(&format!("{asset_prefix}{js_name}"))
+            )
+        };
         let mut html = String::with_capacity(16 * 1024 + model.document.source.len());
         let relative_path = model.document.identity.relative_path.clone();
         let analysis_digest = model
@@ -185,18 +193,17 @@ impl ReaderRenderer {
 <title>{title}</title>
 <link rel="icon" type="image/svg+xml" href="{logo}"/>
 <link rel="stylesheet" href="{css}"/>
-<script defer src="{js}"></script>
+{script}
 </head>
 <body class="mq-reader" data-mode="document" data-theme="light" data-annotations="{annotations}" data-size="normal" data-source-status="{status}" data-run-state="{run_state}" data-run-available="{run_available}" data-has-main="{has_main}" data-core-available="{core_available}" data-document="{document}" data-analysis-digest="{analysis_digest}" data-run-timeout="{run_timeout}" data-live="{live}">
 <a class="mq-skip" href="#mq-main">跳到正文</a>
 "##,
             presentation_version = model.version,
             view_version = env!("CARGO_PKG_VERSION"),
-            csp = csp_policy(),
+            csp = csp_policy(ctx.snapshot_package),
             title = escape_text(&page_title),
             logo = escape_attr(&logo_uri),
             css = escape_attr(&format!("{asset_prefix}{css_name}")),
-            js = escape_attr(&format!("{asset_prefix}{js_name}")),
             status = model.source_status.data_value(),
             annotations = if ctx.annotations { "on" } else { "off" },
             run_state = model.run_state().data_value(),
@@ -217,6 +224,13 @@ impl ReaderRenderer {
             self.render_welcome(&mut html, navigation);
         }
         self.render_document_meta(&mut html, model);
+        if ctx.overlay.is_some() {
+            let prefix = match ctx.links {
+                LinkPolicy::StaticRelative { page_depth } => "../".repeat(page_depth),
+                LinkPolicy::LocalServer => String::new(),
+            };
+            let _ = write!(html, "<p class=\"mq-snapshot-notice\">此文档包含一次执行快照。来源摘要见 <a href=\"{prefix}manifest.json\">manifest.json</a>。</p>");
+        }
         self.render_diagnostics(&mut html, model);
         self.render_functions(&mut html, model, ctx);
         self.render_document(&mut html, model, ctx);
@@ -225,18 +239,30 @@ impl ReaderRenderer {
         } else {
             self.render_run_panel(&mut html, model, ctx);
         }
-        self.render_source_pane(&mut html, model, ctx);
+        if ctx.snapshot_package {
+            let _ = write!(html, "<details class=\"mq-static-source\"><summary>原始源码</summary><pre>{}</pre></details>",
+                escape_text(&model.document.source));
+            html.push_str(&self.render_file_list(model, ctx));
+        } else {
+            self.render_source_pane(&mut html, model, ctx);
+        }
         self.render_footer(&mut html, model);
         let _ = write!(html, "</main>\n");
 
-        self.render_dock(&mut html, ctx);
-        self.render_toast(&mut html);
-        self.render_dialogs(&mut html, model, ctx);
+        if !ctx.snapshot_package {
+            self.render_dock(&mut html, ctx);
+            self.render_toast(&mut html);
+            self.render_dialogs(&mut html, model, ctx);
+        }
         html.push_str("</body>\n</html>\n");
 
         RenderedPage {
             html,
-            assets_used: vec![css_name, js_name],
+            assets_used: if ctx.snapshot_package {
+                vec![css_name]
+            } else {
+                vec![css_name, js_name]
+            },
         }
     }
 
@@ -247,6 +273,11 @@ impl ReaderRenderer {
         ctx: &RenderContext,
         navigation: &crate::reader::model::Navigation,
     ) {
+        if ctx.snapshot_package {
+            let _ = write!(html, "<header class=\"mq-topbar\"><a class=\"mq-brand\" href=\"#mq-main\"><img class=\"mq-brand-logo\" src=\"{}\" width=\"44\" height=\"44\" alt=\"\"><span class=\"mq-brand-word\">{}</span></a></header>",
+                escape_attr(&self.assets.logo().data_uri()), escape_text(&navigation.site_title));
+            return;
+        }
         let active = model
             .navigation
             .active
@@ -449,6 +480,9 @@ impl ReaderRenderer {
                 let place_result = |html: &mut String, function: &crate::protocol::analysis_v2::SemanticFunction| {
                     if ctx.live {
                         let _ = write!(html, "<div class=\"mq-result-slot\" data-result-for=\"{}\"></div>", escape_attr(&function.id));
+                    }
+                    if let Some(overlay) = ctx.overlay.as_deref().filter(|overlay| overlay.execution.target == function.id) {
+                        render_snapshot(html, overlay);
                     }
                 };
                 for block in &model.document.blocks {
@@ -1373,10 +1407,71 @@ fn escape_attr(raw: &str) -> String {
     escape_text(raw)
 }
 
-fn csp_policy() -> &'static str {
-    // `frame-ancestors` is ignored in <meta>; the HTTP header (server.rs) adds
-    // the framing restrictions. Keep the meta policy identical otherwise.
-    "default-src 'none'; style-src 'self'; script-src 'self' file:; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'"
+fn csp_policy(snapshot_package: bool) -> &'static str {
+    if snapshot_package {
+        "default-src 'none'; style-src 'self' file:; img-src 'self' file: data:; font-src 'self' file:; base-uri 'none'; form-action 'none'; object-src 'none'"
+    } else {
+        "default-src 'none'; style-src 'self'; script-src 'self' file:; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'"
+    }
+}
+
+fn render_snapshot(html: &mut String, overlay: &super::snapshot::ExportResultOverlay) {
+    let execution = &overlay.execution;
+    let status = if execution.status == "succeeded" {
+        "成功"
+    } else {
+        "失败 · 部分观察"
+    };
+    let _ = write!(html, "<details class=\"mq-snapshot\" data-run-state=\"{}\" open><summary>本次执行快照 · {} · {status}</summary><p class=\"mq-colophon\">Core {} · {} · <time datetime=\"{}\">{}</time></p>",
+        escape_attr(execution.status), escape_text(&overlay.label), escape_text(&execution.core_version),
+        escape_text(&execution.mode), escape_attr(&execution.terminal_at), escape_text(&execution.terminal_at));
+    for (label, value) in [
+        ("返回值", &overlay.value),
+        ("stdout", &overlay.stdout),
+        ("stderr", &overlay.stderr),
+    ] {
+        if let Some(value) = value {
+            let _ = write!(
+                html,
+                "<p>{label}</p><pre aria-label=\"{label}\">{}</pre>",
+                escape_text(value)
+            );
+        }
+    }
+    if let Some(arguments) = &overlay.arguments {
+        html.push_str("<p>提交的参数表达式</p><dl>");
+        for (name, expression) in arguments {
+            let _ = write!(
+                html,
+                "<dt>{}</dt><dd><code>{}</code></dd>",
+                escape_text(name),
+                escape_text(expression)
+            );
+        }
+        html.push_str("</dl>");
+    } else {
+        html.push_str("<p class=\"mq-colophon\">参数未包含</p>");
+    }
+    let trace_status = match execution.trace_status.as_str() {
+        "verified" => "已验证",
+        "truncated" => "已验证，轨迹截断",
+        "invalid" => "无效",
+        _ => "不可用",
+    };
+    let _ = write!(html, "<p class=\"mq-colophon\">Trace v2 {trace_status}</p>");
+    if let Some(counts) = &overlay.trace_counts {
+        html.push_str("<dl class=\"mq-snapshot-counts\">");
+        for (kind, count) in counts {
+            let _ = write!(html, "<dt>{}</dt><dd>{count}</dd>", escape_text(kind));
+        }
+        html.push_str("</dl>");
+    }
+    if !execution.output_complete || !execution.result_complete || execution.observation_truncated {
+        html.push_str(
+            "<p class=\"mq-run-warning\">部分结果、输出或事件超过显示上限，或未完成。</p>",
+        );
+    }
+    html.push_str("</details>");
 }
 
 fn percent_encode_path(raw: &str) -> String {

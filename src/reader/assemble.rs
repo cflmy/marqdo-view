@@ -382,6 +382,7 @@ pub struct StaticDocument {
     pub source_sha256: String,
     /// Exact bytes written by `marqdo check --emit`.
     pub analysis_bytes: Vec<u8>,
+    pub media_digests: std::collections::BTreeMap<String, String>,
     pub analysis_digest: String,
     pub verified: crate::protocol::analysis_v2::VerifiedAnalysis,
 }
@@ -443,6 +444,10 @@ impl DocumentService {
             &source_index,
             relative.as_str(),
         )?;
+        let document =
+            DocumentModel::parse(source.clone(), DocumentIdentity::placeholder(relative));
+        let media = super::media::collect(&self.project, relative, &document.blocks);
+        let media_digests = super::media::digests(&media);
         Ok(StaticDocument {
             relative: relative.clone(),
             source,
@@ -450,6 +455,7 @@ impl DocumentService {
             source_sha256,
             analysis_digest: check.analysis_digest,
             analysis_bytes: check.analysis_bytes,
+            media_digests,
             verified,
         })
     }

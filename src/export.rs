@@ -8,9 +8,12 @@ use crate::error::{ViewError, ViewResult};
 use crate::reader::assemble::DocumentService;
 use crate::reader::assets::AssetBundle;
 use crate::reader::render::ReaderRenderer;
+use crate::reader::snapshot::ExportResultOverlay;
 use crate::reader::source::sha256_hex;
 use crate::reader::source::SafeRelativePath;
+use crate::scratch::ScratchDir;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 const MANIFEST_SCHEMA: &str = "marqdo.view-export";
 
@@ -45,7 +48,7 @@ pub fn export(context: &DocumentService, options: &ExportOptions) -> ViewResult<
     let staging = staging_dir(&out)?;
     let result = (|| {
         let entry = context.load(&context.project().entry().relative)?;
-        let site = build_site(context, &entry, &staging, !options.no_annotations)?;
+        let site = build_site(context, &entry, &staging, !options.no_annotations, None)?;
         publish(&staging, &out)?;
         Ok(ExportSummary {
             out,
@@ -113,6 +116,7 @@ fn build_site(
     entry_model: &crate::reader::model::PresentationModel,
     staging: &Path,
     annotations: bool,
+    overlay: Option<Arc<ExportResultOverlay>>,
 ) -> ViewResult<Site> {
     let documents = context.project().list_documents()?;
     let entry = SafeRelativePath::parse(&entry_model.document.identity.relative_path)?;
@@ -130,6 +134,9 @@ fn build_site(
     let renderer = ReaderRenderer::new();
     let mut assets = Vec::new();
     for asset in bundle.all() {
+        if overlay.is_some() && asset.extension == "js" {
+            continue;
+        }
         let (name, bytes) = if asset.name == "reader" && asset.extension == "css" {
             (bundle.hashed_css_name(), bundle.css_bytes())
         } else {
@@ -158,7 +165,13 @@ fn build_site(
             }
         }
         let depth = relative.as_str().split('/').count();
-        let settings = crate::reader::render::RenderContext::static_export(depth, annotations);
+        let mut settings = crate::reader::render::RenderContext::static_export(depth, annotations);
+        settings.snapshot_package = overlay.is_some();
+        settings.overlay = if *relative == entry {
+            overlay.clone()
+        } else {
+            None
+        };
         let page = renderer.render(model, &settings);
         let path = format!("pages/{}.html", relative.as_str());
         let file = writer.write(&path, page.html.as_bytes())?;
@@ -176,13 +189,15 @@ fn build_site(
     }
     files.extend(media_files.values().cloned());
 
-    let index_context = crate::reader::render::RenderContext::static_export(0, annotations);
+    let mut index_context = crate::reader::render::RenderContext::static_export(0, annotations);
+    index_context.snapshot_package = overlay.is_some();
+    index_context.overlay = overlay.clone();
     let index_page = renderer.render(entry_model, &index_context);
     let index_file = writer.write("index.html", index_page.html.as_bytes())?;
     let index_sha = index_file["sha256"].clone();
     files.push(index_file);
     files.sort_by(|a, b| a["path"].as_str().cmp(&b["path"].as_str()));
-    let manifest = serde_json::json!({
+    let mut manifest = serde_json::json!({
         "schema": MANIFEST_SCHEMA,
         "schema_version": 1,
         "view": {"name": "marqdo-view", "version": env!("CARGO_PKG_VERSION")},
@@ -202,6 +217,17 @@ fn build_site(
         "executed": false,
         "note": "Static export only; reading or exporting never executes the document.",
     });
+    if let Some(overlay) = overlay {
+        manifest["schema_version"] = serde_json::json!(2);
+        manifest["source"] = serde_json::json!(overlay.source);
+        manifest["execution"] = serde_json::json!(overlay.execution);
+        manifest["scope"] = serde_json::json!("document");
+        manifest["executed_during_export"] = serde_json::json!(false);
+        if let Some(fields) = manifest.as_object_mut() {
+            fields.remove("executed");
+            fields.remove("note");
+        }
+    }
     let manifest_bytes =
         serde_json::to_vec_pretty(&manifest).map_err(|err| ViewError::ExportFailed {
             detail: format!("serialize export manifest: {err}"),
@@ -211,6 +237,60 @@ fn build_site(
         pages: documents.len(),
         entries: writer.entries.into_iter().collect(),
         manifest_sha256: sha256_hex(&manifest_bytes),
+    })
+}
+
+pub struct SnapshotArchive {
+    pub file: std::fs::File,
+    pub len: usize,
+    _scratch: ScratchDir,
+}
+
+pub fn snapshot(
+    context: &DocumentService,
+    model: &crate::reader::model::PresentationModel,
+    overlay: ExportResultOverlay,
+) -> ViewResult<SnapshotArchive> {
+    let temp = std::env::temp_dir()
+        .canonicalize()
+        .map_err(|err| ViewError::io("resolve temporary location", err))?;
+    if temp.starts_with(context.project().root()) {
+        return Err(ViewError::ExportFailed {
+            detail: "temporary location is inside the project".into(),
+        });
+    }
+    let scratch = ScratchDir::create("snapshot")?;
+    let staging = scratch.file("site");
+    std::fs::create_dir(&staging)
+        .map_err(|err| ViewError::io("create private snapshot site", err))?;
+    let site = build_site(context, model, &staging, true, Some(Arc::new(overlay)))?;
+    let path = scratch.file("snapshot.zip");
+    let archive =
+        std::fs::File::create(&path).map_err(|err| ViewError::io("create snapshot ZIP", err))?;
+    let mut archive = zip::ZipWriter::new(archive);
+    let zip_error = |err: zip::result::ZipError| ViewError::ExportFailed {
+        detail: format!("package snapshot ZIP: {err}"),
+    };
+    let options = zip::write::SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Stored)
+        .unix_permissions(0o644);
+    for name in site.entries {
+        archive.start_file(&name, options).map_err(zip_error)?;
+        let mut file = std::fs::File::open(staging.join(name))
+            .map_err(|err| ViewError::io("open static snapshot file", err))?;
+        std::io::copy(&mut file, &mut archive)
+            .map_err(|err| ViewError::io("write snapshot file into ZIP", err))?;
+    }
+    archive.finish().map_err(zip_error)?;
+    let file = std::fs::File::open(path).map_err(|err| ViewError::io("open snapshot ZIP", err))?;
+    let len = file
+        .metadata()
+        .map_err(|err| ViewError::io("stat snapshot ZIP", err))?
+        .len() as usize;
+    Ok(SnapshotArchive {
+        file,
+        len,
+        _scratch: scratch,
     })
 }
 

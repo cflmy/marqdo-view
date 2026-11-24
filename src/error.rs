@@ -17,55 +17,115 @@ pub enum ExitClass {
 #[derive(Debug)]
 pub enum ViewError {
     /// `MARQDO_BIN` unset, missing, or not executable.
-    CoreMissing { detail: String },
+    CoreMissing {
+        detail: String,
+    },
     /// Tool/Analysis/Trace protocol or product range mismatch.
-    ProtocolIncompatible { detail: String },
+    ProtocolIncompatible {
+        detail: String,
+    },
     /// Core `check` failed; prose stays readable but semantics are unusable.
-    AnalysisFailed { detail: String },
+    AnalysisFailed {
+        detail: String,
+    },
     /// Analysis `source_digest` does not match the current source bytes.
-    SourceMismatch { expected: String, actual: String },
+    SourceMismatch {
+        expected: String,
+        actual: String,
+    },
     /// A Core byte span is out of range or not on a UTF-8 boundary.
-    SourceSpanInvalid { detail: String },
+    SourceSpanInvalid {
+        detail: String,
+    },
     /// Trace does not bind to the current Analysis bytes.
-    TraceStale { detail: String },
+    TraceStale {
+        detail: String,
+    },
     /// The user did not confirm, or the requested mode/grants are not allowed.
-    RunDenied { detail: String },
+    RunDenied {
+        detail: String,
+    },
     /// Path escapes the allowed project root or is otherwise forbidden.
-    PathForbidden { detail: String },
+    PathForbidden {
+        detail: String,
+    },
     /// Refused a bind address that is not explicitly allowed.
-    BindDenied { detail: String },
+    BindDenied {
+        detail: String,
+    },
     /// Embedded asset digest mismatch (build/package integrity).
-    AssetIntegrity { detail: String },
+    AssetIntegrity {
+        detail: String,
+    },
     /// Export target is unsafe or the write failed.
-    ExportFailed { detail: String },
+    ExportFailed {
+        detail: String,
+    },
+    ExportInvalid {
+        detail: String,
+    },
+    ExportUnavailable {
+        detail: String,
+    },
+    ExportSourceChanged {
+        detail: String,
+    },
     /// A configured resource limit was exceeded.
-    ResourceLimit { detail: String },
+    ResourceLimit {
+        detail: String,
+    },
     /// Core subprocess could not be spawned.
-    CoreSpawn { detail: String },
+    CoreSpawn {
+        detail: String,
+    },
     /// The submitted run request failed schema/target/parameter validation.
-    RunInvalid { detail: String },
+    RunInvalid {
+        detail: String,
+    },
     /// The entry document has no resolvable `main`; View never substitutes one.
-    NoEntryFunction { detail: String },
+    NoEntryFunction {
+        detail: String,
+    },
     /// A page/SSE/POST requires a valid local session cookie.
-    SessionRequired { detail: String },
+    SessionRequired {
+        detail: String,
+    },
     /// Another explicit run is already active; View allows one at a time.
-    RunBusy { detail: String },
+    RunBusy {
+        detail: String,
+    },
     /// The same client request id was reused with a different payload.
-    RunConflict { detail: String },
+    RunConflict {
+        detail: String,
+    },
     /// The requested run id is unknown, expired or belongs to another session.
-    RunNotFound { detail: String },
+    RunNotFound {
+        detail: String,
+    },
     /// Bounded capture of CLI stdout/stderr/JSON/trace exceeded the budget.
-    OutputLimit { detail: String },
+    OutputLimit {
+        detail: String,
+    },
     /// The CLI exited but its `--json` document was missing or invalid.
-    CoreProtocol { detail: String },
+    CoreProtocol {
+        detail: String,
+    },
     /// More than two concurrent SSE observers for one job.
-    SseBusy { detail: String },
+    SseBusy {
+        detail: String,
+    },
     /// Core subprocess exceeded the View-level timeout and was killed.
-    CoreTimeout { detail: String },
+    CoreTimeout {
+        detail: String,
+    },
     /// Local file system / HTTP I/O failure.
-    Io { detail: String },
+    Io {
+        detail: String,
+    },
     /// Feature intentionally not implemented in this build (honest status).
-    Unsupported { detail: String },
+    Unsupported {
+        detail: String,
+    },
 }
 
 impl ViewError {
@@ -82,6 +142,9 @@ impl ViewError {
             ViewError::BindDenied { .. } => "view.bind_denied",
             ViewError::AssetIntegrity { .. } => "view.asset_integrity",
             ViewError::ExportFailed { .. } => "view.export_failed",
+            ViewError::ExportInvalid { .. } => "view.export_invalid",
+            ViewError::ExportUnavailable { .. } => "view.export_unavailable",
+            ViewError::ExportSourceChanged { .. } => "view.export_source_changed",
             ViewError::ResourceLimit { .. } => "view.resource_limit",
             ViewError::CoreSpawn { .. } => "view.core_spawn",
             ViewError::CoreTimeout { .. } => "view.core_timeout",
@@ -151,6 +214,9 @@ impl ViewError {
             "view.bind_denied" => "拒绝绑定该网络地址。",
             "view.asset_integrity" => "内嵌资源摘要不一致。",
             "view.export_failed" => "静态导出失败（输出目录不安全或写入失败）。",
+            "view.export_invalid" => "导出范围或隐私确认无效。",
+            "view.export_unavailable" => "本次执行尚无可导出的已验证终态。",
+            "view.export_source_changed" => "文档、依赖或图片已变更。请刷新并重新运行后再导出。",
             "view.resource_limit" => "超过配置的资源上限。",
             "view.core_spawn" => "无法启动冻结核心。",
             "view.core_timeout" => "冻结核心执行超时，已终止。",
@@ -204,6 +270,9 @@ impl ViewError {
             | ViewError::BindDenied { detail }
             | ViewError::AssetIntegrity { detail }
             | ViewError::ExportFailed { detail }
+            | ViewError::ExportInvalid { detail }
+            | ViewError::ExportUnavailable { detail }
+            | ViewError::ExportSourceChanged { detail }
             | ViewError::ResourceLimit { detail }
             | ViewError::CoreSpawn { detail }
             | ViewError::CoreTimeout { detail }

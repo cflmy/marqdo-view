@@ -1408,3 +1408,36 @@
 
   .mq-run-panel[hidden] { display: none; }
 }
+
+@layer semantics {
+  .mq-snapshot, .mq-snapshot-notice, .mq-static-source {
+    background: var(--mq-surface);
+    border: 1px solid var(--mq-line);
+    border-radius: .65rem;
+    padding: .9rem 1rem;
+    margin-block: 1.25rem;
+  }
+
+  .mq-snapshot {
+    border-color: var(--mq-olive);
+    overflow-wrap: anywhere;
+  }
+
+  .mq-snapshot > summary, .mq-static-source > summary {
+    font-weight: 650;
+    cursor: pointer;
+  }
+
+  .mq-snapshot pre, .mq-static-source pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font: .9rem/1.55 var(--mq-mono);
+  }
+
+  .mq-snapshot-counts {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) 1fr;
+  }
+
+  .mq-snapshot-counts dd { margin: 0; }
+}

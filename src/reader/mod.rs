@@ -12,4 +12,5 @@ pub mod math;
 pub mod media;
 pub mod model;
 pub mod render;
+pub mod snapshot;
 pub mod source;

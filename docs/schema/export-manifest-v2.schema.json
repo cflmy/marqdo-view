@@ -1,0 +1,371 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://git.cflmy.cn/cflmy/marqdo-view/raw/branch/master/docs/schema/export-manifest-v2.schema.json",
+  "title": "View Static Result Export Manifest v2",
+  "type": "object",
+  "properties": {
+    "schema": {
+      "const": "marqdo.view-export"
+    },
+    "schema_version": {
+      "const": 2
+    },
+    "view": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "const": "marqdo-view"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version"
+      ],
+      "additionalProperties": false
+    },
+    "compatibility": {
+      "type": "object",
+      "properties": {
+        "marqdo": {
+          "type": "string"
+        },
+        "tool_protocol": {
+          "const": 1
+        },
+        "analysis": {
+          "const": 2
+        },
+        "analysis_supported": {
+          "const": [
+            2,
+            3
+          ]
+        },
+        "trace": {
+          "const": 2
+        },
+        "markdown_profile": {
+          "const": "marqdo.md.v1"
+        }
+      },
+      "required": [
+        "marqdo",
+        "tool_protocol",
+        "analysis",
+        "analysis_supported",
+        "trace",
+        "markdown_profile"
+      ],
+      "additionalProperties": false
+    },
+    "core_version": {
+      "type": "string"
+    },
+    "entry": {
+      "type": "object",
+      "properties": {
+        "relative_path": {
+          "type": "string",
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))[^\\\\:\\x00-\\x1f]+$"
+        },
+        "file": {
+          "const": "index.html"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "relative_path",
+        "file",
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "pages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "relative_path": {
+            "type": "string",
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))[^\\\\:\\x00-\\x1f]+$"
+          },
+          "module_id": {
+            "type": "string"
+          },
+          "source_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "source_status": {
+            "type": "string"
+          },
+          "analysis_digest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "file": {
+            "type": "string",
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))[^\\\\:\\x00-\\x1f]+$"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "annotations": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "relative_path",
+          "module_id",
+          "source_sha256",
+          "source_status",
+          "analysis_digest",
+          "file",
+          "sha256",
+          "annotations"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "assets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))[^\\\\:\\x00-\\x1f]+$"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "size"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))[^\\\\:\\x00-\\x1f]+$"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "mime": {
+            "enum": [
+              "image/png",
+              "image/jpeg",
+              "image/gif",
+              "image/webp",
+              "image/svg+xml"
+            ]
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "size"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "scope": {
+      "const": "document"
+    },
+    "source": {
+      "type": "object",
+      "properties": {
+        "project_root_id": {
+          "type": "string"
+        },
+        "document": {
+          "type": "string",
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))[^\\\\:\\x00-\\x1f]+$"
+        },
+        "module_id": {
+          "type": "string"
+        },
+        "source_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "analysis_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "lock_digest": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "project_root_id",
+        "document",
+        "module_id",
+        "source_sha256",
+        "analysis_digest",
+        "lock_digest"
+      ],
+      "additionalProperties": false
+    },
+    "execution": {
+      "type": "object",
+      "properties": {
+        "included": {
+          "const": true
+        },
+        "core_run_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$"
+        },
+        "core_version": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "succeeded",
+            "failed"
+          ]
+        },
+        "terminal_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "source_verified": {
+          "const": true
+        },
+        "trace_status": {
+          "enum": [
+            "verified",
+            "invalid",
+            "unavailable",
+            "truncated"
+          ]
+        },
+        "result_complete": {
+          "type": "boolean"
+        },
+        "output_complete": {
+          "type": "boolean"
+        },
+        "observation_truncated": {
+          "type": "boolean"
+        },
+        "parameters": {
+          "enum": [
+            "omitted",
+            "included"
+          ]
+        },
+        "mode": {
+          "enum": [
+            "pure",
+            "project"
+          ]
+        },
+        "core_protocol": {
+          "type": "object",
+          "properties": {
+            "analysis": {
+              "enum": [
+                2,
+                3
+              ]
+            },
+            "trace": {
+              "const": 2
+            },
+            "events": {
+              "const": 1
+            }
+          },
+          "required": [
+            "analysis",
+            "trace",
+            "events"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "included",
+        "core_run_id",
+        "core_version",
+        "target",
+        "status",
+        "terminal_at",
+        "source_verified",
+        "trace_status",
+        "result_complete",
+        "output_complete",
+        "observation_truncated",
+        "parameters",
+        "mode",
+        "core_protocol"
+      ],
+      "additionalProperties": false
+    },
+    "executed_during_export": {
+      "const": false
+    }
+  },
+  "required": [
+    "schema",
+    "schema_version",
+    "view",
+    "compatibility",
+    "core_version",
+    "entry",
+    "pages",
+    "assets",
+    "files",
+    "scope",
+    "source",
+    "execution",
+    "executed_during_export"
+  ],
+  "additionalProperties": false
+}

@@ -6,6 +6,8 @@
 //! | `GET /file?path=...` | no |
 //! | `GET /assets/...` | no |
 //! | `GET /api/documents` | no |
+//! | `GET /media/...` | no |
+//! | `POST /api/exports` | no (static snapshot) |
 //! | `POST /api/runs` | **yes — the only execution entry** |
 //! | `GET /api/runs/{id}/events` | no (observe only) |
 //! | `POST /api/runs/{id}/cancel` | no (control of an existing job) |
@@ -37,6 +39,7 @@ pub struct ServerState {
     pub cache: Mutex<HashMap<String, CacheEntry>>,
     pub security: SecurityState,
     pub active_requests: AtomicUsize,
+    pub snapshot_export: Mutex<()>,
 }
 
 #[derive(Clone)]
@@ -129,6 +132,9 @@ pub fn handle(state: &ServerState, request: Request) -> ViewResult<()> {
     }
 
     if method == Method::Post {
+        if path == "/api/exports" {
+            return submit_export(state, request);
+        }
         if path == "/api/runs" {
             return submit_run(state, request);
         }
@@ -188,6 +194,8 @@ fn serve_page(
         annotations: true,
         run_timeout_secs: state.controller.config().run_timeout_secs(),
         core_available: state.service.core().is_some(),
+        snapshot_package: false,
+        overlay: None,
     };
     let page = state.renderer.render(&model, &ctx);
     let mut headers = Vec::new();
@@ -326,6 +334,56 @@ fn serve_documents(state: &ServerState, request: Request, query: &str) -> ViewRe
 }
 
 /// The only execution entry in the whole product.
+fn submit_export(state: &ServerState, mut request: Request) -> ViewResult<()> {
+    use crate::export_result::{ExportSelection, MAX_EXPORT_REQUEST};
+    let result = (|| {
+        let session = state.security.authenticate_post(&request)?;
+        let selection = ExportSelection::parse(&read_body(&mut request, MAX_EXPORT_REQUEST)?)?;
+        let candidate = state
+            .controller
+            .get_export_candidate(&session.id, &selection.run_id)?;
+        let guard = state
+            .snapshot_export
+            .try_lock()
+            .map_err(|_| ViewError::ResourceLimit {
+                detail: "a snapshot download is already being prepared or sent".into(),
+            })?;
+        let (model, overlay) = selection.prepare(&state.service, &candidate)?;
+        let archive = crate::export::snapshot(&state.service, &model, overlay)?;
+        Ok((guard, archive))
+    })();
+    let (_guard, archive) = match result {
+        Ok(result) => result,
+        Err(err) => return respond_error(request, status_for(&err), &err),
+    };
+    let mut headers = crate::server::security::security_headers();
+    headers.retain(|(name, _)| *name != "Content-Security-Policy");
+    headers.extend([
+        ("Content-Type", "application/zip"),
+        (
+            "Content-Disposition",
+            "attachment; filename=marqdo-execution-snapshot.zip",
+        ),
+        ("Content-Security-Policy", "default-src 'none'; sandbox"),
+    ]);
+    let headers = headers
+        .into_iter()
+        .map(|(name, value)| {
+            Header::from_bytes(name, value).expect("valid snapshot download header")
+        })
+        .collect();
+    let response = Response::new(
+        StatusCode(200),
+        headers,
+        archive.file,
+        Some(archive.len),
+        None,
+    );
+    request
+        .respond(response)
+        .map_err(|err| ViewError::io("send snapshot ZIP", err))
+}
+
 fn submit_run(state: &ServerState, mut request: Request) -> ViewResult<()> {
     let session = match state.security.authenticate_post(&request) {
         Ok(session) => session,
@@ -478,8 +536,11 @@ fn status_for(err: &ViewError) -> StatusCode {
     match err.code() {
         "view.session_required" => StatusCode(401),
         "view.run_denied" => StatusCode(403),
-        "view.run_invalid" | "view.no_entry_function" => StatusCode(400),
-        "view.run_busy" | "view.run_conflict" => StatusCode(409),
+        "view.run_invalid" | "view.no_entry_function" | "view.export_invalid" => StatusCode(400),
+        "view.run_busy"
+        | "view.run_conflict"
+        | "view.export_unavailable"
+        | "view.export_source_changed" => StatusCode(409),
         "view.run_not_found" => StatusCode(404),
         "view.sse_busy" | "view.resource_limit" => StatusCode(429),
         "view.output_limit" => StatusCode(413),

@@ -12,8 +12,10 @@ pub mod core_client;
 pub mod error;
 pub mod execution;
 pub mod export;
+pub mod export_result;
 pub mod protocol;
 pub mod reader;
+mod scratch;
 pub mod server;
 
 pub use cli::Cli;

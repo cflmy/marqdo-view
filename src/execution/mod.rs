@@ -11,5 +11,6 @@
 
 pub mod controller;
 pub mod events;
+pub mod export_candidate;
 pub mod process;
 pub mod request;

@@ -63,6 +63,13 @@ pub fn collect(
     result
 }
 
+pub fn digests(media: &BTreeMap<String, Arc<Media>>) -> BTreeMap<String, String> {
+    media
+        .values()
+        .map(|item| (item.path.to_string(), item.digest.clone()))
+        .collect()
+}
+
 fn scan_blocks<'a>(blocks: &'a [DocBlock], urls: &mut BTreeSet<&'a str>) {
     for block in blocks {
         match block {

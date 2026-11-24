@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://git.cflmy.cn/cflmy/marqdo-view/raw/branch/master/docs/schema/export-request-v1.schema.json",
+  "title": "View Static Export Request v1",
+  "type": "object",
+  "properties": {
+    "schema": {
+      "const": "marqdo.view-static-export-request"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{1,128}$"
+    },
+    "document": {
+      "type": "string",
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))[^\\\\:\\x00-\\x1f]+$",
+      "maxLength": 1024,
+      "allOf": [
+        {
+          "pattern": "\\.mq\\.md$"
+        }
+      ]
+    },
+    "analysis_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "scope": {
+      "const": "document"
+    },
+    "include": {
+      "type": "object",
+      "properties": {
+        "result_value": {
+          "type": "boolean"
+        },
+        "stdout": {
+          "type": "boolean"
+        },
+        "stderr": {
+          "type": "boolean"
+        },
+        "trace_summary": {
+          "type": "boolean"
+        },
+        "arguments": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "result_value",
+        "stdout",
+        "stderr",
+        "trace_summary",
+        "arguments"
+      ],
+      "additionalProperties": false
+    },
+    "confirm_sensitive_output": {
+      "type": "boolean"
+    },
+    "confirm_partial": {
+      "type": "boolean"
+    },
+    "client_export_request_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{1,128}$"
+    }
+  },
+  "required": [
+    "schema",
+    "schema_version",
+    "run_id",
+    "document",
+    "analysis_digest",
+    "scope",
+    "include",
+    "confirm_sensitive_output",
+    "client_export_request_id"
+  ],
+  "additionalProperties": false
+}

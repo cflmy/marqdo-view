@@ -48,6 +48,7 @@ pub fn serve(service: DocumentService, opts: &RuntimeOpts) -> ViewResult<i32> {
         cache: Mutex::new(HashMap::new()),
         security: crate::server::security::SecurityState::new(port),
         active_requests: AtomicUsize::new(0),
+        snapshot_export: Mutex::new(()),
     });
 
     eprintln!("marqdo view: {url}");
