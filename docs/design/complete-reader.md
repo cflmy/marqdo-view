@@ -1,0 +1,7 @@
+# 完整阅读与结果导出设计
+
+[高保真设计图](complete-reader.png)由内置 ImageGen 生成，参考旧版 View 截图。实现沿用旧版居中品牌、暖纸色、衬线正文、金色函数标记和橄榄色结果边框。示意图右侧是独立的导出确认状态，窄屏使用单列。
+
+提示词见下方。
+
+> Use case: ui-mockup. Asset type: high fidelity desktop Marqdo View implementation design reference. Create a wide storyboard of two product states using the provided old Marqdo View screenshot as a visual reference (retain its centered logo, warm paper, understated pale blossom upper left, amber accent, olive success and serif document typography). Left 64%: real desktop reader, with centered header Marqdo, navigation 文档, 源码, subdued filename index.mq.md, readable title 小型统计实验, a paragraph, rendered mathematical mean formula and small document figure. Continue in the same article with a gold-slash function heading 计算均值 and a small outline button 调用 on the same row. Under the function body put one thin olive-bordered collapsible 本次执行 panel, status 成功, read-only 返回值 4, stdout preview and action 导出文档（含本次结果）. Right 36%: show the opened export confirmation dialog as a full flat inset panel headed 导出文档（含本次结果）, target 计算均值 and status 成功, checklist with 返回值, stdout and 轨迹摘要 selected, 参数 and stderr unselected, byte counts, privacy confirmation, and an amber 下载 ZIP button beside 取消. Quiet editorial composition, no coding dashboard, no charts unrelated to document, no extra product copy. Flat straight-on browser UI, readable typography, generous whitespace, clean borders. The reference is for an existing paper-themed reader, preserve its design language.
