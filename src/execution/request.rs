@@ -111,6 +111,7 @@ pub enum ExecutionTarget {
 pub struct ExecutionPlan {
     pub document: SafeRelativePath,
     pub target: ExecutionTarget,
+    pub function_id: String,
     pub arguments: Vec<(String, String)>,
     pub mode: RunMode,
     pub grants: Grants,
@@ -122,17 +123,17 @@ impl ValidatedRequest {
     /// Resolve the target and parameter names against the verified entry-module
     /// Analysis. Never accepts a dependency-module function id (RFC §6.3).
     pub fn plan_against(self, projection: &SemanticProjection) -> ViewResult<ExecutionPlan> {
-        let target = match &self.target {
+        let (target, function_id) = match &self.target {
             RunTarget::Entry => {
-                if resolve_main(projection).is_none() {
+                let Some(function) = resolve_main(projection) else {
                     return Err(ViewError::NoEntryFunction {
                         detail: format!(
                             "{} 没有可调用的 main；请从函数面板选择一个 H2 Exec 函数",
                             self.document
                         ),
                     });
-                }
-                ExecutionTarget::Entry
+                };
+                (ExecutionTarget::Entry, function.id.clone())
             }
             RunTarget::Function { function_id } => {
                 let function = projection
@@ -153,12 +154,16 @@ impl ValidatedRequest {
                 };
                 let label = canonical;
                 validate_parameters(&self.parameters, projection, &function.id)?;
-                ExecutionTarget::Function { cli_name, label }
+                (
+                    ExecutionTarget::Function { cli_name, label },
+                    function.id.clone(),
+                )
             }
         };
         Ok(ExecutionPlan {
             document: self.document,
             target,
+            function_id,
             arguments: self
                 .parameters
                 .into_iter()
@@ -201,7 +206,7 @@ pub fn validate_request(body: &[u8]) -> ViewResult<ValidatedRequest> {
                 || function_id.chars().any(|ch| ch.is_control() || ch == '\0')
             {
                 return Err(ViewError::RunInvalid {
-                    detail: "function_id 必须来自 Analysis v2 且长度为 1..=512".to_string(),
+                    detail: "function_id 必须来自 Analysis 且长度为 1..=512".to_string(),
                 });
             }
         }
@@ -364,17 +369,21 @@ fn validate_glob(glob: &str) -> ViewResult<()> {
 
 /// Resolve `main` exactly like the frozen CLI does for `run`: canonical name
 /// first, then a unique local name. No fallback to any other function.
-fn resolve_main(projection: &SemanticProjection) -> Option<(String, String)> {
-    if let Some(function) = projection.functions.iter().find(|function| {
-        canonical_name(&function.id, &projection.module_id) == "main"
-            || function.local_name == "main"
-    }) {
-        return Some((
-            canonical_name(&function.id, &projection.module_id),
-            function.local_name.clone(),
-        ));
-    }
-    None
+fn resolve_main(
+    projection: &SemanticProjection,
+) -> Option<&crate::protocol::analysis_v2::SemanticFunction> {
+    projection
+        .functions
+        .iter()
+        .find(|function| canonical_name(&function.id, &projection.module_id) == "main")
+        .or_else(|| {
+            let mut candidates = projection
+                .functions
+                .iter()
+                .filter(|function| function.local_name == "main");
+            let first = candidates.next()?;
+            candidates.next().is_none().then_some(first)
+        })
 }
 
 fn unique_local_name(projection: &SemanticProjection, local_name: &str, id: &str) -> bool {

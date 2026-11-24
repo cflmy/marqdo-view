@@ -8,8 +8,11 @@
 use crate::core_client::{build_call_args, build_run_args, RunOptions, SandboxMode, ScratchDir};
 use crate::error::{ViewError, ViewResult};
 use crate::execution::events::{EventLog, RunEvent, RunState, Subscription};
-use crate::execution::process::{run_bounded_with_hook, ProcessBudget, ProcessOutcome};
+use crate::execution::process::{
+    run_bounded_with_hook, Captured, ProcessBudget, ProcessHooks, ProcessOutcome,
+};
 use crate::execution::request::{self, payload_digest, ExecutionPlan, ExecutionTarget, RunMode};
+use crate::protocol::execution_events_v1 as core_events;
 use crate::protocol::trace_v2::{verify_trace, TraceVerificationInput};
 use crate::reader::assemble::{DocumentService, StaticDocument};
 use crate::reader::source::{sha256_hex, sha256_prefixed};
@@ -171,6 +174,12 @@ struct ControllerState {
     dedupe: HashMap<String, DedupeEntry>,
 }
 
+struct CoreRun {
+    process: ProcessOutcome,
+    trace: Option<Vec<u8>>,
+    stream: Option<core_events::Stream>,
+}
+
 pub struct ExecutionController {
     service: Arc<DocumentService>,
     config: ExecutionConfig,
@@ -282,7 +291,7 @@ impl ExecutionController {
         plan: ExecutionPlan,
     ) {
         let started = Instant::now();
-        let outcome = self.run_core(&job, &plan);
+        let outcome = self.run_core(&job, &plan, &static_doc);
         let cancel_requested = job.cancel.load(Ordering::SeqCst);
         eprintln!(
             "JOB_DEBUG id={} run_core elapsed={:?} cancel={cancel_requested}",
@@ -336,7 +345,8 @@ impl ExecutionController {
         &self,
         job: &Arc<Job>,
         plan: &ExecutionPlan,
-    ) -> Result<(ProcessOutcome, Option<Vec<u8>>), ViewError> {
+        static_doc: &StaticDocument,
+    ) -> ViewResult<CoreRun> {
         let client = self
             .service
             .core_client()
@@ -346,7 +356,13 @@ impl ExecutionController {
         let entry = self.service.project().absolute_for(&plan.document)?;
         let scratch = ScratchDir::create("run")?;
         let trace_path = scratch.file("trace.json");
-        let options = self.run_options(plan);
+        let mut options = self.run_options(plan);
+        let projection = &static_doc.verified.projection;
+        options.event_stream =
+            semver::Version::parse(&projection.producer_version).is_ok_and(|version| {
+                version >= semver::Version::new(3, 0, 0)
+                    || version >= semver::Version::parse("3.0.0-rc.2").expect("valid Core version")
+            });
         let args = match &plan.target {
             ExecutionTarget::Entry => build_run_args(&entry, &trace_path, &options),
             ExecutionTarget::Function { cli_name, .. } => {
@@ -365,20 +381,60 @@ impl ExecutionController {
             wall_clock: self.config.run_timeout,
             ..self.config.budget.clone()
         };
+        let (send_stream, receive_stream) = std::sync::mpsc::channel();
+        let mut hooks = ProcessHooks {
+            on_spawn: Some(Box::new(hook)),
+            ..Default::default()
+        };
+        if options.event_stream {
+            let entry = match &plan.target {
+                ExecutionTarget::Entry => "main",
+                ExecutionTarget::Function { cli_name, .. } => cli_name,
+            };
+            let binding = core_events::Binding {
+                digest: static_doc.analysis_digest.clone(),
+                root: projection.project_root_id.clone(),
+                entry: format!("{}::{entry}", projection.module_id),
+                function: plan.function_id.clone(),
+                mode: plan.mode.as_str().to_string(),
+                producer: projection.producer_version.clone(),
+                modules: projection
+                    .modules
+                    .iter()
+                    .map(|module| module.id.clone())
+                    .collect(),
+                max_output: DEFAULT_MAX_OUTPUT as usize,
+            };
+            let observed_job = Arc::clone(job);
+            hooks.stdout = Some(Box::new(move |stdout| {
+                let stream = core_events::read(stdout, &binding, |observation| {
+                    if let Ok(mut inner) = observed_job.inner.lock() {
+                        inner.log.publish_observation(observation);
+                    }
+                });
+                let _ = send_stream.send(stream);
+                Captured::default()
+            }));
+        }
         let outcome = run_bounded_with_hook(
             client.bin(),
             &args,
             self.service.project().root(),
             &budget,
             Some(Arc::clone(&job.cancel)),
-            Box::new(hook),
+            hooks,
         )?;
         let trace = read_trace_limited(&trace_path)?;
-        Ok((outcome, trace))
+        Ok(CoreRun {
+            process: outcome,
+            trace,
+            stream: receive_stream.try_recv().ok(),
+        })
     }
 
     fn run_options(&self, plan: &ExecutionPlan) -> RunOptions {
         RunOptions {
+            event_stream: false,
             mode: match plan.mode {
                 RunMode::Pure => SandboxMode::Pure,
                 RunMode::Project => SandboxMode::Project,
@@ -399,7 +455,7 @@ impl ExecutionController {
         plan: &ExecutionPlan,
         static_doc: &StaticDocument,
         started: Instant,
-        outcome: Result<(ProcessOutcome, Option<Vec<u8>>), ViewError>,
+        outcome: ViewResult<CoreRun>,
         cancel_requested: bool,
     ) -> (
         RunState,
@@ -410,7 +466,11 @@ impl ExecutionController {
         Option<String>,
     ) {
         let duration_ms = started.elapsed().as_millis() as u64;
-        let (outcome, trace_bytes) = match outcome {
+        let CoreRun {
+            process: outcome,
+            trace: trace_bytes,
+            stream,
+        } = match outcome {
             Ok(value) => value,
             Err(err) => {
                 let state = match err.code() {
@@ -486,7 +546,40 @@ impl ExecutionController {
                 )),
             );
         }
-        let json: serde_json::Value =
+        let json: serde_json::Value = if let Some(stream) = &stream {
+            let Some(mut terminal) = stream
+                .terminal
+                .clone()
+                .filter(|terminal| terminal["success"].as_bool() == Some(outcome.status_ok()))
+            else {
+                let mut result = base_result(plan, static_doc, duration_ms);
+                result["stdout"] = serde_json::json!(String::from_utf8_lossy(&stream.stdout));
+                result["stderr"] = serde_json::json!(String::from_utf8_lossy(&stream.stderr));
+                result["output_complete"] = serde_json::json!(false);
+                return (
+                    RunState::Incomplete,
+                    result,
+                    None,
+                    "unavailable".into(),
+                    Some("view.core_protocol".into()),
+                    Some(
+                        if stream.invalid {
+                            "CLI 事件流无效"
+                        } else {
+                            "CLI 事件流缺少可信终态"
+                        }
+                        .into(),
+                    ),
+                );
+            };
+            terminal["command"] = serde_json::json!(match plan.target {
+                ExecutionTarget::Entry => "run",
+                ExecutionTarget::Function { .. } => "call",
+            });
+            terminal["stdout"] = serde_json::json!(String::from_utf8_lossy(&stream.stdout));
+            terminal["stderr"] = serde_json::json!(String::from_utf8_lossy(&stream.stderr));
+            terminal
+        } else {
             match serde_json::from_slice::<serde_json::Value>(&outcome.stdout.bytes) {
                 Ok(value) if value.is_object() => value,
                 Ok(_) => {
@@ -512,7 +605,8 @@ impl ExecutionController {
                         )),
                     )
                 }
-            };
+            }
+        };
 
         // Re-read the source after the run: a changed source makes the result
         // stale and forbids anchoring events to the current text.
@@ -523,7 +617,7 @@ impl ExecutionController {
             .unwrap_or_default();
         let stale = sha256_hex(&current_source) != static_doc.source_sha256;
 
-        let (trace, trace_status) = build_trace_summary(
+        let (mut trace, mut trace_status) = build_trace_summary(
             trace_bytes.as_deref(),
             static_doc,
             &json,
@@ -532,6 +626,26 @@ impl ExecutionController {
         );
         let mut result = build_cli_result(plan, static_doc, duration_ms, &json, &outcome);
         result["stale"] = serde_json::json!(stale);
+        if let Some(stream) = stream {
+            result["event_protocol"] = serde_json::json!(1);
+            result["core_run_id"] = serde_json::json!(stream.id);
+            result["source_verified"] = serde_json::json!(stream.verified && !stale);
+            result["observation_truncated"] = serde_json::json!(stream.truncated);
+            result["stdout_bytes"] = serde_json::json!(stream.stdout.len());
+            result["stderr_bytes"] = serde_json::json!(stream.stderr.len());
+            result["output_complete"] = serde_json::json!(!json["error"]["code"]
+                .as_str()
+                .is_some_and(|code| code.contains("output_limit")));
+            if trace_status == "verified"
+                && trace
+                    .as_ref()
+                    .and_then(|trace| trace["core_run_id"].as_str())
+                    != Some(&stream.id)
+            {
+                trace = None;
+                trace_status = "invalid".into();
+            }
+        }
         let success = json
             .get("success")
             .and_then(serde_json::Value::as_bool)
@@ -692,6 +806,7 @@ fn base_result(
 ) -> serde_json::Value {
     serde_json::json!({
         "document": plan.document.as_str(),
+        "function_id": plan.function_id,
         "target": match &plan.target {
             ExecutionTarget::Entry => serde_json::json!({"kind": "entry"}),
             ExecutionTarget::Function { cli_name, label } => serde_json::json!({

@@ -26,6 +26,7 @@ pub enum RunState {
     Cancelled,
     TimedOut,
     Unavailable,
+    Incomplete,
 }
 
 impl RunState {
@@ -39,6 +40,7 @@ impl RunState {
             RunState::Cancelled => "cancelled",
             RunState::TimedOut => "timed_out",
             RunState::Unavailable => "unavailable",
+            RunState::Incomplete => "incomplete",
         }
     }
 
@@ -52,6 +54,7 @@ impl RunState {
             RunState::Cancelled => "已取消",
             RunState::TimedOut => "超时",
             RunState::Unavailable => "不可用",
+            RunState::Incomplete => "事件流不完整",
         }
     }
 
@@ -63,6 +66,7 @@ impl RunState {
                 | RunState::Cancelled
                 | RunState::TimedOut
                 | RunState::Unavailable
+                | RunState::Incomplete
         )
     }
 }
@@ -73,6 +77,7 @@ pub enum EventKind {
     Complete,
     Error,
     Snapshot,
+    Observation,
 }
 
 impl EventKind {
@@ -82,6 +87,7 @@ impl EventKind {
             EventKind::Complete => "run.complete",
             EventKind::Error => "run.error",
             EventKind::Snapshot => "run.snapshot",
+            EventKind::Observation => "run.observation",
         }
     }
 }
@@ -98,6 +104,7 @@ pub struct RunEvent {
     pub trace: Option<serde_json::Value>,
     /// `{code, message}` for terminal failures.
     pub error: Option<serde_json::Value>,
+    pub observation: Option<serde_json::Value>,
 }
 
 impl RunEvent {
@@ -118,6 +125,9 @@ impl RunEvent {
         }
         if let Some(error) = &self.error {
             data["error"] = error.clone();
+        }
+        if let Some(observation) = &self.observation {
+            data["observation"] = observation.clone();
         }
         data
     }
@@ -180,6 +190,7 @@ impl EventLog {
             result: None,
             trace: None,
             error: None,
+            observation: None,
         };
         self.next_seq += 1;
         self.last_state = state;
@@ -211,6 +222,12 @@ impl EventLog {
     pub fn publish_state(&mut self, state: RunState) -> RunEvent {
         let event = self.next_event(EventKind::State, state);
         self.record(event)
+    }
+
+    pub fn publish_observation(&mut self, observation: serde_json::Value) {
+        let mut event = self.next_event(EventKind::Observation, self.last_state);
+        event.observation = Some(observation);
+        self.record(event);
     }
 
     pub fn publish_complete(
@@ -276,6 +293,7 @@ impl EventLog {
             result: None,
             trace: None,
             error: None,
+            observation: None,
         }
     }
 

@@ -85,7 +85,15 @@ pub fn run_bounded(
     budget: &ProcessBudget,
     cancel: Option<Arc<AtomicBool>>,
 ) -> ViewResult<ProcessOutcome> {
-    run_bounded_with_hook(bin, args, cwd, budget, cancel, Box::new(|| {}))
+    run_bounded_with_hook(bin, args, cwd, budget, cancel, ProcessHooks::default())
+}
+
+type StdoutReader = Box<dyn FnOnce(std::process::ChildStdout) -> Captured + Send>;
+
+#[derive(Default)]
+pub struct ProcessHooks {
+    pub on_spawn: Option<Box<dyn FnOnce() + Send>>,
+    pub stdout: Option<StdoutReader>,
 }
 
 /// Same as [`run_bounded`], with a hook invoked exactly once **after** the
@@ -96,7 +104,7 @@ pub fn run_bounded_with_hook(
     cwd: &Path,
     budget: &ProcessBudget,
     cancel: Option<Arc<AtomicBool>>,
-    on_spawn: Box<dyn FnOnce() + Send>,
+    hooks: ProcessHooks,
 ) -> ViewResult<ProcessOutcome> {
     let started = Instant::now();
     let mut command = Command::new(bin);
@@ -122,12 +130,17 @@ pub fn run_bounded_with_hook(
     let mut child = command.spawn().map_err(|err| ViewError::CoreSpawn {
         detail: format!("spawn {}: {err}", bin.display()),
     })?;
-    on_spawn();
+    if let Some(on_spawn) = hooks.on_spawn {
+        on_spawn();
+    }
     let stdout = child.stdout.take().expect("piped stdout");
     let stderr = child.stderr.take().expect("piped stderr");
     let stdout_cap = budget.max_stdout;
     let stderr_cap = budget.max_stderr;
-    let stdout_thread = std::thread::spawn(move || read_bounded(stdout, stdout_cap));
+    let stdout_thread = std::thread::spawn(move || match hooks.stdout {
+        Some(read_stdout) => read_stdout(stdout),
+        None => read_bounded(stdout, stdout_cap),
+    });
     let stderr_thread = std::thread::spawn(move || read_bounded(stderr, stderr_cap));
 
     let deadline = started + budget.wall_clock;

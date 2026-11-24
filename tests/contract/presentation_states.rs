@@ -58,7 +58,7 @@ fn source_digest_mismatch_degrades_instead_of_misbinding() {
 fn unknown_analysis_schema_is_a_hard_protocol_error() {
     let (project, core) = project("state-protocol");
     let source = std::fs::read(project.path("index.mq.md")).unwrap();
-    core.set_analysis(&minimal_analysis("index.mq.md", &sha256_hex(&source), 3));
+    core.set_analysis(&minimal_analysis("index.mq.md", &sha256_hex(&source), 4));
     let context = DocumentService::open(&project.dir, Some(&core.script)).unwrap();
     let relative = context.project().entry().relative.clone();
     let err = context.load(&relative).unwrap_err();

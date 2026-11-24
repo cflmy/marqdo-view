@@ -66,6 +66,7 @@ pub struct CheckOptions {
 
 #[derive(Debug, Clone)]
 pub struct RunOptions {
+    pub event_stream: bool,
     pub mode: SandboxMode,
     pub grants: Grants,
     pub fuel: Option<u64>,
@@ -80,6 +81,7 @@ pub struct RunOptions {
 impl Default for RunOptions {
     fn default() -> Self {
         Self {
+            event_stream: false,
             mode: SandboxMode::Pure,
             grants: Grants::default(),
             fuel: None,
@@ -481,7 +483,13 @@ fn append_common_args(args: &mut Vec<OsString>, trace_path: &Path, options: &Run
     }
     args.push(OsString::from("--mode"));
     args.push(OsString::from(options.mode.as_str()));
-    args.push(OsString::from("--json"));
+    if options.event_stream {
+        push_pair(args, "--event-stream", "jsonl");
+        push_pair(args, "--observe-max-events", "10000");
+        push_pair(args, "--observe-max-bytes", "4194304");
+    } else {
+        args.push(OsString::from("--json"));
+    }
     args.push(OsString::from("--trace-file"));
     args.push(trace_path.as_os_str().to_os_string());
     for glob in &options.grants.allow_read {
@@ -758,6 +766,7 @@ mod tests {
             Path::new("/p/index.mq.md"),
             Path::new("/t/trace.json"),
             &RunOptions {
+                event_stream: false,
                 mode: SandboxMode::Pure,
                 grants: Grants {
                     allow_read: vec!["data/**".into()],

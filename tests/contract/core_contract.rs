@@ -249,13 +249,13 @@ fn cli_verify_end_to_end_against_fake_core() {
 }
 
 #[test]
-fn cli_verify_rejects_schema_v3_and_digest_mismatch() {
+fn cli_verify_rejects_schema_v4_and_digest_mismatch() {
     let (project, core) = fixture("verify_negative");
     let source = std::fs::read(project.path("index.mq.md")).unwrap();
     let script = core.script.to_str().unwrap().to_string();
     let dir = project.dir.to_str().unwrap().to_string();
 
-    core.set_analysis(&minimal_analysis("index.mq.md", &sha256_hex(&source), 3));
+    core.set_analysis(&minimal_analysis("index.mq.md", &sha256_hex(&source), 4));
     let output = common::run_view(
         &["verify", "index.mq.md", "--marqdo-bin", &script],
         std::path::Path::new(&dir),

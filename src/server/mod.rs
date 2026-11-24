@@ -62,7 +62,7 @@ pub fn serve(service: DocumentService, opts: &RuntimeOpts) -> ViewResult<i32> {
             .unwrap_or(0)
     );
     if let Some(version) = state.service.core_version() {
-        eprintln!("core: marqdo {version} (Analysis v2, Trace v2)");
+        eprintln!("core: marqdo {version} (Analysis v2/v3, Trace v2)");
     } else if let Some(note) = state.service.core_note() {
         eprintln!("core: unavailable ({note})");
     }

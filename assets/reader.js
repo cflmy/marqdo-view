@@ -372,12 +372,13 @@
       case "cancelled": return "已取消";
       case "timed_out": return "超时";
       case "unavailable": return "不可用";
+      case "incomplete": return "事件流不完整";
       default: return String(state || "未知");
     }
   }
 
   function isTerminalState(state) {
-    return ["succeeded", "failed", "cancelled", "timed_out", "unavailable"].indexOf(state) >= 0;
+    return ["succeeded", "failed", "cancelled", "timed_out", "unavailable", "incomplete"].indexOf(state) >= 0;
   }
 
   function runPanel() {
@@ -650,6 +651,7 @@
       setRunStatus("浏览器不支持 EventSource，无法接收运行状态；请使用现代浏览器。");
       return;
     }
+    var decoders = { stdout: new TextDecoder(), stderr: new TextDecoder() };
     var source = new EventSource(job.events_url, { withCredentials: true });
     activeRun.source = source;
     function apply(event) {
@@ -668,9 +670,13 @@
         return;
       }
       activeRun.lastSeq = data.seq;
+      if (data.observation) {
+        renderObservation(data.observation, decoders);
+        return;
+      }
       updateRunView(data);
     }
-    ["run.state", "run.complete", "run.error", "run.snapshot"].forEach(function (kind) {
+    ["run.state", "run.complete", "run.error", "run.snapshot", "run.observation"].forEach(function (kind) {
       source.addEventListener(kind, apply);
     });
     source.onerror = function () {
@@ -678,6 +684,26 @@
         setRunStatus("SSE 连接中断，正在自动恢复…（任务仍在服务端运行；不会重新执行）");
       }
     };
+  }
+
+  function renderObservation(observation, decoders) {
+    var stream = observation.kind === "stdout.chunk" ? "stdout"
+      : observation.kind === "stderr.chunk" ? "stderr" : null;
+    if (stream) {
+      var output = $("#mq-run-" + stream);
+      if (!output) return;
+      var bytes = Uint8Array.from(atob(observation.data_base64), function (value) {
+        return value.charCodeAt(0);
+      });
+      output.append(document.createTextNode(decoders[stream].decode(bytes, { stream: true })));
+      output.hidden = false;
+    } else if (/^(branch|loop|control|call)\./.test(observation.kind)) {
+      var events = $("#mq-run-events");
+      if (events && events.childElementCount < 100) {
+        appendLine(events, "li", "", observation.kind +
+          (observation.decision === undefined ? "" : " · " + observation.decision));
+      }
+    }
   }
 
   function updateRunView(data) {
