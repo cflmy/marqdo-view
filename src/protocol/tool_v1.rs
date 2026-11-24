@@ -15,6 +15,7 @@ pub const MIN_PRODUCT: &str = "3.0.0-beta.1";
 
 pub const TOOL_PROTOCOL: u32 = 1;
 pub const ANALYSIS_PROTOCOL: u32 = 2;
+pub const ANALYSIS_PROTOCOLS: [u32; 2] = [2, 3];
 pub const TRACE_PROTOCOL: u32 = 2;
 
 /// Environment variables injected by CLI Tool Protocol v1.
@@ -83,10 +84,10 @@ pub fn negotiate_protocol_env(
     }
     if let Some(raw) = analysis_protocol {
         let value = parse_env_u32(ENV_PROTOCOL_ANALYSIS, raw)?;
-        if value != ANALYSIS_PROTOCOL {
+        if !ANALYSIS_PROTOCOLS.contains(&value) {
             return Err(ViewError::ProtocolIncompatible {
                 detail: format!(
-                    "{ENV_PROTOCOL_ANALYSIS}={value} is not supported (this View requires Analysis v{ANALYSIS_PROTOCOL})"
+                    "{ENV_PROTOCOL_ANALYSIS}={value} is not supported (this View implements Analysis v2/v3)"
                 ),
             });
         }
@@ -141,6 +142,7 @@ mod tests {
     fn negotiates_known_protocols_only() {
         assert!(negotiate_protocol_env(Some("1"), Some("2"), Some("2")).is_ok());
         assert!(negotiate_protocol_env(None, None, None).is_ok());
+        assert!(negotiate_protocol_env(Some("1"), Some("3"), Some("2")).is_ok());
         assert!(negotiate_protocol_env(Some("2"), None, None).is_err());
         assert!(negotiate_protocol_env(None, Some("1"), None).is_err());
         assert!(negotiate_protocol_env(None, None, Some("3")).is_err());

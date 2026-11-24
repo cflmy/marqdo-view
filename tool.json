@@ -7,7 +7,7 @@
   "entrypoint": "bin/marqdo-view",
   "compatibility": {
     "marqdo": ">=3.0.0-beta.1,<4.0.0",
-    "analysis": [2],
+    "analysis": [2, 3],
     "trace": [2]
   }
 }

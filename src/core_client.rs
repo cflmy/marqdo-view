@@ -696,7 +696,7 @@ pub fn verify_command(opts: &RuntimeOpts, args: &VerifyArgs) -> ViewResult<i32> 
             },
             "analysis": {
                 "schema": "marqdo.analysis",
-                "schema_version": tool_v1::ANALYSIS_PROTOCOL,
+                "schema_version": projection.schema_version,
                 "digest": projection.analysis_digest,
                 "producer_version": projection.producer_version,
                 "markdown_profile": projection.markdown_profile,
@@ -736,7 +736,8 @@ pub fn verify_command(opts: &RuntimeOpts, args: &VerifyArgs) -> ViewResult<i32> 
         );
         println!("document: {entry}");
         println!(
-            "analysis: schema=marqdo.analysis v2 modules={} functions={} digest={}",
+            "analysis: schema=marqdo.analysis v{} modules={} functions={} digest={}",
+            projection.schema_version,
             projection.modules.len(),
             projection.functions.len(),
             projection.analysis_digest

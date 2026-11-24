@@ -73,6 +73,8 @@ pub enum StatementKind {
     Branch,
     Loop,
     Return,
+    Break,
+    Continue,
     Other,
 }
 
@@ -84,6 +86,8 @@ impl StatementKind {
             StatementKind::Branch => "条件分支",
             StatementKind::Loop => "循环",
             StatementKind::Return => "返回",
+            StatementKind::Break => "跳出循环",
+            StatementKind::Continue => "继续循环",
             StatementKind::Other => "语句",
         }
     }
@@ -95,6 +99,8 @@ impl StatementKind {
             StatementKind::Branch => "branch",
             StatementKind::Loop => "loop",
             StatementKind::Return => "return",
+            StatementKind::Break => "break",
+            StatementKind::Continue => "continue",
             StatementKind::Other => "other",
         }
     }
@@ -210,6 +216,7 @@ pub struct ModuleSummary {
 
 #[derive(Debug, Clone)]
 pub struct SemanticProjection {
+    pub schema_version: u32,
     pub analysis_sha256: String,
     pub analysis_digest: String,
     pub producer_version: String,
@@ -541,19 +548,18 @@ pub fn verify_analysis(
 ) -> ViewResult<VerifiedAnalysis> {
     let raw: RawAnalysis =
         serde_json::from_slice(analysis_bytes).map_err(|err| ViewError::AnalysisFailed {
-            detail: format!("Analysis v2 is not valid JSON: {err}"),
+            detail: format!("Analysis is not valid JSON: {err}"),
         })?;
     if raw.schema != "marqdo.analysis" {
         return Err(ViewError::ProtocolIncompatible {
             detail: format!("unexpected Analysis schema {:?}", raw.schema),
         });
     }
-    if raw.schema_version != crate::protocol::tool_v1::ANALYSIS_PROTOCOL {
+    if !crate::protocol::tool_v1::ANALYSIS_PROTOCOLS.contains(&raw.schema_version) {
         return Err(ViewError::ProtocolIncompatible {
             detail: format!(
-                "Analysis schema_version {} is not supported (View implements v{})",
-                raw.schema_version,
-                crate::protocol::tool_v1::ANALYSIS_PROTOCOL
+                "Analysis schema_version {} is not supported (View implements v2/v3)",
+                raw.schema_version
             ),
         });
     }
@@ -641,7 +647,9 @@ pub fn verify_analysis(
             let statements = function
                 .body
                 .iter()
-                .filter_map(|statement| convert_statement(statement, &mut valid_span))
+                .filter_map(|statement| {
+                    convert_statement(statement, raw.schema_version, &mut valid_span)
+                })
                 .collect();
             Some(SemanticFunction {
                 id: function.id.clone(),
@@ -777,6 +785,7 @@ pub fn verify_analysis(
 
     Ok(VerifiedAnalysis {
         projection: SemanticProjection {
+            schema_version: raw.schema_version,
             analysis_sha256: sha256_hex(analysis_bytes),
             analysis_digest: sha256_prefixed(analysis_bytes),
             producer_version: raw.producer.version.clone(),
@@ -804,6 +813,7 @@ pub fn verify_analysis(
 
 fn convert_statement(
     raw: &RawStatement,
+    schema_version: u32,
     valid_span: &mut impl FnMut(Option<SourceSpan>, &str) -> Option<SourceSpan>,
 ) -> Option<SemanticStatement> {
     let span = valid_span(raw.span, "语句")?;
@@ -813,12 +823,14 @@ fn convert_statement(
         "branch" => StatementKind::Branch,
         "loop" => StatementKind::Loop,
         "return" => StatementKind::Return,
+        "break" if schema_version == 3 => StatementKind::Break,
+        "continue" if schema_version == 3 => StatementKind::Continue,
         _ => StatementKind::Other,
     };
     let body = raw
         .body
         .iter()
-        .filter_map(|child| convert_statement(child, valid_span))
+        .filter_map(|child| convert_statement(child, schema_version, valid_span))
         .collect();
     let arms = raw
         .arms
@@ -829,7 +841,7 @@ fn convert_statement(
             body: arm
                 .body
                 .iter()
-                .filter_map(|child| convert_statement(child, valid_span))
+                .filter_map(|child| convert_statement(child, schema_version, valid_span))
                 .collect(),
         })
         .collect();
@@ -905,7 +917,7 @@ mod tests {
         let index = SourceIndex::new(source);
         let digest = sha256_hex(source.as_bytes());
         let err =
-            verify_analysis(&analysis(3, &digest), source, &index, "index.mq.md").unwrap_err();
+            verify_analysis(&analysis(4, &digest), source, &index, "index.mq.md").unwrap_err();
         assert_eq!(err.code(), "view.protocol_incompatible");
     }
 

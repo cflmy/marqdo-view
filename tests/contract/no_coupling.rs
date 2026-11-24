@@ -182,7 +182,7 @@ fn tool_manifest_matches_package_and_protocols() {
         "tool.json version must match Cargo package version"
     );
     assert_eq!(tool["compatibility"]["marqdo"], ">=3.0.0-beta.1,<4.0.0");
-    assert_eq!(tool["compatibility"]["analysis"], serde_json::json!([2]));
+    assert_eq!(tool["compatibility"]["analysis"], serde_json::json!([2, 3]));
     assert_eq!(tool["compatibility"]["trace"], serde_json::json!([2]));
 }
 

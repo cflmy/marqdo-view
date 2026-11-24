@@ -288,7 +288,7 @@ fn serve_documents(state: &ServerState, request: Request, query: &str) -> ViewRe
             "source_status": model.source_status.data_value(),
             "semantics_usable": model.source_status.semantics_usable(),
             "analysis": semantic.map(|projection| serde_json::json!({
-                "schema_version": crate::protocol::tool_v1::ANALYSIS_PROTOCOL,
+                "schema_version": projection.schema_version,
                 "digest": projection.analysis_digest,
                 "producer_version": projection.producer_version,
                 "project_root_id": projection.project_root_id,
