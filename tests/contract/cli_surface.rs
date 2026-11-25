@@ -6,12 +6,7 @@ use crate::common;
 use common::run_view;
 
 fn clean_env() -> Vec<(&'static str, Option<&'static str>)> {
-    vec![
-        ("MARQDO_BIN", None),
-        ("MARQDO_TOOL_PROTOCOL", None),
-        ("MARQDO_PROTOCOL_ANALYSIS", None),
-        ("MARQDO_PROTOCOL_TRACE", None),
-    ]
+    vec![("MARQDO_BIN", None), ("MARQDO_API_REVISION", None)]
 }
 
 #[test]
@@ -36,7 +31,7 @@ fn version_is_the_tool_version() {
     let output = run_view(&["--version"], &cwd, &clean_env());
     assert_eq!(output.status.code(), Some(0));
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("marqdo-view 0.2.0"), "{stdout}");
+    assert!(stdout.contains("marqdo-view 0.3.0"), "{stdout}");
 }
 
 #[test]

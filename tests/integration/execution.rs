@@ -2,7 +2,8 @@
 //! unique terminal state, SSE-ready events, dedupe, grants and cancellation.
 //!
 //! The fake Core is a real executable (never a mocked trait) so argv, process
-//! lifecycle and trace files are exercised at the process boundary.
+//! lifecycle and the Observation v1 stdout/snapshot destinations are exercised at
+//! the process boundary.
 
 use crate::common::{sha256_hex, FakeCore};
 use marqdo_view::execution::controller::{ExecutionConfig, ExecutionController, SseSubscription};
@@ -12,12 +13,19 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+const ANALYSIS: &str = "tests/golden/analysis-v3/control-flow.json";
+const OBS_JSONL: &str = "tests/golden/observation-v1/control-flow.jsonl";
+const OBS_SNAPSHOT: &str = "tests/golden/observation-v1/control-flow.snapshot.json";
+const OBS_TRUNCATED_JSONL: &str = "tests/golden/observation-v1/control-flow.truncated.jsonl";
+const OBS_TRUNCATED_SNAPSHOT: &str =
+    "tests/golden/observation-v1/control-flow.truncated.snapshot.json";
+
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
 
 fn golden(name: &str) -> String {
-    let path = repo_root().join("tests/golden/analysis-v2").join(name);
+    let path = repo_root().join(name);
     std::fs::read_to_string(&path).unwrap_or_else(|err| panic!("read {path:?}: {err}"))
 }
 
@@ -35,14 +43,14 @@ fn fixture_with(
     name: &str,
     project_relative: &str,
     analysis: &str,
-    run_json: &str,
-    trace: Option<&str>,
+    observation_jsonl: &str,
+    observation_snapshot: Option<&str>,
     config: ExecutionConfig,
 ) -> Fixture {
     let core = FakeCore::new(name);
     core.set_analysis(analysis);
     core.set_check_json(r#"{"command":"check","diagnostics":[],"errors":0,"success":true}"#);
-    core.set_run(0, run_json, trace);
+    core.set_observation(0, observation_jsonl, observation_snapshot);
     let project = repo_root().join(project_relative);
     let service = Arc::new(
         DocumentService::open(&project, Some(core.script.as_path()))
@@ -57,19 +65,12 @@ fn fixture_with(
 }
 
 fn control_flow(name: &str) -> Fixture {
-    let analysis = golden("control-flow.json");
-    let run =
-        std::fs::read_to_string(repo_root().join("tests/golden/trace-v2/control-flow.run.json"))
-            .expect("run golden");
-    let trace =
-        std::fs::read_to_string(repo_root().join("tests/golden/trace-v2/control-flow.trace.json"))
-            .expect("trace golden");
     fixture_with(
         name,
         "examples/control-flow",
-        &analysis,
-        &run,
-        Some(&trace),
+        &golden(ANALYSIS),
+        &golden(OBS_JSONL),
+        Some(&golden(OBS_SNAPSHOT)),
         ExecutionConfig::default().with_timeout(10),
     )
 }
@@ -106,7 +107,7 @@ fn is_terminal_data(data: &serde_json::Value) -> bool {
         .map(|state| {
             matches!(
                 state,
-                "succeeded" | "failed" | "cancelled" | "timed_out" | "unavailable"
+                "succeeded" | "failed" | "cancelled" | "timed_out" | "unavailable" | "incomplete"
             )
         })
         .unwrap_or(false)
@@ -159,9 +160,9 @@ fn wait_for_file(path: &Path) {
 }
 
 #[test]
-fn explicit_entry_run_streams_accepted_running_and_succeeded_with_verified_trace() {
+fn explicit_entry_run_streams_accepted_running_and_verified_observation() {
     let fixture = control_flow("ctrl-success");
-    let analysis = golden("control-flow.json");
+    let analysis = golden(ANALYSIS);
     let body = request_body(
         &analysis,
         serde_json::json!({"kind": "entry"}),
@@ -207,17 +208,26 @@ fn explicit_entry_run_streams_accepted_running_and_succeeded_with_verified_trace
     );
     assert_eq!(terminal["state"], "succeeded");
     assert_eq!(terminal["result"]["success"], true);
-    assert_eq!(terminal["trace"]["status"], "verified");
-    assert!(!terminal["trace"]["events"].as_array().unwrap().is_empty());
-    assert_eq!(terminal["trace"]["stale"], false);
-    // The fake Core's stderr/stdout were read through the adapter, not guessed.
+    assert_eq!(terminal["result"]["observation_status"], "verified");
+    let summary = terminal["observation_summary"]
+        .as_object()
+        .expect("observation summary");
+    assert_eq!(summary["status"], "verified");
+    assert!(!summary["events"].as_array().unwrap().is_empty());
     assert_eq!(terminal["result"]["stdout"], "0\n0\n2\n");
+    let argv = fixture.core.last_args();
+    assert!(argv.contains(&"--output".to_string()), "argv: {argv:?}");
+    assert!(argv.contains(&"jsonl".to_string()), "argv: {argv:?}");
+    assert!(
+        argv.contains(&"--observation-file".to_string()),
+        "argv: {argv:?}"
+    );
 }
 
 #[test]
 fn call_target_uses_the_call_subcommand_and_function_name() {
     let fixture = control_flow("ctrl-call");
-    let analysis = golden("control-flow.json");
+    let analysis = golden(ANALYSIS);
     let function_id = "root:control-flow@0.1.0::index.mq.md::演示.main";
     let body = request_body(
         &analysis,
@@ -236,15 +246,22 @@ fn call_target_uses_the_call_subcommand_and_function_name() {
         .expect("subscribe");
     let (_events, terminal) = terminal_events(subscription);
     assert_eq!(terminal["state"], "succeeded");
-    let argv = std::fs::read_to_string(fixture.core.dir.join("argv.txt")).unwrap_or_default();
-    assert!(argv.contains("arg=call"), "argv: {argv}");
-    assert!(argv.contains("arg=main"), "argv: {argv}");
+    let argv = fixture.core.last_args();
+    assert!(argv.iter().any(|arg| arg == "call"), "argv: {argv:?}");
+    assert!(
+        argv.iter().any(|arg| arg.contains("main")),
+        "argv: {argv:?}"
+    );
+    assert!(
+        !argv.iter().any(|arg| arg == "--trace-file"),
+        "argv: {argv:?}"
+    );
 }
 
 #[test]
 fn same_client_request_id_is_idempotent_and_different_payload_conflicts() {
     let fixture = control_flow("ctrl-dedupe");
-    let analysis = golden("control-flow.json");
+    let analysis = golden(ANALYSIS);
     let body = request_body(
         &analysis,
         serde_json::json!({"kind": "entry"}),
@@ -274,17 +291,9 @@ fn same_client_request_id_is_idempotent_and_different_payload_conflicts() {
 
 #[test]
 fn second_run_is_busy_while_one_is_active_and_cancel_is_idempotent() {
-    let analysis = golden("control-flow.json");
-    let run = r#"{"command":"run","success":true,"value":{"type":"int","decimal":"1"}}"#;
-    let fixture = fixture_with(
-        "ctrl-cancel",
-        "examples/control-flow",
-        &analysis,
-        run,
-        None,
-        ExecutionConfig::default().with_timeout(30),
-    );
+    let fixture = control_flow("ctrl-cancel");
     fixture.core.set_sleep_seconds(30);
+    let analysis = golden(ANALYSIS);
     let body = request_body(
         &analysis,
         serde_json::json!({"kind": "entry"}),
@@ -320,7 +329,6 @@ fn second_run_is_busy_while_one_is_active_and_cancel_is_idempotent() {
         state,
         RunState::CancelRequested | RunState::Cancelled
     ));
-    // Repeat cancel is idempotent.
     let _ = fixture
         .controller
         .cancel("session-a", &accepted.run_id)
@@ -334,17 +342,7 @@ fn second_run_is_busy_while_one_is_active_and_cancel_is_idempotent() {
     assert_eq!(terminal["state"], "cancelled");
     let terminal_count = events
         .iter()
-        .filter(|event| {
-            event["state"]
-                .as_str()
-                .map(|state| {
-                    matches!(
-                        state,
-                        "succeeded" | "failed" | "cancelled" | "timed_out" | "unavailable"
-                    )
-                })
-                .unwrap_or(false)
-        })
+        .filter(|event| is_terminal_data(event))
         .count();
     assert_eq!(terminal_count, 1, "exactly one terminal state: {events:?}");
     assert!(started.elapsed() < Duration::from_secs(10));
@@ -353,7 +351,7 @@ fn second_run_is_busy_while_one_is_active_and_cancel_is_idempotent() {
 #[test]
 fn cross_session_observation_is_rejected() {
     let fixture = control_flow("ctrl-session");
-    let analysis = golden("control-flow.json");
+    let analysis = golden(ANALYSIS);
     let body = request_body(
         &analysis,
         serde_json::json!({"kind": "entry"}),
@@ -384,9 +382,9 @@ fn cross_session_observation_is_rejected() {
 }
 
 #[test]
-fn stale_analysis_digest_is_rejected_before_any_process_starts() {
-    let fixture = control_flow("ctrl-stale");
-    let analysis = golden("control-flow.json");
+fn stale_request_digest_is_rejected_before_any_process_starts() {
+    let fixture = control_flow("ctrl-stale-request");
+    let analysis = golden(ANALYSIS);
     let mut body: serde_json::Value = serde_json::from_slice(&request_body(
         &analysis,
         serde_json::json!({"kind": "entry"}),
@@ -401,13 +399,13 @@ fn stale_analysis_digest_is_rejected_before_any_process_starts() {
         .submit("session-a", body.to_string().as_bytes())
         .expect_err("stale digest must be rejected");
     assert_eq!(err.code(), "view.run_invalid");
-    assert!(!fixture.core.dir.join("run-was-called").exists());
+    assert!(!fixture.core.run_was_called());
 }
 
 #[test]
 fn project_grants_are_mapped_to_explicit_cli_flags_and_pure_grants_are_rejected() {
     let fixture = control_flow("ctrl-grants");
-    let analysis = golden("control-flow.json");
+    let analysis = golden(ANALYSIS);
     let body = request_body(
         &analysis,
         serde_json::json!({"kind": "entry"}),
@@ -425,19 +423,22 @@ fn project_grants_are_mapped_to_explicit_cli_flags_and_pure_grants_are_rejected(
         .expect("subscribe");
     let (_events, terminal) = terminal_events(subscription);
     assert_eq!(terminal["state"], "succeeded");
-    let argv = std::fs::read_to_string(fixture.core.dir.join("argv.txt")).unwrap_or_default();
-    assert!(argv.contains("arg=--mode\narg=project"), "argv: {argv}");
+    let argv = fixture.core.last_args();
     assert!(
-        argv.contains("arg=--allow-read\narg=data/**"),
-        "argv: {argv}"
+        argv.windows(2).any(|pair| pair == ["--mode", "project"]),
+        "argv: {argv:?}"
     );
     assert!(
-        argv.contains("arg=--allow-write\narg=out/*.txt"),
-        "argv: {argv}"
+        argv.windows(2)
+            .any(|pair| pair == ["--allow-read", "data/**"]),
+        "argv: {argv:?}"
     );
-    assert!(!argv.contains("arg=--mode\narg=pure"));
+    assert!(
+        argv.windows(2)
+            .any(|pair| pair == ["--allow-write", "out/*.txt"]),
+        "argv: {argv:?}"
+    );
 
-    // pure with grants is rejected by request validation before the Core runs.
     let pure_with_grants = request_body(
         &analysis,
         serde_json::json!({"kind": "entry"}),
@@ -453,23 +454,18 @@ fn project_grants_are_mapped_to_explicit_cli_flags_and_pure_grants_are_rejected(
 }
 
 #[test]
-fn run_without_a_trace_file_succeeds_but_reports_unavailable_trace() {
-    let analysis = golden("control-flow.json");
-    let run = r#"{"command":"run","success":true,"value":{"type":"int","decimal":"7"},"stdout":"hi\n","stderr":"","diagnostics":[]}"#;
-    let fixture = fixture_with(
-        "ctrl-no-trace",
-        "examples/control-flow",
-        &analysis,
-        run,
-        None,
-        ExecutionConfig::default().with_timeout(10),
-    );
+fn missing_observation_stream_is_incomplete_never_success() {
+    let fixture = control_flow("ctrl-no-observation");
+    fixture
+        .core
+        .set_observation(0, "", Some(&golden(OBS_SNAPSHOT)));
+    let analysis = golden(ANALYSIS);
     let body = request_body(
         &analysis,
         serde_json::json!({"kind": "entry"}),
         "pure",
         serde_json::json!({}),
-        "req-no-trace",
+        "req-no-observation",
     );
     let accepted = fixture
         .controller
@@ -480,62 +476,26 @@ fn run_without_a_trace_file_succeeds_but_reports_unavailable_trace() {
         .subscribe("session-a", &accepted.run_id, Some(0))
         .expect("subscribe");
     let (_events, terminal) = terminal_events(subscription);
-    assert_eq!(terminal["state"], "succeeded");
-    assert_eq!(terminal["result"]["value_text"], "Int(7)");
-    assert_eq!(terminal["trace"], serde_json::Value::Null);
-    assert_eq!(terminal["result"]["trace_status"], "unavailable");
-    assert!(!fixture.core.dir.join("trace.json").exists() || terminal["trace"].is_null());
-}
-
-#[test]
-fn event_frames_use_the_view_run_events_schema_and_numeric_ids() {
-    let fixture = control_flow("ctrl-frames");
-    let analysis = golden("control-flow.json");
-    let body = request_body(
-        &analysis,
-        serde_json::json!({"kind": "entry"}),
-        "pure",
-        serde_json::json!({}),
-        "req-frames",
+    assert_eq!(terminal["state"], "failed");
+    assert_eq!(
+        terminal["result"]["error"]["code"],
+        "view.observation_invalid"
     );
-    let accepted = fixture
-        .controller
-        .submit("session-a", &body)
-        .expect("accepted");
-    let subscription = fixture
-        .controller
-        .subscribe("session-a", &accepted.run_id, None)
-        .expect("subscribe");
-    let (events, terminal) = terminal_events(subscription);
-    assert_eq!(terminal["schema"], "marqdo.view-run-events");
-    assert_eq!(terminal["schema_version"], 1);
-    assert_eq!(terminal["run_id"], accepted.run_id.as_str());
-    assert!(!events.is_empty());
+    assert_ne!(terminal["result"]["success"], true);
 }
 
 #[test]
 fn source_edit_during_a_run_marks_the_result_stale_and_drops_anchor_ids() {
-    let project = crate::common::TempProject::new("exec-stale");
-    let source = std::fs::read_to_string(repo_root().join("examples/control-flow/index.mq.md"))
-        .expect("example source");
-    project.write(
-        "marqdo.yaml",
-        "project:\n  name: control-flow\n  version: 0.1.0\n",
-    );
-    project.write("index.mq.md", &source);
-    let analysis = golden("control-flow.json");
-    let run =
-        std::fs::read_to_string(repo_root().join("tests/golden/trace-v2/control-flow.run.json"))
-            .expect("run golden");
-    let trace =
-        std::fs::read_to_string(repo_root().join("tests/golden/trace-v2/control-flow.trace.json"))
-            .expect("trace golden");
-    let core = FakeCore::new("exec-stale-core");
+    let project = crate::common::TempProject::new("ctrl-stale-source");
+    project.marqdo_project(&golden("examples/control-flow/index.mq.md"));
+    let analysis = golden(ANALYSIS);
+    let core = FakeCore::new("ctrl-stale-source");
     core.set_analysis(&analysis);
-    core.set_run(0, &run, Some(&trace));
+    core.set_check_json(r#"{"command":"check","diagnostics":[],"errors":0,"success":true}"#);
+    core.set_observation(0, &golden(OBS_JSONL), Some(&golden(OBS_SNAPSHOT)));
     core.set_sleep_seconds(1);
     let service = Arc::new(
-        DocumentService::open(&project.dir, Some(core.script.as_path())).expect("service"),
+        DocumentService::open(&project.dir, Some(core.script.as_path())).expect("open service"),
     );
     let controller = Arc::new(ExecutionController::new(
         Arc::clone(&service),
@@ -550,51 +510,93 @@ fn source_edit_during_a_run_marks_the_result_stale_and_drops_anchor_ids() {
     );
     let accepted = controller.submit("session-a", &body).expect("accepted");
     wait_for_file(&core.dir.join("run-was-called"));
-    project.write("index.mq.md", &format!("{source}\n\n追加的编辑。\n"));
+    project.write(
+        "index.mq.md",
+        &format!(
+            "{}\n\n<!-- changed -->\n",
+            golden("examples/control-flow/index.mq.md")
+        ),
+    );
     let subscription = controller
         .subscribe("session-a", &accepted.run_id, Some(0))
         .expect("subscribe");
     let (_events, terminal) = terminal_events(subscription);
-    assert_eq!(terminal["state"], "succeeded");
-    assert_eq!(terminal["result"]["stale"], true);
-    assert_eq!(terminal["trace"]["status"], "verified");
-    assert_eq!(terminal["trace"]["stale"], true);
-    let events = terminal["trace"]["events"].as_array().expect("events");
-    assert!(!events.is_empty());
-    assert!(
-        events
-            .iter()
-            .all(|event| event["anchor"].is_null() && event["source_id"].is_null()),
-        "stale runs must not anchor to the current text"
+    assert_eq!(terminal["state"], "failed");
+    assert_eq!(
+        terminal["result"]["error"]["code"],
+        "view.observation_stale"
     );
+    assert_eq!(terminal["result"]["observation_status"], "stale");
+    assert_ne!(terminal["result"]["success"], true);
+    let summary = terminal["observation_summary"]
+        .as_object()
+        .expect("stale summary");
+    assert_eq!(summary["status"], "stale");
+    assert!(summary["events"].as_array().unwrap().is_empty());
 }
 
 #[test]
-fn trace_with_a_mismatched_digest_is_reported_invalid_but_the_run_still_succeeds() {
-    let analysis = golden("control-flow.json");
-    let run =
-        std::fs::read_to_string(repo_root().join("tests/golden/trace-v2/control-flow.run.json"))
-            .expect("run golden");
-    let mut trace: serde_json::Value = serde_json::from_str(
-        &std::fs::read_to_string(repo_root().join("tests/golden/trace-v2/control-flow.trace.json"))
-            .expect("trace golden"),
-    )
-    .expect("trace json");
-    trace["source"]["analysis_digest"] = serde_json::json!(format!("sha256:{}", "0".repeat(64)));
-    let fixture = fixture_with(
-        "exec-trace-invalid",
-        "examples/control-flow",
-        &analysis,
-        &run,
-        Some(&trace.to_string()),
-        ExecutionConfig::default().with_timeout(10),
+fn observation_with_a_mismatched_digest_is_rejected_as_stale() {
+    let fixture = control_flow("ctrl-observation-mismatch");
+    let mut lines: Vec<String> = golden(OBS_JSONL).lines().map(str::to_string).collect();
+    for line in &mut lines {
+        if line.contains("\"kind\":\"run.started\"") {
+            *line = line.replace(
+                &format!(
+                    "\"analysis_digest\":\"sha256:{}\"",
+                    sha256_hex(&golden(ANALYSIS).into_bytes())
+                ),
+                &format!("\"analysis_digest\":\"sha256:{}\"", "0".repeat(64)),
+            );
+        }
+    }
+    fixture.core.set_observation(
+        0,
+        &format!("{}\n", lines.join("\n")),
+        Some(&golden(OBS_SNAPSHOT)),
     );
+    let analysis = golden(ANALYSIS);
     let body = request_body(
         &analysis,
         serde_json::json!({"kind": "entry"}),
         "pure",
         serde_json::json!({}),
-        "req-trace-invalid",
+        "req-observation-mismatch",
+    );
+    let accepted = fixture
+        .controller
+        .submit("session-a", &body)
+        .expect("accepted");
+    let subscription = fixture
+        .controller
+        .subscribe("session-a", &accepted.run_id, Some(0))
+        .expect("subscribe");
+    let (_events, terminal) = terminal_events(subscription);
+    assert_eq!(terminal["state"], "failed");
+    assert_eq!(
+        terminal["result"]["error"]["code"],
+        "view.observation_stale"
+    );
+    assert_ne!(terminal["result"]["observation_status"], "verified");
+}
+
+#[test]
+fn truncated_observation_is_explicit_and_never_labelled_complete() {
+    let fixture = fixture_with(
+        "ctrl-truncated",
+        "examples/control-flow",
+        &golden(ANALYSIS),
+        &golden(OBS_TRUNCATED_JSONL),
+        Some(&golden(OBS_TRUNCATED_SNAPSHOT)),
+        ExecutionConfig::default().with_timeout(10),
+    );
+    let analysis = golden(ANALYSIS);
+    let body = request_body(
+        &analysis,
+        serde_json::json!({"kind": "entry"}),
+        "pure",
+        serde_json::json!({}),
+        "req-truncated",
     );
     let accepted = fixture
         .controller
@@ -606,35 +608,27 @@ fn trace_with_a_mismatched_digest_is_reported_invalid_but_the_run_still_succeeds
         .expect("subscribe");
     let (_events, terminal) = terminal_events(subscription);
     assert_eq!(terminal["state"], "succeeded");
-    assert_eq!(terminal["trace"]["status"], "invalid");
-    assert!(terminal["trace"]["events"].is_null());
+    assert_eq!(terminal["result"]["observation_status"], "truncated");
+    assert_eq!(terminal["result"]["observation_truncated"], true);
+    assert_eq!(terminal["result"]["output_complete"], false);
+    let summary = terminal["observation_summary"]
+        .as_object()
+        .expect("observation summary");
+    assert_eq!(summary["state"], "truncated");
+    assert_eq!(summary["truncated"]["reason"], "event_budget");
+    assert_eq!(summary["truncated"]["limit"], 5);
 }
 
 #[test]
-fn truncated_trace_is_marked_without_claiming_complete_coverage() {
-    let analysis = golden("control-flow.json");
-    let run = std::fs::read_to_string(
-        repo_root().join("tests/golden/trace-v2/control-flow.truncated.run.json"),
-    )
-    .expect("run golden");
-    let trace = std::fs::read_to_string(
-        repo_root().join("tests/golden/trace-v2/control-flow.truncated.trace.json"),
-    )
-    .expect("trace golden");
-    let fixture = fixture_with(
-        "exec-trace-truncated",
-        "examples/control-flow",
-        &analysis,
-        &run,
-        Some(&trace),
-        ExecutionConfig::default().with_timeout(10),
-    );
+fn event_frames_use_the_view_run_events_schema_and_numeric_ids() {
+    let fixture = control_flow("ctrl-events");
+    let analysis = golden(ANALYSIS);
     let body = request_body(
         &analysis,
         serde_json::json!({"kind": "entry"}),
         "pure",
         serde_json::json!({}),
-        "req-trace-truncated",
+        "req-events",
     );
     let accepted = fixture
         .controller
@@ -642,11 +636,20 @@ fn truncated_trace_is_marked_without_claiming_complete_coverage() {
         .expect("accepted");
     let subscription = fixture
         .controller
-        .subscribe("session-a", &accepted.run_id, Some(0))
+        .subscribe("session-a", &accepted.run_id, None)
         .expect("subscribe");
-    let (_events, terminal) = terminal_events(subscription);
+    let (events, terminal) = terminal_events(subscription);
+    assert!(events.iter().all(|event| {
+        event["schema"] == "marqdo.view-run-events" && event["schema_version"] == 1
+    }));
+    assert!(events
+        .iter()
+        .all(|event| event["run_id"] == accepted.run_id));
+    assert!(events.iter().all(|event| event["seq"].as_u64().is_some()));
+    let observation_frames = events
+        .iter()
+        .filter(|event| event.get("observation").is_some())
+        .count();
+    assert!(observation_frames > 0, "events: {events:?}");
     assert_eq!(terminal["state"], "succeeded");
-    assert_eq!(terminal["trace"]["status"], "verified");
-    assert_eq!(terminal["trace"]["truncated"]["reason"], "event_budget");
-    assert_eq!(terminal["trace"]["truncated"]["limit"], 5);
 }

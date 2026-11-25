@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Prove a frozen marqdo release binary is byte-identical before and after a
-# command sequence (RFC-VIEW-0002 §2 / §9.4 / §10.2).
+# command sequence (issue #4/#5 release evidence).
 #
 # Usage:
 #   scripts/verify-frozen-cli.sh /abs/path/marqdo [-- EXPECTED_SHA256] -- CMD [ARGS...]

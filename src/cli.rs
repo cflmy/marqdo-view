@@ -12,8 +12,8 @@ use std::path::PathBuf;
 #[command(
     name = "marqdo-view",
     version,
-    about = "Read .mq.md documents as documents: static Analysis v2, optional explicit run Trace v2",
-    long_about = "Marqdo View renders the original Markdown and attaches verified Analysis v2 facts. \
+    about = "Read .mq.md documents as documents: static Analysis v3, optional explicit Observation v1",
+    long_about = "Marqdo View renders the original Markdown and attaches verified Analysis v3 facts. \
                   Running is never implicit: it requires an explicit user action. \
                   Export is always a pure read-only operation.",
     disable_help_subcommand = true,

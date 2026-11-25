@@ -3,11 +3,12 @@
 
 use crate::{
     execution::{events::RunState, export_candidate::TerminalExportCandidate},
+    protocol::tool_v1,
     reader::{
         assemble::DocumentService,
         media,
         model::PresentationModel,
-        snapshot::{ExportResultOverlay, SnapshotExecution, SnapshotProtocols, SnapshotSource},
+        snapshot::{ExportResultOverlay, SnapshotContracts, SnapshotExecution, SnapshotSource},
         source::{sha256_hex, SafeRelativePath},
     },
     ViewError, ViewResult,
@@ -44,7 +45,7 @@ struct Include {
     result_value: bool,
     stdout: bool,
     stderr: bool,
-    trace_summary: bool,
+    observation_summary: bool,
     arguments: bool,
 }
 
@@ -113,7 +114,7 @@ impl ExportSelection {
             || !candidate.output_complete
             || !candidate.result_complete
             || candidate.observation_truncated
-            || candidate.trace_status == "truncated")
+            || candidate.observation_status == "truncated")
             && !self.confirm_partial
         {
             return Err(invalid());
@@ -147,13 +148,14 @@ impl ExportSelection {
             },
             execution: SnapshotExecution {
                 included: true,
-                core_run_id: candidate.core_run_id.clone(),
+                core_run_id: candidate.observation_run_id.clone(),
                 target: candidate.function_id.clone(),
                 core_version: candidate.core_version.clone(),
                 status: candidate.state.data_value(),
                 terminal_at: candidate.terminal_at.clone(),
                 source_verified: true,
-                trace_status: candidate.trace_status.clone(),
+                observation_status: candidate.observation_status.clone(),
+                capture_level: candidate.capture_level.clone(),
                 result_complete: candidate.result_complete,
                 output_complete: candidate.output_complete,
                 observation_truncated: candidate.observation_truncated,
@@ -163,10 +165,10 @@ impl ExportSelection {
                     "omitted"
                 },
                 mode: candidate.mode.clone(),
-                core_protocol: SnapshotProtocols {
+                contracts: SnapshotContracts {
+                    api_revision: tool_v1::API_REVISION,
                     analysis: candidate.analysis_version,
-                    trace: 2,
-                    events: 1,
+                    observation: tool_v1::OBSERVATION_REVISION,
                 },
             },
             label: candidate.label.clone(),
@@ -177,10 +179,10 @@ impl ExportSelection {
                 .flatten(),
             stdout: self.include.stdout.then(|| candidate.stdout.clone()),
             stderr: self.include.stderr.then(|| candidate.stderr.clone()),
-            trace_counts: self
+            observation_counts: self
                 .include
-                .trace_summary
-                .then(|| candidate.trace_counts.clone())
+                .observation_summary
+                .then(|| candidate.observation_counts.clone())
                 .flatten(),
             arguments: self.include.arguments.then(|| candidate.arguments.clone()),
         };

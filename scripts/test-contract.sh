@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Contract-focused gate: formatting, lints, all tests, Tool v1 install smoke,
-# static verify and static export against the frozen core. No browser.
+# Contract-focused gate: formatting, lints, all tests, CLI Tool revision 1
+# install smoke, static verify and static export against the frozen core.
+# No browser. Current contracts: Analysis revision 3, Observation revision 1.
 #
 # Usage: MARQDO_BIN=/abs/path/marqdo scripts/test-contract.sh
 set -euo pipefail

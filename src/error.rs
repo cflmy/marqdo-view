@@ -37,8 +37,17 @@ pub enum ViewError {
     SourceSpanInvalid {
         detail: String,
     },
-    /// Trace does not bind to the current Analysis bytes.
-    TraceStale {
+    /// Observation v1 is malformed, mixed, out of order or violates the
+    /// selected observation policy.
+    ObservationInvalid {
+        detail: String,
+    },
+    /// Observation does not bind to the current Analysis bytes/source.
+    ObservationStale {
+        detail: String,
+    },
+    /// The CLI rejected an option combination before starting (exit code 2).
+    CoreOptionRejected {
         detail: String,
     },
     /// The user did not confirm, or the requested mode/grants are not allowed.
@@ -106,7 +115,7 @@ pub enum ViewError {
     OutputLimit {
         detail: String,
     },
-    /// The CLI exited but its `--json` document was missing or invalid.
+    /// The CLI exited but its Observation v1 stream was missing or invalid.
     CoreProtocol {
         detail: String,
     },
@@ -136,7 +145,9 @@ impl ViewError {
             ViewError::AnalysisFailed { .. } => "view.analysis_failed",
             ViewError::SourceMismatch { .. } => "view.source_mismatch",
             ViewError::SourceSpanInvalid { .. } => "view.source_span_invalid",
-            ViewError::TraceStale { .. } => "view.trace_stale",
+            ViewError::ObservationInvalid { .. } => "view.observation_invalid",
+            ViewError::ObservationStale { .. } => "view.observation_stale",
+            ViewError::CoreOptionRejected { .. } => "view.core_option_rejected",
             ViewError::RunDenied { .. } => "view.run_denied",
             ViewError::PathForbidden { .. } => "view.path_forbidden",
             ViewError::BindDenied { .. } => "view.bind_denied",
@@ -170,6 +181,8 @@ impl ViewError {
             | ViewError::PathForbidden { .. }
             | ViewError::BindDenied { .. }
             | ViewError::SourceSpanInvalid { .. }
+            | ViewError::ObservationInvalid { .. }
+            | ViewError::CoreOptionRejected { .. }
             | ViewError::Unsupported { .. }
             | ViewError::RunInvalid { .. }
             | ViewError::NoEntryFunction { .. }
@@ -208,7 +221,11 @@ impl ViewError {
             "view.analysis_failed" => "Core 静态检查失败；正文仍可阅读，语义标注已撤销。",
             "view.source_mismatch" => "当前源码与 Analysis 字节摘要不一致。",
             "view.source_span_invalid" => "语义位置超出源码或不在 UTF-8 边界。",
-            "view.trace_stale" => "运行结果与当前 Analysis 不匹配，已标记为过期。",
+            "view.observation_invalid" => "运行观察事件无效或不符合当前协议，已拒绝展示。",
+            "view.observation_stale" => "运行结果与当前 Analysis 不匹配，已标记为过期。",
+            "view.core_option_rejected" => {
+                "冻结核心在启动前拒绝了该选项组合（ exit 2 ）；View 不会去掉参数重试。"
+            }
             "view.run_denied" => "运行请求未获授权或被拒绝。",
             "view.path_forbidden" => "请求的路径超出允许的项目根目录。",
             "view.bind_denied" => "拒绝绑定该网络地址。",
@@ -226,7 +243,7 @@ impl ViewError {
             "view.run_busy" => "已有一次运行正在进行；本版本每个 View 服务只允许一个任务。",
             "view.run_conflict" => "同一客户端请求 ID 携带了不同内容，拒绝执行。",
             "view.run_not_found" => "运行任务不存在、已过期或不属于当前会话。",
-            "view.core_protocol" => "冻结核心退出但未给出合法的 --json 结果。",
+            "view.core_protocol" => "冻结核心退出但未给出合法的 Observation v1 事件流。",
             "view.sse_busy" => "该运行任务的 SSE 观察连接超过上限，请稍后重试。",
             "view.output_limit" => "执行输出超过 View 的接收上限，已停止接收。",
             "view.io" => "本地 I/O 失败。",
@@ -264,7 +281,9 @@ impl ViewError {
             | ViewError::ProtocolIncompatible { detail }
             | ViewError::AnalysisFailed { detail }
             | ViewError::SourceSpanInvalid { detail }
-            | ViewError::TraceStale { detail }
+            | ViewError::ObservationInvalid { detail }
+            | ViewError::ObservationStale { detail }
+            | ViewError::CoreOptionRejected { detail }
             | ViewError::RunDenied { detail }
             | ViewError::PathForbidden { detail }
             | ViewError::BindDenied { detail }

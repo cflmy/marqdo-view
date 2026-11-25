@@ -2,10 +2,19 @@
 //!
 //! One explicit `POST /api/runs` request becomes exactly one Core subprocess.
 //! The controller owns the job state machine, deduplication, cancellation, the
-//! bounded event log and Trace verification; it never polls and never starts a
-//! second process for the same accepted job (RFC-VIEW-0002 §6.6/§6.7).
+//! bounded View event log and Observation v1 binding; it never polls and never
+//! starts a second process for the same accepted job (RFC-VIEW-0002 §6.6/§6.7).
+//!
+//! Production consumes the live `--output jsonl` Observation stream only: every
+//! stdout byte chunk goes through exactly one [`ObservationDecoder`], whose
+//! normalized browser projections are published as View SSE frames. The CLI's
+//! atomic `--observation-file` snapshot is requested for parity/forensics but is
+//! never merged back (no double read, no second decoder).
 
-use crate::core_client::{build_call_args, build_run_args, RunOptions, SandboxMode, ScratchDir};
+use crate::core_client::{
+    build_call_args, build_run_args, RunOptions, SandboxMode, ScratchDir,
+    DEFAULT_OBSERVE_MAX_BYTES, DEFAULT_OBSERVE_MAX_EVENTS, DEFAULT_OBSERVE_MAX_VALUE_BYTES,
+};
 use crate::error::{ViewError, ViewResult};
 use crate::execution::events::{EventLog, RunEvent, RunState, Subscription};
 use crate::execution::export_candidate::TerminalExportCandidate;
@@ -13,11 +22,16 @@ use crate::execution::process::{
     run_bounded_with_hook, Captured, ProcessBudget, ProcessHooks, ProcessOutcome,
 };
 use crate::execution::request::{self, payload_digest, ExecutionPlan, ExecutionTarget, RunMode};
-use crate::protocol::execution_events_v1 as core_events;
-use crate::protocol::trace_v2::{verify_trace, TraceVerificationInput};
+use crate::protocol::observation_v1::{
+    self, ObservationDecoder, RunDisplayState, RunProjection, RunValue,
+};
+use crate::protocol::tool_v1;
 use crate::reader::assemble::{DocumentService, StaticDocument};
 use crate::reader::source::{sha256_hex, sha256_prefixed};
 use std::collections::{HashMap, VecDeque};
+use std::ffi::OsString;
+use std::io::Read;
+use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Receiver;
 use std::sync::{Arc, Mutex};
@@ -31,12 +45,6 @@ pub const DEFAULT_MAX_SSE_CONNECTIONS: usize = 2;
 /// Execution budgets sent explicitly on every `run`/`call` (RFC §6.7).
 pub const DEFAULT_FUEL: u64 = 1_000_000;
 pub const DEFAULT_MAX_OUTPUT: u64 = 1_048_576;
-pub const DEFAULT_TRACE_MAX_EVENTS: u64 = 10_000;
-pub const DEFAULT_TRACE_MAX_BYTES: u64 = 4_194_304;
-/// Maximum JSON/trace bytes accepted from one execution.
-pub const MAX_RESULT_JSON_BYTES: usize = 4 * 1024 * 1024;
-pub const MAX_TRACE_FILE_BYTES: usize = 4 * 1024 * 1024;
-
 #[derive(Debug, Clone)]
 pub struct ExecutionConfig {
     /// View-owned wall clock; kept equal to the Core `--timeout` value.
@@ -177,10 +185,22 @@ struct ControllerState {
     dedupe: HashMap<(String, String), DedupeEntry>,
 }
 
+/// One spawned execution. The decoder consumed the whole live stdout JSONL
+/// stream; it is returned here so the terminal classification happens once,
+/// after the child exited and the post-run source re-read.
 struct CoreRun {
     process: ProcessOutcome,
-    trace: ViewResult<Option<Vec<u8>>>,
-    stream: Option<core_events::Stream>,
+    decoder: Option<ObservationDecoder>,
+}
+
+/// Everything the executor needs to publish exactly one terminal frame.
+struct TerminalOutcome {
+    state: RunState,
+    result: serde_json::Value,
+    observation_summary: Option<serde_json::Value>,
+    observation: Option<RunProjection>,
+    error_code: Option<String>,
+    error_message: Option<String>,
 }
 
 pub struct ExecutionController {
@@ -315,11 +335,6 @@ impl ExecutionController {
         let started = Instant::now();
         let outcome = self.run_core(&job, &plan, &static_doc);
         let cancel_requested = job.cancel.load(Ordering::SeqCst);
-        eprintln!(
-            "JOB_DEBUG id={} run_core elapsed={:?} cancel={cancel_requested}",
-            job.run_id,
-            started.elapsed()
-        );
         let terminal = self.build_terminal(&plan, &static_doc, started, outcome, cancel_requested);
         let Ok(mut inner) = job.inner.lock() else {
             return;
@@ -327,39 +342,36 @@ impl ExecutionController {
         if inner.log.terminal() {
             return;
         }
-        let (state, result, trace, trace_status, error_code, error_message) = terminal;
-        let mut result = result;
-        result["trace_status"] = serde_json::json!(trace_status.clone());
+        let mut result = terminal.result;
         if let Some(candidate) = TerminalExportCandidate::from_terminal(
-            state,
+            terminal.state,
             &plan,
             &static_doc,
             &result,
-            trace.as_ref(),
+            terminal.observation.as_ref(),
         ) {
             result["export_preview"] = candidate.preview();
             inner.export_candidate = Some(Arc::new(candidate));
         }
-        match state {
+        match terminal.state {
             RunState::Succeeded => {
-                inner.log.publish_complete(result, trace);
+                inner
+                    .log
+                    .publish_complete(result, terminal.observation_summary);
             }
             _ => {
                 inner.log.publish_error(
-                    state,
-                    error_code.as_deref().unwrap_or("view.run_failed"),
-                    error_message.as_deref().unwrap_or("运行失败"),
+                    terminal.state,
+                    terminal.error_code.as_deref().unwrap_or("view.run_failed"),
+                    terminal
+                        .error_message
+                        .as_deref()
+                        .unwrap_or("运行失败或观察未完成"),
                     Some(result),
-                    trace,
+                    terminal.observation_summary,
                 );
             }
         }
-        eprintln!(
-            "JOB_DEBUG id={} terminal state={:?} total={:?}",
-            job.run_id,
-            state,
-            started.elapsed()
-        );
         inner.terminal_at = Some(Instant::now());
         drop(inner);
 
@@ -373,6 +385,11 @@ impl ExecutionController {
 
     /// Spawn and wait for the one Core subprocess. `running` is published only
     /// after the process was actually spawned (through the spawn hook).
+    ///
+    /// Every stdout byte is fed into the *same* [`ObservationDecoder`] on the
+    /// reader thread; each normalized browser projection is published as a View
+    /// SSE frame immediately. The decoder is handed back after EOF so the
+    /// terminal classification can validate the exact stream once.
     fn run_core(
         &self,
         job: &Arc<Job>,
@@ -387,17 +404,10 @@ impl ExecutionController {
             })?;
         let entry = self.service.project().absolute_for(&plan.document)?;
         let scratch = ScratchDir::create("run")?;
-        let trace_path = scratch.file("trace.json");
-        let mut options = self.run_options(plan);
-        let projection = &static_doc.verified.projection;
-        options.event_stream =
-            crate::protocol::tool_v1::supports_execution_events(&projection.producer_version);
-        let args = match &plan.target {
-            ExecutionTarget::Entry => build_run_args(&entry, &trace_path, &options),
-            ExecutionTarget::Function { cli_name, .. } => {
-                build_call_args(&entry, cli_name, &plan.arguments, &trace_path, &options)
-            }
-        };
+        let observation_path = scratch.file("observation.json");
+        let options = self.run_options(plan);
+        let args = build_argv(plan, &entry, &observation_path, &options);
+
         let running_job = Arc::clone(job);
         let hook = move || {
             if let Ok(mut inner) = running_job.inner.lock() {
@@ -406,45 +416,43 @@ impl ExecutionController {
                 }
             }
         };
-        let budget = ProcessBudget {
-            wall_clock: self.config.run_timeout,
-            ..self.config.budget.clone()
-        };
-        let (send_stream, receive_stream) = std::sync::mpsc::channel();
+
+        let (send_decoder, receive_decoder) = std::sync::mpsc::channel();
+        let decoder = ObservationDecoder::new(&static_doc.verified.projection);
+        let observed_job = Arc::clone(job);
         let mut hooks = ProcessHooks {
             on_spawn: Some(Box::new(hook)),
             ..Default::default()
         };
-        if options.event_stream {
-            let entry = match &plan.target {
-                ExecutionTarget::Entry => "main",
-                ExecutionTarget::Function { cli_name, .. } => cli_name,
-            };
-            let binding = core_events::Binding {
-                digest: static_doc.analysis_digest.clone(),
-                root: projection.project_root_id.clone(),
-                entry: format!("{}::{entry}", projection.module_id),
-                function: plan.function_id.clone(),
-                mode: plan.mode.as_str().to_string(),
-                producer: projection.producer_version.clone(),
-                modules: projection
-                    .modules
-                    .iter()
-                    .map(|module| module.id.clone())
-                    .collect(),
-                max_output: DEFAULT_MAX_OUTPUT as usize,
-            };
-            let observed_job = Arc::clone(job);
-            hooks.stdout = Some(Box::new(move |stdout| {
-                let stream = core_events::read(stdout, &binding, |observation| {
-                    if let Ok(mut inner) = observed_job.inner.lock() {
-                        inner.log.publish_observation(observation);
+        hooks.stdout = Some(Box::new(move |stdout| {
+            let mut reader = stdout;
+            let mut decoder = decoder;
+            let mut buffer = [0u8; 16 * 1024];
+            loop {
+                match reader.read(&mut buffer) {
+                    Ok(0) => break,
+                    Ok(read) => {
+                        let values = decoder.push(&buffer[..read]);
+                        if !values.is_empty() {
+                            if let Ok(mut inner) = observed_job.inner.lock() {
+                                for value in values {
+                                    inner.log.publish_observation(value);
+                                }
+                            }
+                        }
                     }
-                });
-                let _ = send_stream.send(stream);
-                Captured::default()
-            }));
-        }
+                    Err(err) if err.kind() == std::io::ErrorKind::Interrupted => continue,
+                    Err(_) => break,
+                }
+            }
+            let _ = send_decoder.send(decoder);
+            Captured::default()
+        }));
+
+        let budget = ProcessBudget {
+            wall_clock: self.config.run_timeout,
+            ..self.config.budget.clone()
+        };
         let outcome = run_bounded_with_hook(
             client.bin(),
             &args,
@@ -453,30 +461,23 @@ impl ExecutionController {
             Some(Arc::clone(&job.cancel)),
             hooks,
         )?;
-        let trace = read_trace_limited(&trace_path);
+
+        // Exit code 2 is the frozen CLI rejecting the explicit argument/option
+        // combination before the run started (for example
+        // `strict.unsupported_grant`). View never strips a flag and retries.
+        classify_exit_code(
+            outcome.exit_code.unwrap_or(-1),
+            &outcome.stderr.text_lossy(),
+        )?;
+
         Ok(CoreRun {
             process: outcome,
-            trace,
-            stream: receive_stream.try_recv().ok(),
+            decoder: receive_decoder.try_recv().ok(),
         })
     }
 
     fn run_options(&self, plan: &ExecutionPlan) -> RunOptions {
-        RunOptions {
-            event_stream: false,
-            mode: match plan.mode {
-                RunMode::Pure => SandboxMode::Pure,
-                RunMode::Project => SandboxMode::Project,
-            },
-            grants: plan.grants.clone(),
-            fuel: Some(DEFAULT_FUEL),
-            stack: None,
-            max_output: Some(DEFAULT_MAX_OUTPUT),
-            timeout_seconds: Some(self.config.run_timeout_secs()),
-            view_timeout: Some(self.config.run_timeout),
-            trace_max_events: Some(DEFAULT_TRACE_MAX_EVENTS),
-            trace_max_bytes: Some(DEFAULT_TRACE_MAX_BYTES),
-        }
+        build_run_options(plan, &self.config)
     }
 
     fn build_terminal(
@@ -486,155 +487,54 @@ impl ExecutionController {
         started: Instant,
         outcome: ViewResult<CoreRun>,
         cancel_requested: bool,
-    ) -> (
-        RunState,
-        serde_json::Value,
-        Option<serde_json::Value>,
-        String,
-        Option<String>,
-        Option<String>,
-    ) {
+    ) -> TerminalOutcome {
         let duration_ms = started.elapsed().as_millis() as u64;
         let CoreRun {
             process: outcome,
-            trace: trace_bytes,
-            stream,
+            decoder,
         } = match outcome {
-            Ok(value) => value,
-            Err(err) => {
-                let state = match err.code() {
-                    "view.output_limit" => RunState::Failed,
-                    _ => RunState::Unavailable,
-                };
-                let result = base_result(plan, static_doc, duration_ms);
-                return (
-                    state,
-                    result,
-                    None,
-                    "unavailable".to_string(),
-                    Some(err.code().to_string()),
-                    Some(err.detail().to_string()),
-                );
-            }
+            Ok(core_run) => core_run,
+            Err(err) => return error_terminal(plan, static_doc, duration_ms, &err),
         };
         if outcome.cancelled {
-            let mut result = base_result(plan, static_doc, duration_ms);
-            result["stdout"] = serde_json::json!(outcome.stdout.text_lossy());
-            result["stderr"] = serde_json::json!(outcome.stderr.text_lossy());
-            return (
-                RunState::Cancelled,
-                result,
-                None,
-                "unavailable".to_string(),
-                Some("view.run_cancelled".to_string()),
-                Some("运行已按用户请求取消，进程组已终止".to_string()),
+            return cancelled_terminal(
+                plan,
+                static_doc,
+                duration_ms,
+                &outcome,
+                "运行已按用户请求取消，进程组已终止",
             );
         }
         if cancel_requested && !outcome.timed_out && !outcome.status_ok() {
             // The user cancelled; the process may have exited from SIGTERM
             // before the grace-period SIGKILL, so the adapter did not mark it
             // itself. A successful exit still wins the race (RFC §6.6).
-            let mut result = base_result(plan, static_doc, duration_ms);
-            result["stderr"] = serde_json::json!(outcome.stderr.text_lossy());
-            return (
-                RunState::Cancelled,
-                result,
-                None,
-                "unavailable".to_string(),
-                Some("view.run_cancelled".to_string()),
-                Some("运行已按用户请求取消，进程组已终止".to_string()),
+            return cancelled_terminal(
+                plan,
+                static_doc,
+                duration_ms,
+                &outcome,
+                "运行已按用户请求取消，进程组已终止",
             );
         }
         if outcome.timed_out {
-            let mut result = base_result(plan, static_doc, duration_ms);
-            result["stderr"] = serde_json::json!(outcome.stderr.text_lossy());
-            return (
-                RunState::TimedOut,
-                result,
-                None,
-                "unavailable".to_string(),
-                Some("view.core_timeout".to_string()),
-                Some(format!(
-                    "运行超过 {} 秒墙钟上限，进程组已终止",
-                    self.config.run_timeout_secs()
-                )),
+            return timed_out_terminal(
+                plan,
+                static_doc,
+                duration_ms,
+                &outcome,
+                self.config.run_timeout_secs(),
             );
         }
-        if outcome.stdout.total > MAX_RESULT_JSON_BYTES {
-            let mut result = base_result(plan, static_doc, duration_ms);
-            result["stdout_truncated"] = serde_json::json!(true);
-            return (
-                RunState::Failed,
-                result,
-                None,
-                "unavailable".to_string(),
-                Some("view.output_limit".to_string()),
-                Some(format!(
-                    "CLI JSON 输出超过 {} 字节上限，已停止接收",
-                    MAX_RESULT_JSON_BYTES
-                )),
+        let Some(decoder) = decoder else {
+            return error_terminal(
+                plan,
+                static_doc,
+                duration_ms,
+                &ViewError::ObservationInvalid {
+                    detail: "CLI 观察事件流解码器未返回终态".to_string(),
+                },
             );
-        }
-        let json: serde_json::Value = if let Some(stream) = &stream {
-            let Some(mut terminal) = stream
-                .terminal
-                .clone()
-                .filter(|terminal| terminal["success"].as_bool() == Some(outcome.status_ok()))
-            else {
-                let mut result = base_result(plan, static_doc, duration_ms);
-                result["stdout"] = serde_json::json!(String::from_utf8_lossy(&stream.stdout));
-                result["stderr"] = serde_json::json!(String::from_utf8_lossy(&stream.stderr));
-                result["output_complete"] = serde_json::json!(false);
-                return (
-                    RunState::Incomplete,
-                    result,
-                    None,
-                    "unavailable".into(),
-                    Some("view.core_protocol".into()),
-                    Some(
-                        if stream.invalid {
-                            "CLI 事件流无效"
-                        } else {
-                            "CLI 事件流缺少可信终态"
-                        }
-                        .into(),
-                    ),
-                );
-            };
-            terminal["command"] = serde_json::json!(match plan.target {
-                ExecutionTarget::Entry => "run",
-                ExecutionTarget::Function { .. } => "call",
-            });
-            terminal["stdout"] = serde_json::json!(String::from_utf8_lossy(&stream.stdout));
-            terminal["stderr"] = serde_json::json!(String::from_utf8_lossy(&stream.stderr));
-            terminal
-        } else {
-            match serde_json::from_slice::<serde_json::Value>(&outcome.stdout.bytes) {
-                Ok(value) if value.is_object() => value,
-                Ok(_) => {
-                    return (
-                        RunState::Failed,
-                        base_result(plan, static_doc, duration_ms),
-                        None,
-                        "unavailable".to_string(),
-                        Some("view.core_protocol".to_string()),
-                        Some("CLI 的 --json 输出不是 JSON 对象".to_string()),
-                    )
-                }
-                Err(err) => {
-                    return (
-                        RunState::Failed,
-                        base_result(plan, static_doc, duration_ms),
-                        None,
-                        "unavailable".to_string(),
-                        Some("view.core_protocol".to_string()),
-                        Some(format!(
-                            "无法解析 CLI --json 输出（exit {:?}）：{err}",
-                            outcome.exit_code
-                        )),
-                    )
-                }
-            }
         };
 
         // Re-read the source after the run: a changed source makes the result
@@ -645,59 +545,11 @@ impl ExecutionController {
             .read_source(&plan.document)
             .unwrap_or_default();
         let stale = sha256_hex(&current_source) != static_doc.source_sha256;
-
-        let (mut trace, mut trace_status) = match trace_bytes {
-            Ok(trace_bytes) => build_trace_summary(
-                trace_bytes.as_deref(),
-                static_doc,
-                &json,
-                outcome.exit_code.unwrap_or(-1),
-                stale,
-            ),
-            Err(_) => (None, "invalid".into()),
-        };
-        let mut result = build_cli_result(plan, static_doc, duration_ms, &json, &outcome);
-        result["stale"] = serde_json::json!(stale);
-        if let Some(stream) = stream {
-            result["event_protocol"] = serde_json::json!(1);
-            result["core_run_id"] = serde_json::json!(stream.id);
-            result["source_verified"] = serde_json::json!(stream.verified && !stale);
-            result["observation_truncated"] = serde_json::json!(stream.truncated);
-            result["stdout_bytes"] = serde_json::json!(stream.stdout.len());
-            result["stderr_bytes"] = serde_json::json!(stream.stderr.len());
-            result["output_complete"] = serde_json::json!(
-                std::str::from_utf8(&stream.stdout).is_ok()
-                    && std::str::from_utf8(&stream.stderr).is_ok()
-                    && !json["error"]["code"]
-                        .as_str()
-                        .is_some_and(|code| code.contains("output_limit"))
-            );
-            if trace_status == "verified"
-                && trace
-                    .as_ref()
-                    .and_then(|trace| trace["core_run_id"].as_str())
-                    != Some(&stream.id)
-            {
-                trace = None;
-                trace_status = "invalid".into();
-            }
-        }
-        let success = json
-            .get("success")
-            .and_then(serde_json::Value::as_bool)
-            .unwrap_or(false);
-        if success {
-            (RunState::Succeeded, result, trace, trace_status, None, None)
-        } else {
-            let (code, message) = cli_error(&json);
-            (
-                RunState::Failed,
-                result,
-                trace,
-                trace_status,
-                Some(code),
-                Some(message),
-            )
+        let process_stderr = outcome.stderr.text_lossy();
+        let exit_code = outcome.exit_code.unwrap_or(-1);
+        match decoder.finish(exit_code, &process_stderr, stale) {
+            Ok(projection) => terminal_from_projection(plan, static_doc, duration_ms, projection),
+            Err(err) => error_terminal(plan, static_doc, duration_ms, &err),
         }
     }
 
@@ -709,7 +561,6 @@ impl ExecutionController {
             detail: "job lock poisoned".to_string(),
         })?;
         let state_now = inner.log.last_state();
-        eprintln!("CANCEL_DEBUG id={} last_state={state_now:?}", job.run_id);
         if state_now.is_terminal() {
             return Ok(state_now);
         }
@@ -838,23 +689,60 @@ impl ExecutionController {
     }
 }
 
-fn read_trace_limited(path: &std::path::Path) -> ViewResult<Option<Vec<u8>>> {
-    use std::io::Read;
-    let file = match std::fs::File::open(path) {
-        Ok(file) => file,
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(err) => return Err(ViewError::io("open Core Trace", err)),
-    };
-    let mut bytes = Vec::new();
-    file.take(MAX_TRACE_FILE_BYTES as u64 + 1)
-        .read_to_end(&mut bytes)
-        .map_err(|err| ViewError::io("read Core Trace", err))?;
-    if bytes.len() > MAX_TRACE_FILE_BYTES {
-        return Err(ViewError::OutputLimit {
-            detail: "Trace v2 byte limit exceeded".into(),
-        });
+/// Build the exact argv for one already-approved execution. Kept pure so a unit
+/// test can prove retired Trace/Events flags can never appear again.
+fn build_argv(
+    plan: &ExecutionPlan,
+    entry: &Path,
+    observation_file: &Path,
+    options: &RunOptions,
+) -> Vec<OsString> {
+    match &plan.target {
+        ExecutionTarget::Entry => build_run_args(entry, observation_file, options),
+        ExecutionTarget::Function { cli_name, .. } => {
+            build_call_args(entry, cli_name, &plan.arguments, observation_file, options)
+        }
     }
-    Ok((!bytes.is_empty()).then_some(bytes))
+}
+
+fn build_run_options(plan: &ExecutionPlan, config: &ExecutionConfig) -> RunOptions {
+    RunOptions {
+        mode: match plan.mode {
+            RunMode::Pure => SandboxMode::Pure,
+            RunMode::Project => SandboxMode::Project,
+        },
+        grants: plan.grants.clone(),
+        fuel: Some(DEFAULT_FUEL),
+        stack: None,
+        max_output: Some(DEFAULT_MAX_OUTPUT),
+        timeout_seconds: Some(config.run_timeout_secs()),
+        view_timeout: Some(config.run_timeout),
+        observe_max_events: DEFAULT_OBSERVE_MAX_EVENTS,
+        observe_max_bytes: DEFAULT_OBSERVE_MAX_BYTES,
+        observe_max_value_bytes: DEFAULT_OBSERVE_MAX_VALUE_BYTES,
+        // View requests no variable/parameter values unless a future explicit
+        // consent path is added; text values additionally need the second
+        // confirmation. Empty here means the CLI records types only.
+        observe_variables: Vec::new(),
+        observe_parameters: Vec::new(),
+        observe_text_values: false,
+    }
+}
+
+/// Exit code 2 means the frozen CLI refused the explicit option combination
+/// before any execution. This is a hard View error with the CLI stderr text;
+/// View never removes an argument and retries.
+fn classify_exit_code(exit_code: i32, stderr: &str) -> ViewResult<()> {
+    if exit_code != 2 {
+        return Ok(());
+    }
+    let text: String = stderr.trim().chars().take(400).collect();
+    let detail = if text.is_empty() {
+        "冻结核心以 exit 2 拒绝了本次运行参数；View 不会移除参数重试。".to_string()
+    } else {
+        format!("冻结核心以 exit 2 拒绝了本次运行参数；View 不会移除参数重试：{text}")
+    };
+    Err(ViewError::CoreOptionRejected { detail })
 }
 
 fn base_result(
@@ -883,280 +771,294 @@ fn base_result(
     })
 }
 
-fn build_cli_result(
+/// One terminal result where no Observation projection could be produced
+/// (spawn failure, invalid/stale stream, timeout, cancellation). It can never
+/// be success and never has complete output.
+fn unavailable_result(
     plan: &ExecutionPlan,
     static_doc: &StaticDocument,
     duration_ms: u64,
-    json: &serde_json::Value,
-    outcome: &ProcessOutcome,
+    observation_status: &str,
+    stale: bool,
 ) -> serde_json::Value {
     let mut result = base_result(plan, static_doc, duration_ms);
-    result["command"] = json
-        .get("command")
-        .cloned()
-        .unwrap_or(serde_json::json!("run"));
-    result["success"] = json
-        .get("success")
-        .cloned()
-        .unwrap_or(serde_json::json!(false));
-    result["exit_code"] = serde_json::json!(outcome.exit_code);
-    result["value"] = json
-        .get("value")
-        .cloned()
-        .unwrap_or(serde_json::Value::Null);
-    let (value_type, value_text) = summarize_value(json.get("value"));
-    result["value_type"] = serde_json::json!(value_type);
-    result["value_text"] = serde_json::json!(value_text);
-    result["stdout"] = json.get("stdout").cloned().unwrap_or(serde_json::json!(""));
-    result["stderr"] = json.get("stderr").cloned().unwrap_or(serde_json::json!(""));
-    result["diagnostics"] = json
-        .get("diagnostics")
-        .cloned()
-        .unwrap_or(serde_json::json!([]));
-    let success = json
-        .get("success")
-        .and_then(serde_json::Value::as_bool)
-        .unwrap_or(false);
-    result["error"] = if success {
-        serde_json::Value::Null
-    } else {
-        let (code, message) = cli_error(json);
-        serde_json::json!({"code": code, "message": message})
-    };
-    result["stdout_bytes"] = serde_json::json!(outcome.stdout.total);
-    result["stderr_bytes"] = serde_json::json!(outcome.stderr.total);
+    result["success"] = serde_json::json!(false);
+    result["command"] = serde_json::json!(command_for(plan));
+    result["observation_status"] = serde_json::json!(observation_status);
+    result["observation_protocol"] = serde_json::json!(tool_v1::OBSERVATION_REVISION);
+    result["observation_truncated"] = serde_json::json!(false);
+    result["capture_level"] = serde_json::json!("");
+    result["core_run_id"] = serde_json::Value::Null;
+    result["source_verified"] = serde_json::json!(false);
+    result["output_complete"] = serde_json::json!(false);
+    result["stale"] = serde_json::json!(stale);
+    result["value"] = serde_json::Value::Null;
+    result["value_type"] = serde_json::json!("none");
+    result["value_text"] = serde_json::json!("无返回值");
+    result["stdout"] = serde_json::json!("");
+    result["stderr"] = serde_json::json!("");
+    result["stdout_bytes"] = serde_json::json!(0);
+    result["stderr_bytes"] = serde_json::json!(0);
+    result["exit_code"] = serde_json::Value::Null;
+    result["diagnostics"] = serde_json::json!([]);
+    result["warnings"] = serde_json::json!([]);
     result
 }
 
-fn cli_error(json: &serde_json::Value) -> (String, String) {
-    if let Some(error) = json.get("error") {
-        if let Some(text) = error.as_str() {
-            let code = json
-                .get("code")
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or("core.error")
-                .to_string();
-            return (code, text.to_string());
-        }
-        if error.is_object() {
-            let code = error
-                .get("code")
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or("core.error")
-                .to_string();
-            let message = error
-                .get("message")
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or("冻结核心报告运行失败")
-                .to_string();
-            return (code, message);
+fn command_for(plan: &ExecutionPlan) -> &'static str {
+    match plan.target {
+        ExecutionTarget::Entry => "run",
+        ExecutionTarget::Function { .. } => "call",
+    }
+}
+
+fn error_terminal_state(err: &ViewError) -> (RunState, &'static str, bool) {
+    match err.code() {
+        "view.observation_stale" => (RunState::Failed, "stale", true),
+        "view.observation_invalid" => (RunState::Failed, "invalid", false),
+        "view.core_option_rejected" => (RunState::Failed, "unavailable", false),
+        _ => (RunState::Unavailable, "unavailable", false),
+    }
+}
+
+fn error_terminal(
+    plan: &ExecutionPlan,
+    static_doc: &StaticDocument,
+    duration_ms: u64,
+    err: &ViewError,
+) -> TerminalOutcome {
+    let (state, observation_status, stale) = error_terminal_state(err);
+    let mut result = unavailable_result(plan, static_doc, duration_ms, observation_status, stale);
+    result["exit_code"] = if err.code() == "view.core_option_rejected" {
+        serde_json::json!(2)
+    } else {
+        serde_json::Value::Null
+    };
+    result["error"] = serde_json::json!({
+        "code": err.code(),
+        "message": err.detail(),
+    });
+    let (observation, observation_summary) = if err.code() == "view.observation_stale" {
+        let projection = observation_v1::stale_projection(&static_doc.analysis_digest);
+        let summary =
+            observation_v1::summary_json(&projection, &static_doc.verified.projection, true);
+        (Some(projection), Some(summary))
+    } else {
+        (None, None)
+    };
+    TerminalOutcome {
+        state,
+        result,
+        observation_summary,
+        observation,
+        error_code: Some(err.code().to_string()),
+        error_message: Some(err.detail().to_string()),
+    }
+}
+
+fn cancelled_terminal(
+    plan: &ExecutionPlan,
+    static_doc: &StaticDocument,
+    duration_ms: u64,
+    outcome: &ProcessOutcome,
+    message: &str,
+) -> TerminalOutcome {
+    let mut result = unavailable_result(plan, static_doc, duration_ms, "unavailable", false);
+    result["exit_code"] = serde_json::json!(outcome.exit_code);
+    result["stdout"] = serde_json::json!(outcome.stdout.text_lossy());
+    result["stderr"] = serde_json::json!(outcome.stderr.text_lossy());
+    result["stdout_bytes"] = serde_json::json!(outcome.stdout.total);
+    result["stderr_bytes"] = serde_json::json!(outcome.stderr.total);
+    result["error"] = serde_json::json!({
+        "code": "view.run_cancelled",
+        "message": message,
+    });
+    TerminalOutcome {
+        state: RunState::Cancelled,
+        result,
+        observation_summary: None,
+        observation: None,
+        error_code: Some("view.run_cancelled".to_string()),
+        error_message: Some(message.to_string()),
+    }
+}
+
+fn timed_out_terminal(
+    plan: &ExecutionPlan,
+    static_doc: &StaticDocument,
+    duration_ms: u64,
+    outcome: &ProcessOutcome,
+    run_timeout_secs: u64,
+) -> TerminalOutcome {
+    let message = format!("运行超过 {run_timeout_secs} 秒墙钟上限，进程组已终止");
+    let mut result = unavailable_result(plan, static_doc, duration_ms, "unavailable", false);
+    result["exit_code"] = serde_json::json!(outcome.exit_code);
+    result["stdout"] = serde_json::json!(outcome.stdout.text_lossy());
+    result["stderr"] = serde_json::json!(outcome.stderr.text_lossy());
+    result["stdout_bytes"] = serde_json::json!(outcome.stdout.total);
+    result["stderr_bytes"] = serde_json::json!(outcome.stderr.total);
+    result["error"] = serde_json::json!({
+        "code": "view.core_timeout",
+        "message": message,
+    });
+    TerminalOutcome {
+        state: RunState::TimedOut,
+        result,
+        observation_summary: None,
+        observation: None,
+        error_code: Some("view.core_timeout".to_string()),
+        error_message: Some(message),
+    }
+}
+
+/// Map a verified Observation display state to the View-owned terminal state.
+/// Truncation is a *successful terminal* (the run finished) but the result is
+/// explicitly marked incomplete; stale/invalid never become success.
+fn terminal_state_for(state: RunDisplayState) -> RunState {
+    match state {
+        RunDisplayState::Succeeded | RunDisplayState::Truncated => RunState::Succeeded,
+        RunDisplayState::Failed => RunState::Failed,
+        RunDisplayState::Incomplete => RunState::Incomplete,
+        // Stale/Unsupported/NotRun/StaticOnly/Running are never produced by a
+        // finished JSONL stream; treat any of them as an unusable terminal.
+        RunDisplayState::Stale
+        | RunDisplayState::Unsupported
+        | RunDisplayState::NotRun
+        | RunDisplayState::StaticOnly
+        | RunDisplayState::Running => RunState::Unavailable,
+    }
+}
+
+/// Observation binding status exposed to the browser. A failed *run* can still
+/// have a fully verified observation stream; truncation is called out first.
+fn observation_status_for(projection: &RunProjection) -> &'static str {
+    if projection.truncated.is_some() {
+        "truncated"
+    } else {
+        match projection.state {
+            RunDisplayState::Succeeded | RunDisplayState::Failed => "verified",
+            _ => "invalid",
         }
     }
-    let code = json
-        .get("code")
-        .and_then(serde_json::Value::as_str)
-        .unwrap_or("core.run_failed")
-        .to_string();
-    (code, "冻结核心报告运行失败".to_string())
+}
+
+/// Truncated observations are terminal but never complete.
+fn output_is_complete(projection: &RunProjection) -> bool {
+    projection.output_complete && projection.truncated.is_none()
+}
+
+fn terminal_from_projection(
+    plan: &ExecutionPlan,
+    static_doc: &StaticDocument,
+    duration_ms: u64,
+    projection: RunProjection,
+) -> TerminalOutcome {
+    let state = terminal_state_for(projection.state);
+    let observation_status = observation_status_for(&projection);
+    let result = observation_result(
+        plan,
+        static_doc,
+        duration_ms,
+        &projection,
+        observation_status,
+    );
+    let summary = observation_v1::summary_json(&projection, &static_doc.verified.projection, false);
+    let (error_code, error_message) = match state {
+        RunState::Failed => (
+            Some(
+                projection
+                    .error_code
+                    .clone()
+                    .unwrap_or_else(|| "view.run_failed".to_string()),
+            ),
+            Some(first_warning(&projection)),
+        ),
+        RunState::Incomplete => (
+            Some(
+                projection
+                    .error_code
+                    .clone()
+                    .unwrap_or_else(|| "view.observation_incomplete".to_string()),
+            ),
+            Some(first_warning(&projection)),
+        ),
+        _ => (None, None),
+    };
+    TerminalOutcome {
+        state,
+        result,
+        observation_summary: Some(summary),
+        observation: Some(projection),
+        error_code,
+        error_message,
+    }
+}
+
+fn first_warning(projection: &RunProjection) -> String {
+    projection
+        .warnings
+        .first()
+        .cloned()
+        .unwrap_or_else(|| "运行未成功完成".to_string())
+}
+
+fn observation_result(
+    plan: &ExecutionPlan,
+    static_doc: &StaticDocument,
+    duration_ms: u64,
+    projection: &RunProjection,
+    observation_status: &str,
+) -> serde_json::Value {
+    let mut result = base_result(plan, static_doc, duration_ms);
+    result["command"] = serde_json::json!(command_for(plan));
+    result["success"] = serde_json::json!(projection.is_success());
+    result["exit_code"] = serde_json::json!(projection.exit_code);
+    let (value, value_type, value_text) = observed_value(projection.result_value.as_ref());
+    result["value"] = value;
+    result["value_type"] = serde_json::json!(value_type);
+    result["value_text"] = serde_json::json!(value_text);
+    result["stdout"] = serde_json::json!(projection.stdout);
+    result["stderr"] = serde_json::json!(projection.stderr);
+    result["stdout_bytes"] = serde_json::json!(projection.stdout.len());
+    result["stderr_bytes"] = serde_json::json!(projection.stderr.len());
+    result["diagnostics"] = serde_json::json!([]);
+    result["error"] = match projection.state {
+        RunDisplayState::Failed | RunDisplayState::Incomplete => {
+            let code = projection
+                .error_code
+                .clone()
+                .unwrap_or_else(|| "view.run_failed".to_string());
+            serde_json::json!({"code": code, "message": first_warning(projection)})
+        }
+        _ => serde_json::Value::Null,
+    };
+    result["core_run_id"] = serde_json::json!(projection.run_id);
+    result["capture_level"] = serde_json::json!(projection.capture_level);
+    result["observation_status"] = serde_json::json!(observation_status);
+    result["observation_protocol"] = serde_json::json!(tool_v1::OBSERVATION_REVISION);
+    result["observation_truncated"] = serde_json::json!(projection.truncated.is_some());
+    result["source_verified"] = serde_json::json!(projection.source_verified);
+    result["output_complete"] = serde_json::json!(output_is_complete(projection));
+    result["warnings"] = serde_json::json!(projection.warnings);
+    result
 }
 
 /// Safe Wire Value summary: recognized scalars are rendered as text; everything
-/// else stays inert JSON that the frontend only shows via text nodes.
-fn summarize_value(value: Option<&serde_json::Value>) -> (String, String) {
-    let Some(value) = value else {
-        return ("none".to_string(), "无返回值".to_string());
-    };
-    let Some(object) = value.as_object() else {
-        return (
-            "unknown".to_string(),
-            "未知 Wire Value（已折叠）".to_string(),
-        );
-    };
-    let ty = object
-        .get("type")
-        .and_then(serde_json::Value::as_str)
-        .unwrap_or("unknown");
-    let text = match ty {
-        "unit" => "Unit（无返回值）".to_string(),
-        "none" => "None".to_string(),
-        "bool" => format!(
-            "Bool({})",
-            object
-                .get("value")
-                .map(serde_json::Value::to_string)
-                .unwrap_or_else(|| "?".to_string())
+/// else stays inert. The decoder already applied value consent, so View never
+/// re-derives or widens what the user requested.
+fn observed_value(value: Option<&RunValue>) -> (serde_json::Value, String, String) {
+    match value {
+        None => (
+            serde_json::Value::Null,
+            "none".to_string(),
+            "无返回值".to_string(),
         ),
-        "int" => format!(
-            "Int({})",
-            object
-                .get("decimal")
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or("?")
+        Some(value) => (
+            serde_json::Value::Null,
+            value.ty.clone(),
+            value.display.clone(),
         ),
-        "text" => format!(
-            "Text({})",
-            object
-                .get("value")
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or("")
-        ),
-        "float" => match object.get("special").and_then(serde_json::Value::as_str) {
-            Some(special) => format!("Float({special})"),
-            None => format!(
-                "Float({})",
-                object
-                    .get("value")
-                    .map(serde_json::Value::to_string)
-                    .unwrap_or_else(|| "?".to_string())
-            ),
-        },
-        "list" => format!(
-            "List({} 项)",
-            object
-                .get("items")
-                .and_then(serde_json::Value::as_array)
-                .map(Vec::len)
-                .unwrap_or(0)
-        ),
-        "map" => format!(
-            "Map({} 项)",
-            object
-                .get("entries")
-                .and_then(serde_json::Value::as_object)
-                .map(serde_json::Map::len)
-                .unwrap_or(0)
-        ),
-        "table" => {
-            let rows = object
-                .get("rows")
-                .and_then(serde_json::Value::as_array)
-                .map(Vec::len)
-                .unwrap_or(0);
-            let cols = object
-                .get("header")
-                .and_then(serde_json::Value::as_array)
-                .map(Vec::len)
-                .unwrap_or(0);
-            format!("Table({rows}×{cols})")
-        }
-        "formula" => "Formula（惰性数据）".to_string(),
-        "code" => "Code（惰性数据）".to_string(),
-        "function_ref" => "FunctionRef".to_string(),
-        "plugin_handle" => "PluginHandle（不可传输）".to_string(),
-        "memory" => "Memory（不可传输）".to_string(),
-        "resource" => "Resource（不可传输）".to_string(),
-        other => format!("{other}（未识别，已折叠为 JSON）"),
-    };
-    (ty.to_string(), text)
-}
-
-/// Verify Trace v2 against the exact pre-run Analysis bytes and project a safe
-/// event summary. Missing/invalid trace never fakes execution evidence.
-fn build_trace_summary(
-    trace_bytes: Option<&[u8]>,
-    static_doc: &StaticDocument,
-    json: &serde_json::Value,
-    exit_code: i32,
-    stale: bool,
-) -> (Option<serde_json::Value>, String) {
-    let Some(trace_bytes) = trace_bytes else {
-        return (None, "unavailable".to_string());
-    };
-    let projection = &static_doc.verified.projection;
-    let verified = verify_trace(TraceVerificationInput {
-        trace_bytes,
-        analysis_bytes: &static_doc.analysis_bytes,
-        semantic: projection,
-        modules: &projection.modules,
-        source: &static_doc.source,
-        source_index: &static_doc.source_index,
-        run_json: json,
-        exit_code,
-    });
-    let verified = match verified {
-        Ok(verified) => verified,
-        Err(_) => {
-            return (
-                Some(serde_json::json!({
-                    "status": "invalid",
-                    "stale": stale,
-                    "note": "Trace 与本次 Analysis 字节不匹配或格式无效；不绘制任何执行标注。",
-                })),
-                "invalid".to_string(),
-            )
-        }
-    };
-    let projection = verified.projection;
-    let statements = static_doc.verified.projection.all_statements();
-    let events = projection
-        .events
-        .iter()
-        .map(|event| {
-            let source_id = if stale {
-                None
-            } else {
-                event.anchor_span.and_then(|span| {
-                    statements
-                        .iter()
-                        .find(|(_, statement)| statement.span == span)
-                        .map(|(_, statement)| {
-                            crate::protocol::analysis_v2::source_id(
-                                &static_doc.verified.projection.module_id,
-                                span,
-                                &format!("statement-{}", statement.kind.data_value()),
-                            )
-                        })
-                })
-            };
-            serde_json::json!({
-                "seq": event.seq,
-                "kind": event.kind_label(),
-                "function_id": event.function_id,
-                "module_id": event.module_id,
-                "span": event.raw_span,
-                "anchor": if stale { serde_json::Value::Null } else {
-                    event.anchor_span.map(|span| serde_json::json!({"start": span.start, "end": span.end}))
-                        .unwrap_or(serde_json::Value::Null)
-                },
-                "source_id": source_id,
-                "detail": event.detail,
-                "operation": event.operation,
-                "duration_micros": event.duration_micros,
-            })
-        })
-        .collect::<Vec<_>>();
-    let truncated = projection.truncated.as_ref().map(|truncated| {
-        serde_json::json!({
-            "reason": truncated.reason,
-            "limit": truncated.limit,
-            "written": truncated.written,
-            "label": truncated.label(),
-        })
-    });
-    let summary = serde_json::json!({
-        "status": "verified",
-        "analysis_digest": projection.analysis_digest,
-        "core_run_id": projection.run_id,
-        "run_status": projection.run_status,
-        "state": projection.state.data_value(),
-        "stale": stale,
-        "truncated": truncated,
-        "events": events,
-        "counts": {
-            "total": projection.counts.total(),
-            "call_enter": projection.counts.call_enter,
-            "call_exit": projection.counts.call_exit,
-            "branch_eval": projection.counts.branch_eval,
-            "loop_iteration": projection.counts.loop_iteration,
-            "return": projection.counts.return_events,
-            "effect": projection.counts.effect,
-            "other": projection.counts.other,
-            "entry": projection.entry_event_count,
-            "other_modules": projection.other_event_count,
-        },
-        "note": "Trace v2 已按 Analysis 原始字节摘要绑定；不包含参数值、逐语句变量或秘密。",
-    });
-    (Some(summary), "verified".to_string())
+    }
 }
 
 fn new_run_id() -> String {
@@ -1197,6 +1099,187 @@ fn unique_counter() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core_client::Grants;
+    use crate::protocol::observation_v1::{EventCounts, Truncation};
+    use crate::reader::source::SafeRelativePath;
+
+    fn plan() -> ExecutionPlan {
+        ExecutionPlan {
+            document: SafeRelativePath::parse("index.mq.md").expect("valid relative path"),
+            target: ExecutionTarget::Entry,
+            function_id: "root:t@0.1.0::index.mq.md::main".to_string(),
+            arguments: Vec::new(),
+            mode: RunMode::Pure,
+            grants: Grants::default(),
+            analysis_digest: format!("sha256:{}", "a".repeat(64)),
+            client_request_id: "req-1".to_string(),
+        }
+    }
+
+    fn projection(state: RunDisplayState, truncated: bool) -> RunProjection {
+        RunProjection {
+            run_id: "core-run".to_string(),
+            entry: None,
+            run_status: "ok".to_string(),
+            state,
+            error_code: None,
+            analysis_digest: format!("sha256:{}", "a".repeat(64)),
+            source_verified: true,
+            events: Vec::new(),
+            truncated: truncated.then(|| Truncation {
+                reason: "event_budget".to_string(),
+                limit: 10,
+                written: 10,
+                dropped: Some(1),
+            }),
+            capture_level: "structural".to_string(),
+            stdout: String::new(),
+            stderr: String::new(),
+            exit_code: 0,
+            result_value: None,
+            counts: EventCounts::default(),
+            entry_event_count: 0,
+            other_event_count: 0,
+            warnings: Vec::new(),
+            output_complete: true,
+        }
+    }
+
+    fn argv_text(args: &[OsString]) -> Vec<String> {
+        args.iter()
+            .map(|arg| arg.to_string_lossy().to_string())
+            .collect()
+    }
+
+    #[test]
+    fn exit_code_two_is_a_hard_option_rejection_never_a_retry() {
+        assert!(classify_exit_code(0, "").is_ok());
+        assert!(classify_exit_code(1, "error: refusing to run").is_ok());
+        let err = classify_exit_code(
+            2,
+            "error[strict.unsupported_grant]: strict mode rejects live destinations\n",
+        )
+        .expect_err("exit 2 must be a hard error");
+        assert_eq!(err.code(), "view.core_option_rejected");
+        assert!(err.detail().contains("strict.unsupported_grant"));
+        assert!(err.detail().contains("不会移除参数重试"));
+    }
+
+    #[test]
+    fn run_argv_is_observation_jsonl_and_never_retired_trace_flags() {
+        let plan = plan();
+        let args = build_argv(
+            &plan,
+            Path::new("/p/index.mq.md"),
+            Path::new("/tmp/observation.json"),
+            &build_run_options(&plan, &ExecutionConfig::default()),
+        );
+        let argv = argv_text(&args);
+        assert_eq!(argv[0], "run");
+        assert!(argv.contains(&"--output".to_string()));
+        assert!(argv.contains(&"jsonl".to_string()));
+        assert!(argv.contains(&"--observation-file".to_string()));
+        for retired in [
+            "--trace-file",
+            "--event-stream",
+            "--trace-max-events",
+            "--trace-max-bytes",
+            "--json",
+        ] {
+            assert!(
+                !argv.contains(&retired.to_string()),
+                "retired flag {retired} must never be built"
+            );
+        }
+        assert!(!argv
+            .iter()
+            .any(|arg| arg.contains(';') || arg.contains('|')));
+    }
+
+    #[test]
+    fn call_argv_carries_explicit_args_and_observation_file() {
+        let mut plan = plan();
+        plan.target = ExecutionTarget::Function {
+            cli_name: "f".to_string(),
+            label: "N.f".to_string(),
+        };
+        plan.arguments = vec![("n".to_string(), "5".to_string())];
+        let args = build_argv(
+            &plan,
+            Path::new("/p/index.mq.md"),
+            Path::new("/tmp/observation.json"),
+            &build_run_options(&plan, &ExecutionConfig::default()),
+        );
+        let argv = argv_text(&args);
+        assert_eq!(argv[0], "call");
+        assert!(argv.contains(&"f".to_string()));
+        assert!(argv.contains(&"n=5".to_string()));
+        assert!(argv.contains(&"--observation-file".to_string()));
+    }
+
+    #[test]
+    fn run_options_never_request_variable_values() {
+        let options = build_run_options(&plan(), &ExecutionConfig::default());
+        assert!(options.observe_variables.is_empty());
+        assert!(options.observe_parameters.is_empty());
+        assert!(!options.observe_text_values);
+        assert_eq!(options.observe_max_events, DEFAULT_OBSERVE_MAX_EVENTS);
+        assert_eq!(options.observe_max_bytes, DEFAULT_OBSERVE_MAX_BYTES);
+    }
+
+    #[test]
+    fn truncated_observation_is_terminal_but_never_labelled_complete() {
+        let truncated = projection(RunDisplayState::Truncated, true);
+        assert_eq!(
+            terminal_state_for(truncated.state),
+            RunState::Succeeded,
+            "a truncated observation still has a real terminal"
+        );
+        assert_eq!(observation_status_for(&truncated), "truncated");
+        assert!(!output_is_complete(&truncated));
+
+        let complete = projection(RunDisplayState::Succeeded, false);
+        assert_eq!(terminal_state_for(complete.state), RunState::Succeeded);
+        assert_eq!(observation_status_for(&complete), "verified");
+        assert!(output_is_complete(&complete));
+    }
+
+    #[test]
+    fn stale_and_incomplete_never_map_to_success() {
+        assert_eq!(
+            terminal_state_for(RunDisplayState::Stale),
+            RunState::Unavailable
+        );
+        assert_eq!(
+            terminal_state_for(RunDisplayState::Incomplete),
+            RunState::Incomplete
+        );
+        assert_eq!(
+            observation_status_for(&projection(RunDisplayState::Incomplete, false)),
+            "invalid"
+        );
+        let stale = ViewError::ObservationStale {
+            detail: "source changed during the run".to_string(),
+        };
+        assert_eq!(
+            error_terminal_state(&stale),
+            (RunState::Failed, "stale", true)
+        );
+        let invalid = ViewError::ObservationInvalid {
+            detail: "mixed run_id".to_string(),
+        };
+        assert_eq!(
+            error_terminal_state(&invalid),
+            (RunState::Failed, "invalid", false)
+        );
+        let rejected = ViewError::CoreOptionRejected {
+            detail: "exit 2".to_string(),
+        };
+        assert_eq!(
+            error_terminal_state(&rejected),
+            (RunState::Failed, "unavailable", false)
+        );
+    }
 
     #[test]
     fn expired_terminal_job_is_never_returned_for_export() {
@@ -1230,47 +1313,6 @@ mod tests {
             "view.run_not_found"
         );
         assert!(controller.state.lock().unwrap().jobs.is_empty());
-    }
-
-    #[test]
-    fn wire_value_summary_is_safe_and_never_html() {
-        assert_eq!(
-            summarize_value(Some(&serde_json::json!({"type": "int", "decimal": "10"}))),
-            ("int".to_string(), "Int(10)".to_string())
-        );
-        assert_eq!(
-            summarize_value(Some(
-                &serde_json::json!({"type": "text", "value": "<b>x</b>"})
-            ))
-            .1,
-            "Text(<b>x</b>)"
-        );
-        assert!(
-            summarize_value(Some(&serde_json::json!({"type": "memory"})))
-                .1
-                .contains("不可传输")
-        );
-    }
-
-    #[test]
-    fn cli_errors_support_both_envelope_shapes() {
-        let prepare = serde_json::json!({
-            "success": false,
-            "code": "sem.no_entry_function",
-            "error": "no main",
-        });
-        assert_eq!(
-            cli_error(&prepare),
-            ("sem.no_entry_function".to_string(), "no main".to_string())
-        );
-        let runtime = serde_json::json!({
-            "success": false,
-            "error": {"code": "runtime.type", "message": "bad type"},
-        });
-        assert_eq!(
-            cli_error(&runtime),
-            ("runtime.type".to_string(), "bad type".to_string())
-        );
     }
 
     #[test]

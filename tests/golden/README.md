@@ -11,7 +11,7 @@ binary, not hand-written:
 Command shape used for every golden:
 
 ```bash
-"$MARQDO_BIN" check <example> --emit tests/golden/analysis-v2/<name>.json
+"$MARQDO_BIN" check <example> --emit tests/golden/analysis-v3/<name>.json
 ```
 
 | Golden | Input |

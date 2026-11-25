@@ -4,7 +4,7 @@
 //! source for **typography only**; the resulting tree is converted into a
 //! View-owned `DocBlock`/`Inline` model that keeps exact UTF-8 byte spans.
 //! No semantic decision (which node is executable) is taken here — that comes
-//! exclusively from validated Analysis v2 (`semantic.rs`).
+//! exclusively from validated Analysis v3 (`protocol::analysis_v3`).
 
 use crate::reader::source::SafeRelativePath;
 use crate::reader::source::{sha256_hex, SourceIndex, SourceSpan};

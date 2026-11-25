@@ -1,14 +1,14 @@
 //! Validation of the two-phase explicit run request (RFC-VIEW-0002 §6.3).
 //!
 //! The browser never sends a command: it sends a document, a target selected
-//! from Analysis v2, constant parameter expressions, the exact Analysis digest
+//! from Analysis v3, constant parameter expressions, the exact Analysis digest
 //! it rendered, a mode and (for project mode) explicit fs globs. Everything is
 //! re-validated here and finally by the Core itself; the client cannot inject
 //! cwd, flags, a binary path or shell text.
 
 use crate::core_client::Grants;
 use crate::error::{ViewError, ViewResult};
-use crate::protocol::analysis_v2::SemanticProjection;
+use crate::protocol::analysis_v3::SemanticProjection;
 use crate::reader::source::SafeRelativePath;
 use serde::Deserialize;
 
@@ -371,7 +371,7 @@ fn validate_glob(glob: &str) -> ViewResult<()> {
 /// first, then a unique local name. No fallback to any other function.
 fn resolve_main(
     projection: &SemanticProjection,
-) -> Option<&crate::protocol::analysis_v2::SemanticFunction> {
+) -> Option<&crate::protocol::analysis_v3::SemanticFunction> {
     projection
         .functions
         .iter()
@@ -401,7 +401,7 @@ fn unique_local_name(projection: &SemanticProjection, local_name: &str, id: &str
     canonical == local_name
 }
 
-/// Analysis v2 function ids are `<module id>::<canonical name>`.
+/// Analysis v3 function ids are `<module id>::<canonical name>`.
 pub fn canonical_name(function_id: &str, module_id: &str) -> String {
     function_id
         .strip_prefix(&format!("{module_id}::"))
@@ -456,44 +456,107 @@ mod tests {
     use super::*;
 
     fn projection() -> SemanticProjection {
+        use crate::protocol::analysis_v3::{
+            DocumentNode, FunctionParam, FunctionSignature, ModuleSummary, SemanticFunction,
+        };
+        use crate::reader::source::{sha256_hex, SourceSpan};
+
+        let module_id = "root:t@0.1.0::index.mq.md";
         let source = "x".repeat(200);
-        let digest = crate::reader::source::sha256_hex(source.as_bytes());
-        let analysis = serde_json::json!({
-            "schema": "marqdo.analysis",
-            "schema_version": 2,
-            "producer": {"name": "marqdo", "version": "3.0.0-beta.1", "markdown_profile": "marqdo.md.v1"},
-            "project": {"root_id": "root:t@0.1.0", "identity_kind": "manifest", "lock_digest": "", "stdlib": null},
-            "modules": [{
-                "id": "root:t@0.1.0::index.mq.md",
-                "package_instance_id": "root:t@0.1.0",
-                "relative_path": "index.mq.md",
-                "source_digest": digest,
-                "units": [],
-                "functions": [
-                    {"id": "root:t@0.1.0::index.mq.md::main", "unit_id": "u1", "local_name": "main",
-                     "namespace": null, "span": {"start": 0, "end": 10}, "heading_span": {"start": 0, "end": 10},
-                     "signature": {"kind": "inferred", "params": []}, "body": [], "effects": ["unknown"]},
-                    {"id": "root:t@0.1.0::index.mq.md::N.f", "unit_id": "u2", "local_name": "f",
-                     "namespace": "N", "span": {"start": 20, "end": 30}, "heading_span": {"start": 20, "end": 30},
-                     "signature": {"kind": "explicit", "params": [
-                        {"name": "n", "required": true, "type": "Int", "default": null, "span": null}
-                     ]}, "body": [], "effects": ["unknown"]}
-                ],
-                "imports": [], "references": [], "calls": [], "resources": []
+        let source_digest = sha256_hex(source.as_bytes());
+        SemanticProjection {
+            schema_version: 3,
+            analysis_sha256: "a".repeat(64),
+            analysis_digest: format!("sha256:{}", "a".repeat(64)),
+            producer_version: "3.0.0-rc.4".to_string(),
+            markdown_profile: "marqdo.md.v1".to_string(),
+            project_root_id: "root:t@0.1.0".to_string(),
+            identity_kind: "manifest".to_string(),
+            entry_module_id: module_id.to_string(),
+            lock_digest: String::new(),
+            manifest_digest: String::new(),
+            stdlib_version: None,
+            stdlib_digest: None,
+            stdlib_instance_id: None,
+            extensions: Vec::new(),
+            module_id: module_id.to_string(),
+            package_instance_id: "root:t@0.1.0".to_string(),
+            relative_path: "index.mq.md".to_string(),
+            source_digest: source_digest.clone(),
+            source: source.clone(),
+            document: DocumentNode {
+                kind: "document".to_string(),
+                span: SourceSpan::new(0, source.len() as u64),
+                children: Vec::new(),
+                literal: None,
+                level: None,
+                setext: None,
+                ordered: None,
+                start: None,
+                tight: None,
+                task: None,
+                ticks: None,
+                fenced: None,
+                info: None,
+                display: None,
+                url: None,
+                title: None,
+                alignments: None,
+                header: None,
+                tag: None,
+            },
+            anchors: Vec::new(),
+            units: Vec::new(),
+            functions: vec![
+                SemanticFunction {
+                    id: format!("{module_id}::main"),
+                    unit_id: "u1".to_string(),
+                    local_name: "main".to_string(),
+                    namespace: None,
+                    span: SourceSpan::new(0, 10),
+                    heading_span: SourceSpan::new(0, 10),
+                    signature: FunctionSignature {
+                        kind: "inferred".to_string(),
+                        params: Vec::new(),
+                    },
+                    effects: vec!["unknown".to_string()],
+                    statements: Vec::new(),
+                },
+                SemanticFunction {
+                    id: format!("{module_id}::N.f"),
+                    unit_id: "u2".to_string(),
+                    local_name: "f".to_string(),
+                    namespace: Some("N".to_string()),
+                    span: SourceSpan::new(20, 30),
+                    heading_span: SourceSpan::new(20, 30),
+                    signature: FunctionSignature {
+                        kind: "explicit".to_string(),
+                        params: vec![FunctionParam {
+                            name: "n".to_string(),
+                            ty: Some("Int".to_string()),
+                            required: true,
+                            default: None,
+                            span: SourceSpan::new(24, 25),
+                        }],
+                    },
+                    effects: vec!["unknown".to_string()],
+                    statements: Vec::new(),
+                },
+            ],
+            resources: Vec::new(),
+            imports: Vec::new(),
+            references: Vec::new(),
+            calls: Vec::new(),
+            diagnostics: Vec::new(),
+            warnings: Vec::new(),
+            modules: vec![ModuleSummary {
+                id: module_id.to_string(),
+                package_instance_id: "root:t@0.1.0".to_string(),
+                relative_path: "index.mq.md".to_string(),
+                source_digest,
+                source,
             }],
-            "diagnostics": []
-        })
-        .to_string();
-        let source = "x".repeat(200);
-        let index = crate::reader::source::SourceIndex::new(&source);
-        crate::protocol::analysis_v2::verify_analysis(
-            analysis.to_string().as_bytes(),
-            &source,
-            &index,
-            "index.mq.md",
-        )
-        .map(|verified| verified.projection)
-        .unwrap_or_else(|err| panic!("fixture analysis must verify: {err}"))
+        }
     }
 
     #[test]

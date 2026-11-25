@@ -1,5 +1,12 @@
 # RFC-VIEW-0002：Marqdo View 3.0 交互式执行闭环与产品精简实施规范
 
+
+> **历史基线（0.2.0）**：本 RFC 是 0.2.0 的实现基线，其中的协议名称、命令行与
+> 门禁描述已不是 0.3.0 的当前契约。当前契约见
+> [`observation-v1-and-analysis-v3.md`](observation-v1-and-analysis-v3.md)、
+> [ADR-0012](../decisions/0012-rc4-current-contracts.md) 与
+> [`docs/ACCEPTANCE.md`](../ACCEPTANCE.md)。
+
 > **状态**：Proposed / 具备直接实施所需的设计、约束、测试和验收定义；并非完成声明。  
 > **目标仓库**：独立 `marqdo-view`，建议路径 `docs/architecture/RFC-VIEW-0002.md`。  
 > **发布日期/审查基线**：2026-11-22。  

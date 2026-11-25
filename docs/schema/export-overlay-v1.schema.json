@@ -53,10 +53,6 @@
         "included": {
           "const": true
         },
-        "core_run_id": {
-          "type": "string",
-          "pattern": "^[A-Za-z0-9_-]{1,128}$"
-        },
         "core_version": {
           "type": "string"
         },
@@ -76,12 +72,13 @@
         "source_verified": {
           "const": true
         },
-        "trace_status": {
+        "observation_status": {
           "enum": [
             "verified",
             "invalid",
             "unavailable",
-            "truncated"
+            "truncated",
+            "stale"
           ]
         },
         "result_complete": {
@@ -105,28 +102,32 @@
             "project"
           ]
         },
-        "core_protocol": {
+        "capture_level": {
+          "type": "string"
+        },
+        "contracts": {
           "type": "object",
           "properties": {
+            "api_revision": {
+              "const": 1
+            },
             "analysis": {
-              "enum": [
-                2,
-                3
-              ]
+              "const": 3
             },
-            "trace": {
-              "const": 2
-            },
-            "events": {
+            "observation": {
               "const": 1
             }
           },
           "required": [
+            "api_revision",
             "analysis",
-            "trace",
-            "events"
+            "observation"
           ],
           "additionalProperties": false
+        },
+        "core_run_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$"
         }
       },
       "required": [
@@ -137,13 +138,14 @@
         "status",
         "terminal_at",
         "source_verified",
-        "trace_status",
+        "observation_status",
+        "capture_level",
         "result_complete",
         "output_complete",
         "observation_truncated",
         "parameters",
         "mode",
-        "core_protocol"
+        "contracts"
       ],
       "additionalProperties": false
     },
@@ -171,7 +173,7 @@
       ],
       "maxLength": 131072
     },
-    "trace_counts": {
+    "observation_counts": {
       "type": [
         "object",
         "null"
@@ -209,7 +211,7 @@
     "value",
     "stdout",
     "stderr",
-    "trace_counts",
+    "observation_counts",
     "arguments"
   ],
   "additionalProperties": false

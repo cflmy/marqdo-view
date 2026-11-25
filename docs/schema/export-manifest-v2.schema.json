@@ -26,41 +26,6 @@
       ],
       "additionalProperties": false
     },
-    "compatibility": {
-      "type": "object",
-      "properties": {
-        "marqdo": {
-          "type": "string"
-        },
-        "tool_protocol": {
-          "const": 1
-        },
-        "analysis": {
-          "const": 2
-        },
-        "analysis_supported": {
-          "const": [
-            2,
-            3
-          ]
-        },
-        "trace": {
-          "const": 2
-        },
-        "markdown_profile": {
-          "const": "marqdo.md.v1"
-        }
-      },
-      "required": [
-        "marqdo",
-        "tool_protocol",
-        "analysis",
-        "analysis_supported",
-        "trace",
-        "markdown_profile"
-      ],
-      "additionalProperties": false
-    },
     "core_version": {
       "type": "string"
     },
@@ -350,13 +315,98 @@
     },
     "executed_during_export": {
       "const": false
+    },
+    "requires": {
+      "type": "object",
+      "properties": {
+        "marqdo": {
+          "type": "string"
+        },
+        "api_revision": {
+          "const": 1
+        },
+        "analysis": {
+          "const": 3
+        },
+        "observation": {
+          "const": 1
+        },
+        "markdown_profile": {
+          "const": "marqdo.md.v1"
+        }
+      },
+      "required": [
+        "marqdo",
+        "api_revision",
+        "analysis",
+        "observation",
+        "markdown_profile"
+      ],
+      "additionalProperties": false
+    },
+    "producers": {
+      "type": "object",
+      "properties": {
+        "view": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "const": "marqdo-view"
+            },
+            "version": {
+              "type": "string"
+            },
+            "binary_sha256": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "version",
+            "binary_sha256"
+          ],
+          "additionalProperties": false
+        },
+        "cli": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "version": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "binary_sha256": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "version",
+                "binary_sha256"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": [
+        "view",
+        "cli"
+      ],
+      "additionalProperties": false
     }
   },
   "required": [
     "schema",
     "schema_version",
     "view",
-    "compatibility",
+    "producers",
+    "requires",
     "core_version",
     "entry",
     "pages",

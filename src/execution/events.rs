@@ -1,8 +1,9 @@
 //! View-owned run event log and SSE frames (`marqdo.view-run-events` v1).
 //!
 //! This is View's own protocol, not a CLI protocol (RFC-VIEW-0002 §6.4). It
-//! only carries four event types and a bounded, sequenced replay buffer; it is
-//! not an event bus and never carries token streams or per-instruction values.
+//! only carries View lifecycle frames plus already-normalized Observation v1
+//! values and a bounded, sequenced replay buffer; it is not an event bus and
+//! never carries token streams or per-instruction values.
 
 use std::collections::VecDeque;
 use std::sync::mpsc::{self, Receiver, SyncSender, TrySendError};
@@ -54,7 +55,7 @@ impl RunState {
             RunState::Cancelled => "已取消",
             RunState::TimedOut => "超时",
             RunState::Unavailable => "不可用",
-            RunState::Incomplete => "事件流不完整",
+            RunState::Incomplete => "观察未完成",
         }
     }
 
@@ -100,8 +101,8 @@ pub struct RunEvent {
     pub at: String,
     /// Safe parsed CLI result summary (never raw HTML/innerHTML material).
     pub result: Option<serde_json::Value>,
-    /// Verified Trace v2 summary, only after digest/binding checks.
-    pub trace: Option<serde_json::Value>,
+    /// Verified Observation v1 summary, only after digest/binding checks.
+    pub observation_summary: Option<serde_json::Value>,
     /// `{code, message}` for terminal failures.
     pub error: Option<serde_json::Value>,
     pub observation: Option<serde_json::Value>,
@@ -120,8 +121,8 @@ impl RunEvent {
         if let Some(result) = &self.result {
             data["result"] = result.clone();
         }
-        if let Some(trace) = &self.trace {
-            data["trace"] = trace.clone();
+        if let Some(summary) = &self.observation_summary {
+            data["observation_summary"] = summary.clone();
         }
         if let Some(error) = &self.error {
             data["error"] = error.clone();
@@ -188,7 +189,7 @@ impl EventLog {
             state,
             at: utc_now(),
             result: None,
-            trace: None,
+            observation_summary: None,
             error: None,
             observation: None,
         };
@@ -233,11 +234,11 @@ impl EventLog {
     pub fn publish_complete(
         &mut self,
         result: serde_json::Value,
-        trace: Option<serde_json::Value>,
+        observation_summary: Option<serde_json::Value>,
     ) -> RunEvent {
         let mut event = self.next_event(EventKind::Complete, RunState::Succeeded);
         event.result = Some(result);
-        event.trace = trace;
+        event.observation_summary = observation_summary;
         self.record(event)
     }
 
@@ -247,7 +248,7 @@ impl EventLog {
         code: &str,
         message: &str,
         result: Option<serde_json::Value>,
-        trace: Option<serde_json::Value>,
+        observation_summary: Option<serde_json::Value>,
     ) -> RunEvent {
         let mut event = self.next_event(EventKind::Error, state);
         event.error = Some(serde_json::json!({
@@ -255,7 +256,7 @@ impl EventLog {
             "message": message,
         }));
         event.result = result;
-        event.trace = trace;
+        event.observation_summary = observation_summary;
         self.record(event)
     }
 
@@ -291,7 +292,7 @@ impl EventLog {
             state: self.last_state,
             at: utc_now(),
             result: None,
-            trace: None,
+            observation_summary: None,
             error: None,
             observation: None,
         }
@@ -428,6 +429,24 @@ mod tests {
         assert_eq!(subscription.replay[0].kind, EventKind::Snapshot);
         assert_eq!(subscription.replay[0].state, RunState::Succeeded);
         assert!(subscription.replay[0].result.is_some());
+    }
+
+    #[test]
+    fn terminal_frame_carries_observation_summary_not_trace() {
+        let mut log = EventLog::new();
+        log.publish_observation(serde_json::json!({
+            "kind": "stdout.chunk",
+            "seq": 13,
+            "run_id": "core-run",
+        }));
+        let event = log.publish_complete(
+            serde_json::json!({"success": true}),
+            Some(serde_json::json!({"status": "verified"})),
+        );
+        let data = event.data("run-1");
+        assert!(data.get("trace").is_none());
+        assert_eq!(data["observation_summary"]["status"], "verified");
+        assert_eq!(data["result"]["success"], true);
     }
 
     #[test]

@@ -1,5 +1,12 @@
 # RFC-VIEW-0001（定稿建议）：完整 Markdown 阅读、统一函数调用与显式结果静态导出
 
+
+> **契约提示**：本文描述完整阅读与结果导出的产品/交互设计，设计仍参考有效；
+> 但其中任何协议字段、命令参数或事件名称以
+> [`observation-v1-and-analysis-v3.md`](observation-v1-and-analysis-v3.md) 与
+> [ADR-0012](../decisions/0012-rc4-current-contracts.md) 的当前契约为准。
+> 0.2.0 时代的协议细节是历史记录，不是当前能力。
+
 > **状态：Proposed / 开发规范，不表示已经实现或通过验收。**
 >
 > **目标仓库：** [`cflmy/marqdo-view`](https://github.com/cflmy/marqdo-view)，本次审阅基线 `master@dcb9daeaf4e5eefd8c35aa0c843dd8a0eaf7fef5`（`0.2.0`）。

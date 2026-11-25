@@ -1,0 +1,495 @@
+{
+  "schema": "marqdo.analysis",
+  "schema_version": 3,
+  "producer": {
+    "name": "marqdo",
+    "version": "3.0.0-rc.4",
+    "markdown_profile": "marqdo.md.v1"
+  },
+  "project": {
+    "root_id": "root:unicode-spans@0.1.0",
+    "identity_kind": "manifest",
+    "entry_module_id": "root:unicode-spans@0.1.0::crlf.mq.md",
+    "lock_digest": "",
+    "manifest_digest": "sha256:f0fa034f049dddbbd467d7fee6a2995c61b61ec6c075efa3650b490e45fb2b11",
+    "stdlib": {
+      "version": "0.1.0",
+      "digest": "sha256:5407d3665ba2fe105820d0f1af5efaafa10c277a69eb819c3225719813c8c713",
+      "instance_id": "std:marqdo-stdlib@0.1.0#5407d3665ba2fe105820d0f1af5efaafa10c277a69eb819c3225719813c8c713"
+    },
+    "extensions": []
+  },
+  "modules": [
+    {
+      "id": "root:unicode-spans@0.1.0::crlf.mq.md",
+      "package_instance_id": "root:unicode-spans@0.1.0",
+      "relative_path": "crlf.mq.md",
+      "source_digest": "3d6c99d8e1666b14cc51e6774a4cf514a3a252f3b2f9f541c7cde4a090551b1f",
+      "source": "# @knowledge CRLF 文档\r\n\r\n正文包含中文与 emoji 🙂。\r\n\r\n# @exec 演示\r\n\r\n## @exec main\r\n\r\n`params(n: Int)`\r\n\r\n**if n > 0**\r\n\r\n`return n`\r\n\r\n**else**\r\n\r\n`return 0`\r\n\r\n**end**\r\n",
+      "document": {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [],
+                "kind": "text",
+                "literal": "@knowledge CRLF 文档",
+                "span": {
+                  "end": 24,
+                  "start": 2
+                }
+              }
+            ],
+            "kind": "heading",
+            "level": 1,
+            "setext": false,
+            "span": {
+              "end": 24,
+              "start": 0
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "kind": "text",
+                "literal": "正文包含中文与 emoji 🙂。",
+                "span": {
+                  "end": 63,
+                  "start": 28
+                }
+              }
+            ],
+            "kind": "paragraph",
+            "span": {
+              "end": 63,
+              "start": 28
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "kind": "text",
+                "literal": "@exec 演示",
+                "span": {
+                  "end": 81,
+                  "start": 69
+                }
+              }
+            ],
+            "kind": "heading",
+            "level": 1,
+            "setext": false,
+            "span": {
+              "end": 81,
+              "start": 67
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "kind": "text",
+                "literal": "@exec main",
+                "span": {
+                  "end": 98,
+                  "start": 88
+                }
+              }
+            ],
+            "kind": "heading",
+            "level": 2,
+            "setext": false,
+            "span": {
+              "end": 98,
+              "start": 85
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "kind": "code",
+                "literal": "params(n: Int)",
+                "span": {
+                  "end": 118,
+                  "start": 102
+                },
+                "ticks": 1
+              }
+            ],
+            "kind": "paragraph",
+            "span": {
+              "end": 118,
+              "start": 102
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [],
+                    "kind": "text",
+                    "literal": "if n > 0",
+                    "span": {
+                      "end": 132,
+                      "start": 124
+                    }
+                  }
+                ],
+                "kind": "strong",
+                "span": {
+                  "end": 134,
+                  "start": 122
+                }
+              }
+            ],
+            "kind": "paragraph",
+            "span": {
+              "end": 134,
+              "start": 122
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "kind": "code",
+                "literal": "return n",
+                "span": {
+                  "end": 148,
+                  "start": 138
+                },
+                "ticks": 1
+              }
+            ],
+            "kind": "paragraph",
+            "span": {
+              "end": 148,
+              "start": 138
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [],
+                    "kind": "text",
+                    "literal": "else",
+                    "span": {
+                      "end": 158,
+                      "start": 154
+                    }
+                  }
+                ],
+                "kind": "strong",
+                "span": {
+                  "end": 160,
+                  "start": 152
+                }
+              }
+            ],
+            "kind": "paragraph",
+            "span": {
+              "end": 160,
+              "start": 152
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "kind": "code",
+                "literal": "return 0",
+                "span": {
+                  "end": 174,
+                  "start": 164
+                },
+                "ticks": 1
+              }
+            ],
+            "kind": "paragraph",
+            "span": {
+              "end": 174,
+              "start": 164
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [],
+                    "kind": "text",
+                    "literal": "end",
+                    "span": {
+                      "end": 183,
+                      "start": 180
+                    }
+                  }
+                ],
+                "kind": "strong",
+                "span": {
+                  "end": 185,
+                  "start": 178
+                }
+              }
+            ],
+            "kind": "paragraph",
+            "span": {
+              "end": 185,
+              "start": 178
+            }
+          }
+        ],
+        "kind": "document",
+        "span": {
+          "end": 187,
+          "start": 0
+        }
+      },
+      "units": [
+        {
+          "id": "root:unicode-spans@0.1.0::crlf.mq.md#",
+          "path": [],
+          "parent_id": null,
+          "kind": "root",
+          "name": "",
+          "level": 0,
+          "mode": "knowledge",
+          "mode_origin": "default",
+          "mode_source_unit_id": "root:unicode-spans@0.1.0::crlf.mq.md#",
+          "heading_span": null,
+          "span": {
+            "start": 0,
+            "end": 187
+          },
+          "function": null
+        },
+        {
+          "id": "root:unicode-spans@0.1.0::crlf.mq.md#CRLF 文档",
+          "path": [
+            "CRLF 文档"
+          ],
+          "parent_id": "root:unicode-spans@0.1.0::crlf.mq.md#",
+          "kind": "namespace",
+          "name": "CRLF 文档",
+          "level": 1,
+          "mode": "knowledge",
+          "mode_origin": "explicit",
+          "mode_source_unit_id": "root:unicode-spans@0.1.0::crlf.mq.md#CRLF 文档",
+          "heading_span": {
+            "start": 0,
+            "end": 24
+          },
+          "span": {
+            "start": 0,
+            "end": 67
+          },
+          "function": null
+        },
+        {
+          "id": "root:unicode-spans@0.1.0::crlf.mq.md#演示",
+          "path": [
+            "演示"
+          ],
+          "parent_id": "root:unicode-spans@0.1.0::crlf.mq.md#",
+          "kind": "namespace",
+          "name": "演示",
+          "level": 1,
+          "mode": "exec",
+          "mode_origin": "explicit",
+          "mode_source_unit_id": "root:unicode-spans@0.1.0::crlf.mq.md#演示",
+          "heading_span": {
+            "start": 67,
+            "end": 81
+          },
+          "span": {
+            "start": 67,
+            "end": 187
+          },
+          "function": null
+        },
+        {
+          "id": "root:unicode-spans@0.1.0::crlf.mq.md#演示/main",
+          "path": [
+            "演示",
+            "main"
+          ],
+          "parent_id": "root:unicode-spans@0.1.0::crlf.mq.md#演示",
+          "kind": "function",
+          "name": "main",
+          "level": 2,
+          "mode": "exec",
+          "mode_origin": "explicit",
+          "mode_source_unit_id": "root:unicode-spans@0.1.0::crlf.mq.md#演示/main",
+          "heading_span": {
+            "start": 85,
+            "end": 98
+          },
+          "span": {
+            "start": 85,
+            "end": 187
+          },
+          "function": "root:unicode-spans@0.1.0::crlf.mq.md::演示.main"
+        }
+      ],
+      "anchors": [
+        {
+          "anchor": "crlf-文档",
+          "unit_id": "root:unicode-spans@0.1.0::crlf.mq.md#CRLF 文档"
+        },
+        {
+          "anchor": "main",
+          "unit_id": "root:unicode-spans@0.1.0::crlf.mq.md#演示/main"
+        },
+        {
+          "anchor": "演示",
+          "unit_id": "root:unicode-spans@0.1.0::crlf.mq.md#演示"
+        }
+      ],
+      "functions": [
+        {
+          "id": "root:unicode-spans@0.1.0::crlf.mq.md::演示.main",
+          "unit_id": "root:unicode-spans@0.1.0::crlf.mq.md#演示/main",
+          "local_name": "main",
+          "namespace": "演示",
+          "span": {
+            "start": 85,
+            "end": 185
+          },
+          "heading_span": {
+            "start": 85,
+            "end": 98
+          },
+          "signature": {
+            "kind": "explicit",
+            "params": [
+              {
+                "name": "n",
+                "required": true,
+                "type": "Int",
+                "default": null,
+                "span": {
+                  "start": 109,
+                  "end": 115
+                }
+              }
+            ]
+          },
+          "effects": [
+            "unknown"
+          ],
+          "body": [
+            {
+              "arms": [
+                {
+                  "body": [
+                    {
+                      "kind": "return",
+                      "span": {
+                        "end": 148,
+                        "start": 138
+                      },
+                      "value": {
+                        "kind": "variable",
+                        "name": "n",
+                        "span": {
+                          "end": 147,
+                          "start": 146
+                        }
+                      }
+                    }
+                  ],
+                  "condition": {
+                    "kind": "binary",
+                    "left": {
+                      "kind": "variable",
+                      "name": "n",
+                      "span": {
+                        "end": 128,
+                        "start": 127
+                      }
+                    },
+                    "op": "gt",
+                    "right": {
+                      "kind": "literal",
+                      "span": {
+                        "end": 0,
+                        "start": 0
+                      },
+                      "type": "int",
+                      "value": "0"
+                    },
+                    "span": {
+                      "end": 132,
+                      "start": 127
+                    }
+                  },
+                  "condition_span": {
+                    "end": 134,
+                    "start": 122
+                  },
+                  "span": {
+                    "end": 134,
+                    "start": 122
+                  }
+                },
+                {
+                  "body": [
+                    {
+                      "kind": "return",
+                      "span": {
+                        "end": 174,
+                        "start": 164
+                      },
+                      "value": {
+                        "kind": "literal",
+                        "span": {
+                          "end": 0,
+                          "start": 0
+                        },
+                        "type": "int",
+                        "value": "0"
+                      }
+                    }
+                  ],
+                  "condition": {
+                    "kind": "literal",
+                    "span": {
+                      "end": 0,
+                      "start": 0
+                    },
+                    "type": "bool",
+                    "value": true
+                  },
+                  "condition_span": {
+                    "end": 160,
+                    "start": 152
+                  },
+                  "span": {
+                    "end": 160,
+                    "start": 152
+                  }
+                }
+              ],
+              "kind": "branch",
+              "span": {
+                "end": 134,
+                "start": 122
+              }
+            }
+          ]
+        }
+      ],
+      "imports": [],
+      "references": [],
+      "calls": [],
+      "resources": []
+    }
+  ],
+  "diagnostics": []
+}

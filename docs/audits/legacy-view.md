@@ -1,5 +1,10 @@
 # 旧 View 静态取证与迁移裁决（RFC-VIEW-0002 §3 / PR-00）
 
+
+> **历史取证**：本文记录旧 View 的静态审计，仅作迁移历史；当前契约与状态见
+> [`docs/STATUS.md`](../STATUS.md) 与
+> [`observation-v1-and-analysis-v3.md`](../architecture/observation-v1-and-analysis-v3.md)。
+
 - 状态：静态源码审计完成，**旧运行时浏览器复验未执行**
   （`LEGACY_RUNTIME_UNVERIFIED`）
 - 日期：2026-11-22

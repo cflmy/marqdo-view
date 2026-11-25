@@ -1,5 +1,9 @@
 # 旧 View 渲染路径审计（PR-00）
 
+
+> **历史取证**：本文记录旧渲染路径的静态审计，仅作迁移历史；当前实现与契约见
+> [`docs/STATUS.md`](../STATUS.md)。
+
 > 状态：**静态审计完成，运行时验证未执行（`LEGACY_RUNTIME_UNVERIFIED`）**
 > 审计对象：`cflmy/marqdo` `main@1c55baabd570e18b9da8f9057cef2f848e176690`（下称“旧仓库”）
 > 审计方式：只读源码检查（`git status` 干净；**没有**编译、没有写入、没有移动旧仓库任何文件）

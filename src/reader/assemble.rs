@@ -1,12 +1,16 @@
 //! Assembly of the one `PresentationModel`.
 //!
-//! Merges the raw document, verified Analysis v2, diagnostics and an optional
-//! verified Trace v2 run into the model; decides stale/revoked semantics here
-//! and nowhere else (RFC-VIEW-0002 §5.2/§5.4).
+//! Merges the exact artifact source and verified Analysis v3 facts, diagnostics
+//! and an optional verified Observation v1 run into the model; decides
+//! stale/revoked semantics here and nowhere else.
+//!
+//! The artifact source (`modules[].source`) is the only source used to interpret
+//! spans. View only re-reads the file before the check to detect concurrent
+//! changes; it never rebuilds spans from `relative_path`.
 
 use crate::config::ViewConfig;
-use crate::protocol::analysis_v2::{CoreDiagnostic, SemanticProjection};
-use crate::protocol::trace_v2::VerifiedRun;
+use crate::protocol::analysis_v3::{CoreDiagnostic, SemanticProjection};
+use crate::protocol::observation_v1::{self, RunProjection};
 use crate::reader::markdown::{DocumentIdentity, DocumentModel};
 use crate::reader::model::{
     Navigation, OutlineEntry, OutlineKind, PresentationModel, SourceStatus,
@@ -15,20 +19,19 @@ use crate::reader::source::{sha256_hex, Project, SafeRelativePath};
 
 use crate::core_client::{CheckOptions, CheckResponse, CoreClient, RawCheckDiagnostic};
 use crate::error::{ViewError, ViewResult};
-use crate::protocol::analysis_v2;
-use crate::protocol::trace_v2;
+use crate::protocol::analysis_v3;
 use crate::reader::model::{anchor_for_span, PRESENTATION_VERSION};
 
 /// Input to the one builder. `analysis` is already protocol/byte verified.
 pub struct BuildInput<'a> {
     pub document: DocumentModel,
-    pub analysis: Option<&'a crate::protocol::analysis_v2::VerifiedAnalysis>,
+    pub analysis: Option<&'a analysis_v3::VerifiedAnalysis>,
     pub status: SourceStatus,
     pub status_note: Option<String>,
     pub diagnostics: Vec<CoreDiagnostic>,
     pub navigation: Navigation,
     pub core_version: Option<String>,
-    pub run: Option<&'a crate::protocol::trace_v2::VerifiedRun>,
+    pub run: Option<&'a RunProjection>,
 }
 
 pub fn build(input: BuildInput<'_>) -> PresentationModel {
@@ -81,7 +84,7 @@ pub fn build(input: BuildInput<'_>) -> PresentationModel {
         navigation,
         outline,
         core_version,
-        run: run.map(|verified| verified.projection.clone()),
+        run: run.cloned(),
     }
 }
 
@@ -96,10 +99,10 @@ fn build_outline(projection: &SemanticProjection) -> Vec<OutlineEntry> {
                 .params
                 .iter()
                 .map(|param| {
-                    if param.ty.is_empty() {
-                        param.name.clone()
+                    if let Some(ty) = &param.ty {
+                        format!("{}: {}", param.name, ty)
                     } else {
-                        format!("{}: {}", param.name, param.ty)
+                        param.name.clone()
                     }
                 })
                 .collect::<Vec<_>>()
@@ -119,18 +122,19 @@ fn build_outline(projection: &SemanticProjection) -> Vec<OutlineEntry> {
     }
     for unit in &projection.units {
         let kind = match unit.kind {
-            crate::protocol::analysis_v2::UnitKind::Knowledge if unit.level >= 2 => {
-                OutlineKind::Knowledge
-            }
-            crate::protocol::analysis_v2::UnitKind::Section => OutlineKind::Section,
+            analysis_v3::UnitKind::Knowledge if unit.level >= 2 => OutlineKind::Knowledge,
+            analysis_v3::UnitKind::Section => OutlineKind::Section,
             _ => continue,
         };
         if unit.name.is_empty() {
             continue;
         }
+        let Some(heading_span) = unit.heading_span else {
+            continue;
+        };
         entries.push(OutlineEntry {
             label: unit.name.clone(),
-            anchor: anchor_for_span(unit.span.start, unit.span.end),
+            anchor: anchor_for_span(heading_span.start, heading_span.end),
             detail: if unit.level == 2 {
                 "知识单元".to_string()
             } else {
@@ -204,26 +208,23 @@ impl DocumentService {
         self.load_with_run(relative, None)
     }
 
-    /// Same pipeline, optionally attaching an already-verified run projection.
+    /// Same pipeline, optionally attaching an already-verified Observation run.
     /// The run is re-bound to freshly checked Analysis bytes; if the source or
     /// analysis changed meanwhile the result becomes `STALE` instead of being
     /// attached to the wrong text.
     pub fn load_with_run(
         &self,
         relative: &SafeRelativePath,
-        run: Option<&VerifiedRun>,
+        run: Option<&RunProjection>,
     ) -> ViewResult<PresentationModel> {
-        let source_bytes = self.project.read_source(relative)?;
-        let source = String::from_utf8(source_bytes).map_err(|err| ViewError::Io {
-            detail: format!("{relative} is not valid UTF-8: {err}"),
-        })?;
-        let document = DocumentModel::parse(source, DocumentIdentity::placeholder(relative));
+        let disk_source = self.read_disk_source(relative)?;
         let navigation = Navigation::from_project(&self.project, &self.config, relative);
 
         let mut status = SourceStatus::CoreUnavailable;
         let mut status_note = self.core_note.clone();
         let mut diagnostics = Vec::new();
         let mut verified = None;
+        let mut source = disk_source.clone();
 
         if let Some(client) = &self.core {
             match client.check(
@@ -253,15 +254,15 @@ impl DocumentService {
                     success: true,
                     analysis: Some(check),
                     ..
-                } => match analysis_v2::verify_analysis(
+                } => match analysis_v3::verify_analysis(
                     &check.analysis_bytes,
-                    &document.source,
-                    &document.source_index,
                     relative.as_str(),
+                    Some(&disk_source),
                 ) {
                     Ok(verified_analysis) => {
                         status = SourceStatus::StaticOk;
                         status_note = None;
+                        source = verified_analysis.projection.source.clone();
                         verified = Some(verified_analysis);
                     }
                     Err(err) if err.code() == "view.source_mismatch" => {
@@ -290,28 +291,17 @@ impl DocumentService {
             }
         }
 
-        let attached_run: Option<VerifiedRun> = match (run, verified.as_ref()) {
-            (Some(run), Some(analysis)) => {
-                let expected = format!("sha256:{}", analysis.projection.analysis_sha256);
-                if expected == run.projection.analysis_digest {
-                    Some(VerifiedRun {
-                        projection: run.projection.clone(),
-                    })
-                } else {
-                    Some(VerifiedRun {
-                        projection: trace_v2::stale_projection(
-                            &run.projection.analysis_digest,
-                            &document.source_index,
-                        ),
-                    })
-                }
+        let identity = identity_for(verified.as_ref(), relative);
+        let document = DocumentModel::parse(source, identity);
+
+        let attached_run: Option<RunProjection> = match (run, verified.as_ref()) {
+            (Some(run), Some(analysis))
+                if run.analysis_digest == analysis.projection.analysis_digest
+                    && run.source_verified =>
+            {
+                Some(run.clone())
             }
-            (Some(run), None) => Some(VerifiedRun {
-                projection: trace_v2::stale_projection(
-                    &run.projection.analysis_digest,
-                    &document.source_index,
-                ),
-            }),
+            (Some(run), _) => Some(observation_v1::stale_projection(&run.analysis_digest)),
             (None, _) => None,
         };
 
@@ -328,6 +318,31 @@ impl DocumentService {
         });
         model.media = media;
         Ok(model)
+    }
+
+    fn read_disk_source(&self, relative: &SafeRelativePath) -> ViewResult<String> {
+        let bytes = self.project.read_source(relative)?;
+        String::from_utf8(bytes).map_err(|err| ViewError::Io {
+            detail: format!("{relative} is not valid UTF-8: {err}"),
+        })
+    }
+}
+
+fn identity_for(
+    verified: Option<&analysis_v3::VerifiedAnalysis>,
+    relative: &SafeRelativePath,
+) -> DocumentIdentity {
+    match verified {
+        Some(verified) => {
+            let projection = &verified.projection;
+            DocumentIdentity {
+                project_root_id: projection.project_root_id.clone(),
+                module_id: projection.module_id.clone(),
+                relative_path: projection.relative_path.clone(),
+                source_sha256: projection.source_digest.clone(),
+            }
+        }
+        None => DocumentIdentity::placeholder(relative),
     }
 }
 
@@ -352,11 +367,11 @@ fn diagnostic_to_view(
         .map(|module| module.ends_with(relative.as_str()))
         .unwrap_or(true);
     CoreDiagnostic {
-        module: diagnostic.module.clone(),
+        module: diagnostic.module.clone().unwrap_or_default(),
         relative_path: if belongs_to_entry {
-            Some(relative.as_str().to_string())
+            relative.as_str().to_string()
         } else {
-            None
+            String::new()
         },
         span: None,
         line: diagnostic.line,
@@ -373,10 +388,11 @@ fn diagnostic_to_view(
 }
 
 /// One read-only, byte-verified static view of a document, used by explicit
-/// run validation and Trace binding. Nothing here executes the document.
+/// run validation and Observation binding. Nothing here executes the document.
 #[derive(Debug)]
 pub struct StaticDocument {
     pub relative: SafeRelativePath,
+    /// Exact source carried by the verified Analysis artifact.
     pub source: String,
     pub source_index: crate::reader::source::SourceIndex,
     pub source_sha256: String,
@@ -384,23 +400,20 @@ pub struct StaticDocument {
     pub analysis_bytes: Vec<u8>,
     pub media_digests: std::collections::BTreeMap<String, String>,
     pub analysis_digest: String,
-    pub verified: crate::protocol::analysis_v2::VerifiedAnalysis,
+    pub core_version: Option<String>,
+    pub verified: analysis_v3::VerifiedAnalysis,
 }
 
 impl DocumentService {
-    /// Re-run the read-only `check --emit` and verify Analysis v2 against the
-    /// current exact source bytes. This is the only static truth used before an
-    /// explicit run is accepted.
+    /// Re-run the read-only `check --emit` and verify Analysis v3 bytes against
+    /// the source View read before the check. This is the only static truth used
+    /// before an explicit run is accepted.
     pub fn static_document(&self, relative: &SafeRelativePath) -> ViewResult<StaticDocument> {
         let client = self.core.as_ref().ok_or_else(|| ViewError::RunDenied {
             detail: "没有可用的冻结核心（MARQDO_BIN）；无法验证运行请求".to_string(),
         })?;
-        let source_bytes = self.project.read_source(relative)?;
-        let source_sha256 = sha256_hex(&source_bytes);
-        let source = String::from_utf8(source_bytes).map_err(|err| ViewError::Io {
-            detail: format!("{relative} is not valid UTF-8: {err}"),
-        })?;
-        let source_index = crate::reader::source::SourceIndex::new(&source);
+        let disk_source = self.read_disk_source(relative)?;
+        let disk_sha256 = sha256_hex(disk_source.as_bytes());
         let response = client.check(
             &self.project,
             relative,
@@ -438,24 +451,26 @@ impl DocumentService {
                 });
             }
         };
-        let verified = crate::protocol::analysis_v2::verify_analysis(
+        let verified = analysis_v3::verify_analysis(
             &check.analysis_bytes,
-            &source,
-            &source_index,
             relative.as_str(),
+            Some(&disk_source),
         )?;
+        let source = verified.projection.source.clone();
+        let source_index = crate::reader::source::SourceIndex::new(&source);
         let document =
-            DocumentModel::parse(source.clone(), DocumentIdentity::placeholder(relative));
+            DocumentModel::parse(source.clone(), identity_for(Some(&verified), relative));
         let media = super::media::collect(&self.project, relative, &document.blocks);
         let media_digests = super::media::digests(&media);
         Ok(StaticDocument {
             relative: relative.clone(),
             source,
             source_index,
-            source_sha256,
+            source_sha256: disk_sha256,
             analysis_digest: check.analysis_digest,
             analysis_bytes: check.analysis_bytes,
             media_digests,
+            core_version: self.core_version.clone(),
             verified,
         })
     }

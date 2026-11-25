@@ -1,0 +1,549 @@
+{
+  "schema": "marqdo.analysis",
+  "schema_version": 3,
+  "producer": {
+    "name": "marqdo",
+    "version": "3.0.0-rc.4",
+    "markdown_profile": "marqdo.md.v1"
+  },
+  "project": {
+    "root_id": "root:tables-math@0.1.0",
+    "identity_kind": "manifest",
+    "entry_module_id": "root:tables-math@0.1.0::index.mq.md",
+    "lock_digest": "",
+    "manifest_digest": "sha256:5fd84c1306f43e9ed10a2db2b3fba6fdc67d960516bc94931ac594d21f034c05",
+    "stdlib": {
+      "version": "0.1.0",
+      "digest": "sha256:5407d3665ba2fe105820d0f1af5efaafa10c277a69eb819c3225719813c8c713",
+      "instance_id": "std:marqdo-stdlib@0.1.0#5407d3665ba2fe105820d0f1af5efaafa10c277a69eb819c3225719813c8c713"
+    },
+    "extensions": []
+  },
+  "modules": [
+    {
+      "id": "root:tables-math@0.1.0::index.mq.md",
+      "package_instance_id": "root:tables-math@0.1.0",
+      "relative_path": "index.mq.md",
+      "source_digest": "66ce180252d201ff0f3f831d47f7a58d7f6804cb9655898cc80ef6d2262f1ce6",
+      "source": "# @knowledge 表格、公式与惰性资源\n\n| 名称 | 值 | 说明 |\n| --- | ---: | --- |\n| 甲 | 1 | 第一行 |\n| 乙 | 2 | 第二行 |\n\n行内公式 $E = mc^2$；块公式：\n\n$$\n\\sum_{i=1}^{n} i = \\frac{n(n+1)}{2}\n$$\n\n```python\nprint(\"代码围栏永远是惰性资源\")\n```\n\n- [x] 任务列表可读\n- [ ] 不会触发任何执行\n\n外部链接：[Marqdo CLI](https://github.com/cflmy/marqdo-cli)。\n",
+      "document": {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [],
+                "kind": "text",
+                "literal": "@knowledge 表格、公式与惰性资源",
+                "span": {
+                  "end": 43,
+                  "start": 2
+                }
+              }
+            ],
+            "kind": "heading",
+            "level": 1,
+            "setext": false,
+            "span": {
+              "end": 43,
+              "start": 0
+            }
+          },
+          {
+            "alignments": [
+              "none",
+              "right",
+              "none"
+            ],
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [],
+                        "kind": "text",
+                        "literal": "名称",
+                        "span": {
+                          "end": 53,
+                          "start": 47
+                        }
+                      }
+                    ],
+                    "kind": "table_cell",
+                    "span": {
+                      "end": 54,
+                      "start": 46
+                    }
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [],
+                        "kind": "text",
+                        "literal": "值",
+                        "span": {
+                          "end": 59,
+                          "start": 56
+                        }
+                      }
+                    ],
+                    "kind": "table_cell",
+                    "span": {
+                      "end": 60,
+                      "start": 55
+                    }
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [],
+                        "kind": "text",
+                        "literal": "说明",
+                        "span": {
+                          "end": 68,
+                          "start": 62
+                        }
+                      }
+                    ],
+                    "kind": "table_cell",
+                    "span": {
+                      "end": 69,
+                      "start": 61
+                    }
+                  }
+                ],
+                "header": true,
+                "kind": "table_row",
+                "span": {
+                  "end": 70,
+                  "start": 45
+                }
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [],
+                        "kind": "text",
+                        "literal": "甲",
+                        "span": {
+                          "end": 97,
+                          "start": 94
+                        }
+                      }
+                    ],
+                    "kind": "table_cell",
+                    "span": {
+                      "end": 98,
+                      "start": 93
+                    }
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [],
+                        "kind": "text",
+                        "literal": "1",
+                        "span": {
+                          "end": 101,
+                          "start": 100
+                        }
+                      }
+                    ],
+                    "kind": "table_cell",
+                    "span": {
+                      "end": 102,
+                      "start": 99
+                    }
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [],
+                        "kind": "text",
+                        "literal": "第一行",
+                        "span": {
+                          "end": 113,
+                          "start": 104
+                        }
+                      }
+                    ],
+                    "kind": "table_cell",
+                    "span": {
+                      "end": 114,
+                      "start": 103
+                    }
+                  }
+                ],
+                "header": false,
+                "kind": "table_row",
+                "span": {
+                  "end": 115,
+                  "start": 92
+                }
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [],
+                        "kind": "text",
+                        "literal": "乙",
+                        "span": {
+                          "end": 121,
+                          "start": 118
+                        }
+                      }
+                    ],
+                    "kind": "table_cell",
+                    "span": {
+                      "end": 122,
+                      "start": 117
+                    }
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [],
+                        "kind": "text",
+                        "literal": "2",
+                        "span": {
+                          "end": 125,
+                          "start": 124
+                        }
+                      }
+                    ],
+                    "kind": "table_cell",
+                    "span": {
+                      "end": 126,
+                      "start": 123
+                    }
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [],
+                        "kind": "text",
+                        "literal": "第二行",
+                        "span": {
+                          "end": 137,
+                          "start": 128
+                        }
+                      }
+                    ],
+                    "kind": "table_cell",
+                    "span": {
+                      "end": 138,
+                      "start": 127
+                    }
+                  }
+                ],
+                "header": false,
+                "kind": "table_row",
+                "span": {
+                  "end": 139,
+                  "start": 116
+                }
+              }
+            ],
+            "kind": "table",
+            "span": {
+              "end": 139,
+              "start": 45
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "kind": "text",
+                "literal": "行内公式 ",
+                "span": {
+                  "end": 154,
+                  "start": 141
+                }
+              },
+              {
+                "children": [],
+                "display": false,
+                "kind": "math",
+                "literal": "E = mc^2",
+                "span": {
+                  "end": 164,
+                  "start": 154
+                }
+              },
+              {
+                "children": [],
+                "kind": "text",
+                "literal": "；块公式：",
+                "span": {
+                  "end": 179,
+                  "start": 164
+                }
+              }
+            ],
+            "kind": "paragraph",
+            "span": {
+              "end": 179,
+              "start": 141
+            }
+          },
+          {
+            "children": [],
+            "kind": "math_block",
+            "literal": "\\sum_{i=1}^{n} i = \\frac{n(n+1)}{2}\n",
+            "span": {
+              "end": 222,
+              "start": 181
+            }
+          },
+          {
+            "children": [],
+            "fenced": true,
+            "info": "python",
+            "kind": "code_block",
+            "literal": "print(\"代码围栏永远是惰性资源\")\n",
+            "span": {
+              "end": 280,
+              "start": 224
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [],
+                        "kind": "text",
+                        "literal": "任务列表可读",
+                        "span": {
+                          "end": 306,
+                          "start": 288
+                        }
+                      }
+                    ],
+                    "kind": "paragraph",
+                    "span": {
+                      "end": 306,
+                      "start": 288
+                    }
+                  }
+                ],
+                "kind": "item",
+                "span": {
+                  "end": 306,
+                  "start": 282
+                },
+                "task": true
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [],
+                        "kind": "text",
+                        "literal": "不会触发任何执行",
+                        "span": {
+                          "end": 337,
+                          "start": 313
+                        }
+                      }
+                    ],
+                    "kind": "paragraph",
+                    "span": {
+                      "end": 337,
+                      "start": 313
+                    }
+                  }
+                ],
+                "kind": "item",
+                "span": {
+                  "end": 337,
+                  "start": 307
+                },
+                "task": false
+              }
+            ],
+            "kind": "list",
+            "ordered": false,
+            "span": {
+              "end": 337,
+              "start": 282
+            },
+            "start": null,
+            "tight": true
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "kind": "text",
+                "literal": "外部链接：",
+                "span": {
+                  "end": 354,
+                  "start": 339
+                }
+              },
+              {
+                "children": [
+                  {
+                    "children": [],
+                    "kind": "text",
+                    "literal": "Marqdo CLI",
+                    "span": {
+                      "end": 365,
+                      "start": 355
+                    }
+                  }
+                ],
+                "kind": "link",
+                "span": {
+                  "end": 403,
+                  "start": 354
+                },
+                "title": "",
+                "url": "https://github.com/cflmy/marqdo-cli"
+              },
+              {
+                "children": [],
+                "kind": "text",
+                "literal": "。",
+                "span": {
+                  "end": 406,
+                  "start": 403
+                }
+              }
+            ],
+            "kind": "paragraph",
+            "span": {
+              "end": 406,
+              "start": 339
+            }
+          }
+        ],
+        "kind": "document",
+        "span": {
+          "end": 407,
+          "start": 0
+        }
+      },
+      "units": [
+        {
+          "id": "root:tables-math@0.1.0::index.mq.md#",
+          "path": [],
+          "parent_id": null,
+          "kind": "root",
+          "name": "",
+          "level": 0,
+          "mode": "knowledge",
+          "mode_origin": "default",
+          "mode_source_unit_id": "root:tables-math@0.1.0::index.mq.md#",
+          "heading_span": null,
+          "span": {
+            "start": 0,
+            "end": 407
+          },
+          "function": null
+        },
+        {
+          "id": "root:tables-math@0.1.0::index.mq.md#表格、公式与惰性资源",
+          "path": [
+            "表格、公式与惰性资源"
+          ],
+          "parent_id": "root:tables-math@0.1.0::index.mq.md#",
+          "kind": "namespace",
+          "name": "表格、公式与惰性资源",
+          "level": 1,
+          "mode": "knowledge",
+          "mode_origin": "explicit",
+          "mode_source_unit_id": "root:tables-math@0.1.0::index.mq.md#表格、公式与惰性资源",
+          "heading_span": {
+            "start": 0,
+            "end": 43
+          },
+          "span": {
+            "start": 0,
+            "end": 407
+          },
+          "function": null
+        }
+      ],
+      "anchors": [
+        {
+          "anchor": "表格公式与惰性资源",
+          "unit_id": "root:tables-math@0.1.0::index.mq.md#表格、公式与惰性资源"
+        }
+      ],
+      "functions": [],
+      "imports": [],
+      "references": [
+        {
+          "source": "root:tables-math@0.1.0::index.mq.md",
+          "source_unit": "root:tables-math@0.1.0::index.mq.md#表格、公式与惰性资源",
+          "url": "https://github.com/cflmy/marqdo-cli",
+          "span": {
+            "start": 354,
+            "end": 403
+          },
+          "state": "external",
+          "target_kind": null,
+          "target_module": null,
+          "target_unit": null,
+          "candidate_package_instance_id": null,
+          "candidate_path": null,
+          "fragment": null,
+          "candidates": []
+        }
+      ],
+      "calls": [],
+      "resources": [
+        {
+          "id": "root:tables-math@0.1.0::index.mq.md#resource:formula-1",
+          "module_id": "root:tables-math@0.1.0::index.mq.md",
+          "unit_id": "root:tables-math@0.1.0::index.mq.md#表格、公式与惰性资源",
+          "kind": "formula",
+          "span": {
+            "start": 154,
+            "end": 164
+          },
+          "content_digest": "2820951a377c18ce3e89093ca7c31c204b1196a7e571781c6080f8207524a8dc",
+          "language": null,
+          "display": false
+        },
+        {
+          "id": "root:tables-math@0.1.0::index.mq.md#resource:formula-2",
+          "module_id": "root:tables-math@0.1.0::index.mq.md",
+          "unit_id": "root:tables-math@0.1.0::index.mq.md#表格、公式与惰性资源",
+          "kind": "formula",
+          "span": {
+            "start": 181,
+            "end": 222
+          },
+          "content_digest": "8b1e8a7ed159e8223af79e768681907870ae7143f0b16001091377f9ff018db2",
+          "language": null,
+          "display": true
+        },
+        {
+          "id": "root:tables-math@0.1.0::index.mq.md#resource:code-1",
+          "module_id": "root:tables-math@0.1.0::index.mq.md",
+          "unit_id": "root:tables-math@0.1.0::index.mq.md#表格、公式与惰性资源",
+          "kind": "code",
+          "span": {
+            "start": 224,
+            "end": 280
+          },
+          "content_digest": "a0d49e456637468d7f594f4e2bb513321875855c1fe85d28e0ca62f1e9180d15",
+          "language": "python",
+          "display": null
+        }
+      ]
+    }
+  ],
+  "diagnostics": []
+}

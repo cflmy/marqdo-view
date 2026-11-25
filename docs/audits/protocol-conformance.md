@@ -1,5 +1,10 @@
 # 协议一致性审计（P-03）
 
+
+> **历史审计（0.2.0 时代）**：本文快照只对其当时基线有效，不是 0.3.0 的当前证据。
+> 当前冻结 CLI 合同审计见 [`protocol-contract-0002.md`](protocol-contract-0002.md)
+> 与 [ADR-0012](../decisions/0012-rc4-current-contracts.md)。
+
 > 结论：View 只消费冻结 CLI 的公开 Tool v1 / Analysis v2 / Trace v2 协议；
 > 未实现或未提供的能力显式标注 `UNSUPPORTED`。本文把规范条款映射到实现与测试，
 > 便于审阅者不依赖对话历史复核。

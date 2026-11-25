@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""HTTP and ZIP acceptance against an unmodified RC.2 release binary."""
+"""HTTP and ZIP acceptance against the frozen rc.4 release binary.
+
+The View consumes Observation v1 (`--output jsonl` / `--observation-file`);
+there is no trace file or legacy JSON run envelope.
+"""
 
 import hashlib
 import http.cookiejar
@@ -67,7 +71,7 @@ def verify_zip(payload, destination, expected_digest):
         assert manifest["execution"]["source_verified"] and manifest["execution"]["status"] == "succeeded"
         assert manifest["execution"]["parameters"] == "omitted"
         assert manifest["source"]["document"] == "index.mq.md"
-        assert manifest["execution"]["core_protocol"] == {"analysis": 3, "trace": 2, "events": 1}
+        assert manifest["execution"]["contracts"] == {"api_revision": 1, "analysis": 3, "observation": 1}
         for entry in manifest["files"] + manifest["assets"]:
             data = archive.read(entry["path"])
             assert sha(data) == entry["sha256"] and len(data) == entry["size"]
@@ -104,11 +108,12 @@ def check(root):
         "import os, subprocess, sys, time\n"
         f"core, count = {str(CORE)!r}, {str(count)!r}\n"
         "if sys.argv[1] in ('run', 'call'):\n"
-        "    assert '--event-stream' in sys.argv and '--json' not in sys.argv\n"
+        "    assert sys.argv[sys.argv.index('--output') + 1] == 'jsonl' and '--observation-file' in sys.argv\n"
+        "    assert '--json' not in sys.argv and '--trace-file' not in sys.argv\n"
         "    with open(count, 'a') as f: f.write(sys.argv[1]+'\\n')\n"
         "    if sys.argv[1] == 'call' and sys.argv[3] == 'write_markup':\n"
         "        result = subprocess.run([core, *sys.argv[1:]], check=False)\n"
-        "        os.unlink(sys.argv[sys.argv.index('--trace-file') + 1])\n"
+        "        os.unlink(sys.argv[sys.argv.index('--observation-file') + 1])\n"
         "        sys.exit(result.returncode)\n"
         "    if sys.argv[1] == 'call' and sys.argv[3] == 'scan': time.sleep(2)\n"
         "os.execv(core, [core, *sys.argv[1:]])\n"
@@ -158,7 +163,7 @@ def check(root):
 
             run_id, terminal = observe(submit("write_output", "one"))
             assert terminal["state"] == "succeeded" and terminal["result"]["stdout"] == "4\n", terminal
-            assert terminal["result"]["trace_status"] == "verified"
+            assert terminal["result"]["observation_status"] == "verified"
             assert count.read_text().splitlines() == ["call"]
             selection = {
                 "schema": "marqdo.view-static-export-request",
@@ -167,7 +172,7 @@ def check(root):
                 "document": "index.mq.md",
                 "analysis_digest": digest,
                 "scope": "document",
-                "include": {"result_value": True, "stdout": True, "stderr": False, "arguments": False, "trace_summary": True},
+                "include": {"result_value": True, "stdout": True, "stderr": False, "arguments": False, "observation_summary": True},
                 "confirm_sensitive_output": True,
                 "client_export_request_id": "zip-one",
             }
@@ -263,16 +268,16 @@ def check(root):
                 assert json.loads(archive.read("manifest.json"))["execution"]["status"] == "failed"
 
             text_id, text = observe(submit("write_markup", "markup"))
-            assert text["state"] == "succeeded" and text["result"]["trace_status"] == "unavailable", text
+            assert text["state"] == "succeeded" and text["result"]["observation_status"] == "unavailable", text
             assert text["result"]["stdout"] == attack_text.decode()
             text_zip, _ = post(browser, base, "/api/exports", token, {**selection, "run_id": text_id})
             with zipfile.ZipFile(io.BytesIO(text_zip)) as archive:
                 html = archive.read("index.html").decode()
                 assert "<script>" not in html and "&lt;script&gt;bad()" in html
-                assert json.loads(archive.read("manifest.json"))["execution"]["trace_status"] == "unavailable"
+                assert json.loads(archive.read("manifest.json"))["execution"]["observation_status"] == "unavailable"
             first, headers = post(browser, base, "/api/exports", token, selection)
             verify_zip(first, None, headers["X-Marqdo-Manifest-SHA256"])
-            print("active/cancelled export denied, verified failure gated, stdout escaped, missing Trace separate")
+            print("active/cancelled export denied, verified failure gated, stdout escaped, missing Observation separate")
             print("selected IDs remain isolated, tampering detected, oversized request denied, failed and aborted packages cleaned")
             calls = count.read_text().splitlines()
             assert calls == ["call"] * 4, calls

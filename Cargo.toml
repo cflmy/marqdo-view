@@ -1,10 +1,10 @@
 [package]
 name = "marqdo-view"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 rust-version = "1.89"
 license = "MIT OR Apache-2.0"
-description = "Marqdo View: read .mq.md documents as documents, with optional verified Analysis v2 and Trace v2"
+description = "Marqdo View: read .mq.md documents as documents, with optional verified Analysis v3 and Observation v1"
 repository = "https://github.com/cflmy/marqdo-view"
 readme = "README.md"
 keywords = ["marqdo", "markdown", "reader", "executable-document"]

@@ -1509,3 +1509,40 @@
 @layer semantics {
   .mq-snapshot-notice a { color: var(--mq-focus); }
 }
+
+@layer semantics {
+  /* Reference resolution states (Analysis v3). `not_loaded` is unverified,
+     never a broken link; only real errors use the error colour. */
+  .mq-link-unverified {
+    text-decoration: underline dotted;
+    text-underline-offset: 0.18em;
+    cursor: help;
+  }
+  .mq-link-unverified::after {
+    content: "（未核验）";
+    font: 10px/1 var(--mq-mono);
+    color: var(--mq-warn);
+    vertical-align: 0.35em;
+  }
+  .mq-link-error {
+    color: var(--mq-error);
+    text-decoration: underline wavy;
+    cursor: help;
+  }
+  .mq-run-status[data-run-state="incomplete"] {
+    color: var(--mq-warn);
+  }
+  .mq-run-chip[data-annotation-source="observation"] {
+    border-color: color-mix(in srgb, var(--mq-focus) 40%, var(--mq-line));
+    color: var(--mq-focus);
+  }
+  .mq-truncated-badge {
+    display: inline-block;
+    margin-inline-start: .4rem;
+    padding: 0 .45rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--mq-warn) 18%, var(--mq-surface));
+    color: var(--mq-warn);
+    font: 11px/1.6 var(--mq-mono);
+  }
+}

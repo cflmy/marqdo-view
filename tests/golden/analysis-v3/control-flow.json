@@ -1,79 +1,591 @@
 {
-  "diagnostics": [],
+  "schema": "marqdo.analysis",
+  "schema_version": 3,
+  "producer": {
+    "name": "marqdo",
+    "version": "3.0.0-rc.4",
+    "markdown_profile": "marqdo.md.v1"
+  },
+  "project": {
+    "root_id": "root:control-flow@0.1.0",
+    "identity_kind": "manifest",
+    "entry_module_id": "root:control-flow@0.1.0::index.mq.md",
+    "lock_digest": "",
+    "manifest_digest": "sha256:a317c418b2b86e74c23f5effcea3e7e4bff0d6dac4043beca78598bc8c90768d",
+    "stdlib": {
+      "version": "0.1.0",
+      "digest": "sha256:5407d3665ba2fe105820d0f1af5efaafa10c277a69eb819c3225719813c8c713",
+      "instance_id": "std:marqdo-stdlib@0.1.0#5407d3665ba2fe105820d0f1af5efaafa10c277a69eb819c3225719813c8c713"
+    },
+    "extensions": []
+  },
   "modules": [
     {
-      "calls": [
+      "id": "root:control-flow@0.1.0::index.mq.md",
+      "package_instance_id": "root:control-flow@0.1.0",
+      "relative_path": "index.mq.md",
+      "source_digest": "127922e228bbc7931aa8241ff69ee7df3cbc8bbaaaead143b67842a527818854",
+      "source": "# @knowledge 控制流演示\n\n下面的函数可以在 `pure` 模式显式运行并产生真实 Trace。示例把 ASCII 数字和换行写入标准输出资源。\n\n# @exec 演示\n\n## @exec main\n\n`x = 0`\n\n`buffer = memory.new(1, 1)`\n\n`buffer[1] = 10`\n\n`stdout = resource.open(\"stdio\", \"stdout\", [\"write\"])`\n\n**while x < 3**\n\n**if x > 1**\n\n`buffer[0] = 48 + x`\n\n**else**\n\n`buffer[0] = 48`\n\n**end**\n\n`resource.write(stdout, buffer, 0, 2)`\n\n**x = x + 1**\n\n**end**\n\n`resource.close(stdout)`\n\n`return 3`\n",
+      "document": {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [],
+                "kind": "text",
+                "literal": "@knowledge 控制流演示",
+                "span": {
+                  "end": 28,
+                  "start": 2
+                }
+              }
+            ],
+            "kind": "heading",
+            "level": 1,
+            "setext": false,
+            "span": {
+              "end": 28,
+              "start": 0
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "kind": "text",
+                "literal": "下面的函数可以在 ",
+                "span": {
+                  "end": 55,
+                  "start": 30
+                }
+              },
+              {
+                "children": [],
+                "kind": "code",
+                "literal": "pure",
+                "span": {
+                  "end": 61,
+                  "start": 55
+                },
+                "ticks": 1
+              },
+              {
+                "children": [],
+                "kind": "text",
+                "literal": " 模式显式运行并产生真实 Trace。示例把 ASCII 数字和换行写入标准输出资源。",
+                "span": {
+                  "end": 162,
+                  "start": 61
+                }
+              }
+            ],
+            "kind": "paragraph",
+            "span": {
+              "end": 162,
+              "start": 30
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "kind": "text",
+                "literal": "@exec 演示",
+                "span": {
+                  "end": 178,
+                  "start": 166
+                }
+              }
+            ],
+            "kind": "heading",
+            "level": 1,
+            "setext": false,
+            "span": {
+              "end": 178,
+              "start": 164
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "kind": "text",
+                "literal": "@exec main",
+                "span": {
+                  "end": 193,
+                  "start": 183
+                }
+              }
+            ],
+            "kind": "heading",
+            "level": 2,
+            "setext": false,
+            "span": {
+              "end": 193,
+              "start": 180
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "kind": "code",
+                "literal": "x = 0",
+                "span": {
+                  "end": 202,
+                  "start": 195
+                },
+                "ticks": 1
+              }
+            ],
+            "kind": "paragraph",
+            "span": {
+              "end": 202,
+              "start": 195
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "kind": "code",
+                "literal": "buffer = memory.new(1, 1)",
+                "span": {
+                  "end": 231,
+                  "start": 204
+                },
+                "ticks": 1
+              }
+            ],
+            "kind": "paragraph",
+            "span": {
+              "end": 231,
+              "start": 204
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "kind": "code",
+                "literal": "buffer[1] = 10",
+                "span": {
+                  "end": 249,
+                  "start": 233
+                },
+                "ticks": 1
+              }
+            ],
+            "kind": "paragraph",
+            "span": {
+              "end": 249,
+              "start": 233
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "kind": "code",
+                "literal": "stdout = resource.open(\"stdio\", \"stdout\", [\"write\"])",
+                "span": {
+                  "end": 305,
+                  "start": 251
+                },
+                "ticks": 1
+              }
+            ],
+            "kind": "paragraph",
+            "span": {
+              "end": 305,
+              "start": 251
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [],
+                    "kind": "text",
+                    "literal": "while x < 3",
+                    "span": {
+                      "end": 320,
+                      "start": 309
+                    }
+                  }
+                ],
+                "kind": "strong",
+                "span": {
+                  "end": 322,
+                  "start": 307
+                }
+              }
+            ],
+            "kind": "paragraph",
+            "span": {
+              "end": 322,
+              "start": 307
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [],
+                    "kind": "text",
+                    "literal": "if x > 1",
+                    "span": {
+                      "end": 334,
+                      "start": 326
+                    }
+                  }
+                ],
+                "kind": "strong",
+                "span": {
+                  "end": 336,
+                  "start": 324
+                }
+              }
+            ],
+            "kind": "paragraph",
+            "span": {
+              "end": 336,
+              "start": 324
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "kind": "code",
+                "literal": "buffer[0] = 48 + x",
+                "span": {
+                  "end": 358,
+                  "start": 338
+                },
+                "ticks": 1
+              }
+            ],
+            "kind": "paragraph",
+            "span": {
+              "end": 358,
+              "start": 338
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [],
+                    "kind": "text",
+                    "literal": "else",
+                    "span": {
+                      "end": 366,
+                      "start": 362
+                    }
+                  }
+                ],
+                "kind": "strong",
+                "span": {
+                  "end": 368,
+                  "start": 360
+                }
+              }
+            ],
+            "kind": "paragraph",
+            "span": {
+              "end": 368,
+              "start": 360
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "kind": "code",
+                "literal": "buffer[0] = 48",
+                "span": {
+                  "end": 386,
+                  "start": 370
+                },
+                "ticks": 1
+              }
+            ],
+            "kind": "paragraph",
+            "span": {
+              "end": 386,
+              "start": 370
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [],
+                    "kind": "text",
+                    "literal": "end",
+                    "span": {
+                      "end": 393,
+                      "start": 390
+                    }
+                  }
+                ],
+                "kind": "strong",
+                "span": {
+                  "end": 395,
+                  "start": 388
+                }
+              }
+            ],
+            "kind": "paragraph",
+            "span": {
+              "end": 395,
+              "start": 388
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "kind": "code",
+                "literal": "resource.write(stdout, buffer, 0, 2)",
+                "span": {
+                  "end": 435,
+                  "start": 397
+                },
+                "ticks": 1
+              }
+            ],
+            "kind": "paragraph",
+            "span": {
+              "end": 435,
+              "start": 397
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [],
+                    "kind": "text",
+                    "literal": "x = x + 1",
+                    "span": {
+                      "end": 448,
+                      "start": 439
+                    }
+                  }
+                ],
+                "kind": "strong",
+                "span": {
+                  "end": 450,
+                  "start": 437
+                }
+              }
+            ],
+            "kind": "paragraph",
+            "span": {
+              "end": 450,
+              "start": 437
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [],
+                    "kind": "text",
+                    "literal": "end",
+                    "span": {
+                      "end": 457,
+                      "start": 454
+                    }
+                  }
+                ],
+                "kind": "strong",
+                "span": {
+                  "end": 459,
+                  "start": 452
+                }
+              }
+            ],
+            "kind": "paragraph",
+            "span": {
+              "end": 459,
+              "start": 452
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "kind": "code",
+                "literal": "resource.close(stdout)",
+                "span": {
+                  "end": 485,
+                  "start": 461
+                },
+                "ticks": 1
+              }
+            ],
+            "kind": "paragraph",
+            "span": {
+              "end": 485,
+              "start": 461
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "kind": "code",
+                "literal": "return 3",
+                "span": {
+                  "end": 497,
+                  "start": 487
+                },
+                "ticks": 1
+              }
+            ],
+            "kind": "paragraph",
+            "span": {
+              "end": 497,
+              "start": 487
+            }
+          }
+        ],
+        "kind": "document",
+        "span": {
+          "end": 498,
+          "start": 0
+        }
+      },
+      "units": [
         {
-          "callee": {
-            "base": {
-              "kind": "ident",
-              "name": "memory"
-            },
-            "field": "new",
-            "kind": "member"
-          },
-          "function": "root:control-flow@0.1.0::index.mq.md::演示.main",
+          "id": "root:control-flow@0.1.0::index.mq.md#",
+          "path": [],
+          "parent_id": null,
+          "kind": "root",
+          "name": "",
+          "level": 0,
+          "mode": "knowledge",
+          "mode_origin": "default",
+          "mode_source_unit_id": "root:control-flow@0.1.0::index.mq.md#",
+          "heading_span": null,
           "span": {
-            "end": 230,
-            "start": 214
+            "start": 0,
+            "end": 498
           },
-          "state": "builtin",
-          "target": "memory.new"
+          "function": null
         },
         {
-          "callee": {
-            "base": {
-              "kind": "ident",
-              "name": "resource"
-            },
-            "field": "open",
-            "kind": "member"
+          "id": "root:control-flow@0.1.0::index.mq.md#控制流演示",
+          "path": [
+            "控制流演示"
+          ],
+          "parent_id": "root:control-flow@0.1.0::index.mq.md#",
+          "kind": "namespace",
+          "name": "控制流演示",
+          "level": 1,
+          "mode": "knowledge",
+          "mode_origin": "explicit",
+          "mode_source_unit_id": "root:control-flow@0.1.0::index.mq.md#控制流演示",
+          "heading_span": {
+            "start": 0,
+            "end": 28
           },
-          "function": "root:control-flow@0.1.0::index.mq.md::演示.main",
           "span": {
-            "end": 304,
-            "start": 261
+            "start": 0,
+            "end": 164
           },
-          "state": "builtin",
-          "target": "resource.open"
+          "function": null
         },
         {
-          "callee": {
-            "base": {
-              "kind": "ident",
-              "name": "resource"
-            },
-            "field": "write",
-            "kind": "member"
+          "id": "root:control-flow@0.1.0::index.mq.md#演示",
+          "path": [
+            "演示"
+          ],
+          "parent_id": "root:control-flow@0.1.0::index.mq.md#",
+          "kind": "namespace",
+          "name": "演示",
+          "level": 1,
+          "mode": "exec",
+          "mode_origin": "explicit",
+          "mode_source_unit_id": "root:control-flow@0.1.0::index.mq.md#演示",
+          "heading_span": {
+            "start": 164,
+            "end": 178
           },
-          "function": "root:control-flow@0.1.0::index.mq.md::演示.main",
           "span": {
-            "end": 434,
-            "start": 398
+            "start": 164,
+            "end": 498
           },
-          "state": "builtin",
-          "target": "resource.write"
+          "function": null
         },
         {
-          "callee": {
-            "base": {
-              "kind": "ident",
-              "name": "resource"
-            },
-            "field": "close",
-            "kind": "member"
+          "id": "root:control-flow@0.1.0::index.mq.md#演示/main",
+          "path": [
+            "演示",
+            "main"
+          ],
+          "parent_id": "root:control-flow@0.1.0::index.mq.md#演示",
+          "kind": "function",
+          "name": "main",
+          "level": 2,
+          "mode": "exec",
+          "mode_origin": "explicit",
+          "mode_source_unit_id": "root:control-flow@0.1.0::index.mq.md#演示/main",
+          "heading_span": {
+            "start": 180,
+            "end": 193
           },
-          "function": "root:control-flow@0.1.0::index.mq.md::演示.main",
           "span": {
-            "end": 484,
-            "start": 462
+            "start": 180,
+            "end": 498
           },
-          "state": "builtin",
-          "target": "resource.close"
+          "function": "root:control-flow@0.1.0::index.mq.md::演示.main"
+        }
+      ],
+      "anchors": [
+        {
+          "anchor": "main",
+          "unit_id": "root:control-flow@0.1.0::index.mq.md#演示/main"
+        },
+        {
+          "anchor": "控制流演示",
+          "unit_id": "root:control-flow@0.1.0::index.mq.md#控制流演示"
+        },
+        {
+          "anchor": "演示",
+          "unit_id": "root:control-flow@0.1.0::index.mq.md#演示"
         }
       ],
       "functions": [
         {
+          "id": "root:control-flow@0.1.0::index.mq.md::演示.main",
+          "unit_id": "root:control-flow@0.1.0::index.mq.md#演示/main",
+          "local_name": "main",
+          "namespace": "演示",
+          "span": {
+            "start": 180,
+            "end": 497
+          },
+          "heading_span": {
+            "start": 180,
+            "end": 193
+          },
+          "signature": {
+            "kind": "inferred",
+            "params": []
+          },
+          "effects": [
+            "unknown"
+          ],
           "body": [
             {
               "kind": "assign",
@@ -437,12 +949,12 @@
                         "value": true
                       },
                       "condition_span": {
-                        "end": 336,
-                        "start": 324
+                        "end": 368,
+                        "start": 360
                       },
                       "span": {
-                        "end": 336,
-                        "start": 324
+                        "end": 368,
+                        "start": 360
                       }
                     }
                   ],
@@ -678,94 +1190,95 @@
                 "value": "3"
               }
             }
-          ],
-          "effects": [
-            "unknown"
-          ],
-          "heading_span": {
-            "end": 193,
-            "start": 180
-          },
-          "id": "root:control-flow@0.1.0::index.mq.md::演示.main",
-          "local_name": "main",
-          "namespace": "演示",
-          "signature": {
-            "kind": "inferred",
-            "params": []
-          },
-          "span": {
-            "end": 497,
-            "start": 180
-          },
-          "unit_id": "root:control-flow@0.1.0::index.mq.md#演示/main"
+          ]
         }
       ],
-      "id": "root:control-flow@0.1.0::index.mq.md",
       "imports": [],
-      "package_instance_id": "root:control-flow@0.1.0",
       "references": [],
-      "relative_path": "index.mq.md",
-      "resources": [],
-      "source_digest": "127922e228bbc7931aa8241ff69ee7df3cbc8bbaaaead143b67842a527818854",
-      "units": [
+      "calls": [
         {
-          "function": null,
-          "id": "root:control-flow@0.1.0::index.mq.md#",
-          "kind": "root",
-          "level": 0,
-          "name": "",
+          "function": "root:control-flow@0.1.0::index.mq.md::演示.main",
           "span": {
-            "end": 497,
-            "start": 0
-          }
-        },
-        {
-          "function": null,
-          "id": "root:control-flow@0.1.0::index.mq.md#控制流演示",
-          "kind": "namespace",
-          "level": 1,
-          "name": "控制流演示",
-          "span": {
-            "end": 28,
-            "start": 0
-          }
-        },
-        {
-          "function": null,
-          "id": "root:control-flow@0.1.0::index.mq.md#演示",
-          "kind": "namespace",
-          "level": 1,
-          "name": "演示",
-          "span": {
-            "end": 178,
-            "start": 164
-          }
+            "start": 214,
+            "end": 230
+          },
+          "callee": {
+            "base": {
+              "kind": "ident",
+              "name": "memory"
+            },
+            "field": "new",
+            "kind": "member"
+          },
+          "state": "builtin",
+          "target": "memory.new",
+          "target_kind": "builtin",
+          "target_owner": null,
+          "reason": null
         },
         {
           "function": "root:control-flow@0.1.0::index.mq.md::演示.main",
-          "id": "root:control-flow@0.1.0::index.mq.md#演示/main",
-          "kind": "function",
-          "level": 2,
-          "name": "main",
           "span": {
-            "end": 193,
-            "start": 180
-          }
+            "start": 261,
+            "end": 304
+          },
+          "callee": {
+            "base": {
+              "kind": "ident",
+              "name": "resource"
+            },
+            "field": "open",
+            "kind": "member"
+          },
+          "state": "builtin",
+          "target": "resource.open",
+          "target_kind": "builtin",
+          "target_owner": null,
+          "reason": null
+        },
+        {
+          "function": "root:control-flow@0.1.0::index.mq.md::演示.main",
+          "span": {
+            "start": 398,
+            "end": 434
+          },
+          "callee": {
+            "base": {
+              "kind": "ident",
+              "name": "resource"
+            },
+            "field": "write",
+            "kind": "member"
+          },
+          "state": "builtin",
+          "target": "resource.write",
+          "target_kind": "builtin",
+          "target_owner": null,
+          "reason": null
+        },
+        {
+          "function": "root:control-flow@0.1.0::index.mq.md::演示.main",
+          "span": {
+            "start": 462,
+            "end": 484
+          },
+          "callee": {
+            "base": {
+              "kind": "ident",
+              "name": "resource"
+            },
+            "field": "close",
+            "kind": "member"
+          },
+          "state": "builtin",
+          "target": "resource.close",
+          "target_kind": "builtin",
+          "target_owner": null,
+          "reason": null
         }
-      ]
+      ],
+      "resources": []
     }
   ],
-  "producer": {
-    "markdown_profile": "marqdo.md.v1",
-    "name": "marqdo",
-    "version": "3.0.0-beta.1"
-  },
-  "project": {
-    "identity_kind": "manifest",
-    "lock_digest": "",
-    "root_id": "root:control-flow@0.1.0",
-    "stdlib": null
-  },
-  "schema": "marqdo.analysis",
-  "schema_version": 2
+  "diagnostics": []
 }

@@ -2,12 +2,84 @@
 
 All notable changes to `marqdo-view` are documented here. The format follows
 Keep a Changelog and the project uses SemVer for the View product version.
-Protocol axes (Tool v1, Analysis v2, Trace v2) are versioned separately.
+The current public protocol axes are versioned separately by the CLI: CLI Tool
+revision 1 (`api_revision` 1), Analysis revision 3 and Observation revision 1.
 
-`0.2.0` is the first release implementing RFC-VIEW-0002 end to end (SSE execution
-loop, 7-route Live API, controlled project grants and Trace-bound annotations).
-The earlier `0.1.0` development line was never published; its verified reader /
-Analysis / export work is folded into this entry.
+`0.3.0` is the one-step migration to the current pre-release contracts of
+`marqdo 3.0.0-rc.4`. There is no compatibility layer for the retired formats:
+old code paths, fixtures and documents were replaced, not branched.
+
+## [0.3.0] - 2026-11-25
+
+### Added
+
+- CLI Tool revision 1 manifest: `tool.json` now declares exact
+  `requires {api_revision: 1, analysis: 3, observation: 1}` with no
+  `compatibility` field; the bundle release info records the same `requires`
+  plus product range `>=3.0.0-rc.3,<4.0.0`.
+- Observation v1 consumption: `run`/`call --output jsonl` is the live source and
+  `--observation-file` publishes the equivalent atomic snapshot. One decoder
+  validates schema/revision, `run_id`, contiguous `seq`, unique terminal event,
+  `observation.truncated`, source binding, module identity and UTF-8 half-open
+  spans. View SSE forwards/summarises the protocol sequence; it never
+  renumbers, reorders or synthesises events.
+- Analysis v3 consumption through the ADR-0069 public boundary: one
+  `check --emit` artifact carries exact `source`, Markdown `document`, heading
+  scopes (`heading_span` + complete section `span`), `anchors`, functions,
+  imports, calls, resources, diagnostics and state-bearing references.
+  `inspect --ast` is no longer a machine source for rendering.
+- Reference states `resolved`, `not_loaded`, `missing`, `ambiguous`, `external`,
+  `outside_scope` and `invalid`; `not_loaded` is rendered as "未核验", never as a
+  broken link, and `ambiguous` lists candidates instead of silently choosing one.
+- `scripts/check-no-legacy.sh` (G01): fails on any retired protocol name,
+  retired run/call argv, Tool negotiation/migration, dual-state/fallback branch
+  or `schema_version` use in the reader across `src/`, `tool.json` and current
+  docs. Historical evidence and ADRs are exempt.
+- `scripts/check-docs.sh` (G12): README/COMPATIBILITY/CHANGELOG/STATUS/ACCEPTANCE
+  must describe the rc.4 baseline; old CHANGELOG entries are allowed only under
+  the explicit `## History` heading.
+- `scripts/check-observation.py`: machine probes for stream/snapshot
+  equivalence, truncation, exact Analysis binding and fail-closed retired input.
+- `docs/architecture/observation-v1-and-analysis-v3.md`: final layering
+  (CLI adapter → decode/validate → domain projection → reader/execution/SSE/
+  export) with no version branch outside protocol modules.
+- ADR-0012 records the rc.3 → rc.4 supersession: issue #5's rc.3 baseline is
+  superseded by issue #6's rc.4 public Analysis boundary; evidence pins the
+  rc.4 source/archive/binary SHAs.
+
+### Changed
+
+- Frozen CLI pin moved to `marqdo 3.0.0-rc.4`: source
+  `452e9a32bd9e40dba427d4180691c58bab74449e`, archive
+  `9c3f166b5e5b8840d39d10019074e4e1c42432fc23e26c69670e64fdcf4e15d8`, binary
+  `a7306962689c635445a59043971ea2eb09298e01feeee81f0ba07b1f3e10306e`.
+- Acceptance manifest replaced by the issue #5 §0 schema
+  `marqdo.view.acceptance` revision 1: SHA-256-prefixed identities, frozen CLI
+  product/source/archive/binary, gates G01–G12 with
+  `state/command/exit_code/log`, and an explicit `unverified` list. A gate that
+  has not run is never recorded as PASS.
+- Scripts (`frozen-beta`, `package`, `install-smoke`, `check-examples`,
+  `gen-golden`, `acceptance`, `test-*`, `acceptance-run.py`,
+  `test-complete-reader.py`) use the current flags and report the current
+  contracts; golden data moved to Analysis revision 3 and Observation revision 1
+  stream/snapshot fixtures.
+- CI (`.github/workflows/ci.yml`, `.woodpecker.yml`) pins rc.4 through
+  `scripts/frozen-beta.sh` and adds a distinct blocking no-legacy job that runs
+  G01 and G12 before quality and acceptance.
+- README, COMPATIBILITY, STATUS, ACCEPTANCE, CONFORMANCE and the frozen-CLI
+  contract audit now describe the current behavior; 0.2.0 material is marked
+  historical.
+
+### Fixed
+
+- Values are never fabricated: the protocol supports explicit
+  `--observe-variable`/`--observe-parameter` (Text needs `--observe-text-values`),
+  but View 0.3.0 requests none by default and never displays memory or handles.
+- Truncated or incomplete observation transport is displayed as
+  `TRUNCATED`/`未完成`, never as success. `UNSUPPORTED`, `PARTIAL` and `WARN`
+  are never written as `PASS`.
+
+## History
 
 ## [Unreleased]
 

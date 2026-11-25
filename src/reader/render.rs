@@ -10,7 +10,7 @@
 //! Markdown is serialized here from the View-owned `DocBlock` tree, with raw
 //! HTML omitted by default and every URL scheme sanitized.
 
-use crate::protocol::analysis_v2::{source_id, UnitKind};
+use crate::protocol::analysis_v3::{source_id, UnitKind};
 use crate::reader::assets::AssetBundle;
 use crate::reader::markdown::{DocBlock, Inline, TableAlign};
 use crate::reader::model::{anchor_for_span, PresentationModel};
@@ -195,7 +195,7 @@ impl ReaderRenderer {
 <link rel="stylesheet" href="{css}"/>
 {script}
 </head>
-<body class="mq-reader" data-mode="document" data-theme="light" data-annotations="{annotations}" data-size="normal" data-source-status="{status}" data-run-state="{run_state}" data-run-available="{run_available}" data-has-main="{has_main}" data-core-available="{core_available}" data-execution-events="{execution_events}" data-document="{document}" data-analysis-digest="{analysis_digest}" data-run-timeout="{run_timeout}" data-live="{live}">
+<body class="mq-reader" data-mode="document" data-theme="light" data-annotations="{annotations}" data-size="normal" data-source-status="{status}" data-run-state="{run_state}" data-run-available="{run_available}" data-has-main="{has_main}" data-core-available="{core_available}" data-document="{document}" data-analysis-digest="{analysis_digest}" data-run-timeout="{run_timeout}" data-live="{live}">
 <a class="mq-skip" href="#mq-main">跳到正文</a>
 "##,
             presentation_version = model.version,
@@ -210,10 +210,6 @@ impl ReaderRenderer {
             run_available = if ctx.run_available { "true" } else { "false" },
             has_main = if has_main { "true" } else { "false" },
             core_available = if ctx.core_available { "true" } else { "false" },
-            execution_events = model
-                .core_version
-                .as_deref()
-                .is_some_and(crate::protocol::tool_v1::supports_execution_events),
             document = escape_attr(&relative_path),
             analysis_digest = escape_attr(&analysis_digest),
             run_timeout = ctx.run_timeout_secs,
@@ -490,7 +486,7 @@ impl ReaderRenderer {
         match &current {
             Some(current) => {
                 let mut section = None;
-                let place_result = |html: &mut String, function: &crate::protocol::analysis_v2::SemanticFunction| {
+                let place_result = |html: &mut String, function: &crate::protocol::analysis_v3::SemanticFunction| {
                     if ctx.live {
                         let _ = write!(html, "<div class=\"mq-result-slot\" data-result-for=\"{}\"></div>", escape_attr(&function.id));
                     }
@@ -563,7 +559,7 @@ impl ReaderRenderer {
             html,
             r##"<footer class="mq-footer">
   <span>Marqdo · 静态阅读</span>
-  <span>Analysis v2 · Trace v2 · {core}</span>
+  <span>Analysis v3 · Observation v1 · {core}</span>
   <span>默认不执行 · 无自动运行</span>
 </footer>
 "##,
@@ -585,8 +581,8 @@ impl ReaderRenderer {
   <div id="mq-run-summary"></div>
   <pre id="mq-run-stdout" class="mq-stdout" aria-label="程序标准输出" hidden></pre>
   <pre id="mq-run-stderr" class="mq-stdout mq-stderr" aria-label="程序标准错误" hidden></pre>
-  <details id="mq-run-trace-wrap" class="mq-run-events-wrap" hidden>
-    <summary id="mq-run-trace-title">实时结构事件</summary>
+  <details id="mq-run-observation-wrap" class="mq-run-events-wrap" hidden>
+    <summary id="mq-run-observation-title">实时结构观察事件</summary>
     <ol id="mq-run-events" class="mq-run-events"></ol>
   </details>
   <button type="button" class="mq-fn-call mq-export-result" data-action="export-result" id="mq-export-result" hidden>导出文档（含本次结果）</button>
@@ -673,7 +669,7 @@ impl ReaderRenderer {
   <ul class="mq-menu-list">
     <li><button type="button" data-action="mode-document">文档态 <span class="mq-menu-hint">原始 Markdown 阅读</span></button></li>
     <li><button type="button" data-action="mode-source">源码态 <span class="mq-menu-hint">逐行原文，含标记</span></button></li>
-    <li><button type="button" data-action="functions">函数大纲 <span class="mq-menu-hint">来自 Analysis v2/v3</span></button></li>
+    <li><button type="button" data-action="functions">函数大纲 <span class="mq-menu-hint">来自 Analysis v3</span></button></li>
     <li><button type="button" data-action="unsupported">未提供的能力 <span class="mq-menu-hint">变量 / 内存 / 调试 / 证明</span></button></li>
     <li><button type="button" data-action="print">打印 <span class="mq-menu-hint">隐藏交互与装饰</span></button></li>
     <li><button type="button" data-action="about">关于 Marqdo View <span class="mq-menu-hint">版本与协议</span></button></li>
@@ -692,7 +688,7 @@ impl ReaderRenderer {
 {export_dialog}
 <dialog class="mq-dialog" id="mq-dialog-about" aria-labelledby="mq-about-title">
   <div class="mq-dialog-head"><h2 id="mq-about-title">关于 Marqdo View</h2><button type="button" class="mq-icon-btn mq-close" data-action="close-dialog" aria-label="关闭关于">×</button></div>
-  <p>版本 {view_version} · Tool Protocol v1 · Analysis v2/v3 · Trace v2。</p>
+  <p>版本 {view_version} · CLI Tool API revision 1 · Analysis v3 · Observation v1。</p>
   <p>冻结核心：{core}。</p>
   <p class="mq-colophon">本页面只渲染原始 Markdown 与已校验的静态语义；打开、刷新、搜索、导出都不会执行文档。运行需要用户显式确认。</p>
 </dialog>
@@ -723,7 +719,7 @@ impl ReaderRenderer {
             html,
             r##"<section class="mq-run-panel" id="mq-run-panel" data-run-state="{state}" data-run-id="{run_id}" aria-labelledby="mq-run-title">
   <h2 id="mq-run-title">本次运行 · {label}</h2>
-  <p class="mq-colophon">入口 {entry} · 模式 pure · 退出码 {exit_code} · 事件 {total}（本文 {entry_count} / 其他模块 {other_count}）</p>
+  <p class="mq-colophon">入口 {entry} · 观察级别 {capture} · 退出码 {exit_code} · 事件 {total}（本文 {entry_count} / 其他模块 {other_count}）</p>
 "##,
             state = run.state.data_value(),
             run_id = escape_attr(&run.run_id),
@@ -733,11 +729,16 @@ impl ReaderRenderer {
             total = counts.total(),
             entry_count = run.entry_event_count,
             other_count = run.other_event_count,
+            capture = escape_text(if run.capture_level.is_empty() {
+                "(未知)"
+            } else {
+                &run.capture_level
+            }),
         );
         if let Some(truncated) = &run.truncated {
             let _ = write!(
                 html,
-                "<p class=\"mq-run-warning\" role=\"note\">Trace 被截断：{}</p>\n",
+                "<p class=\"mq-run-warning\" role=\"note\">Observation 已截断：{}</p>\n",
                 escape_text(&truncated.label())
             );
         }
@@ -778,7 +779,7 @@ impl ReaderRenderer {
             );
         }
         if !run.events.is_empty() {
-            html.push_str("<details class=\"mq-run-events-wrap\" open><summary>真实 Trace v2 事件</summary>\n<ol class=\"mq-run-events\">\n");
+            html.push_str("<details class=\"mq-run-events-wrap\" open><summary>真实 Observation v1 事件</summary>\n<ol class=\"mq-run-events\">\n");
             for event in run.events.iter().take(200) {
                 let location = match event.span {
                     Some(span) => {
@@ -903,6 +904,15 @@ fn render_block(
                 );
             }
             let (badge, cleaned) = display_heading_content(content, unit);
+            let section_span = unit
+                .and_then(|unit| unit.span.start.checked_sub(0).map(|_| unit.span))
+                .map(|span| {
+                    format!(
+                        " data-section-start=\"{}\" data-section-end=\"{}\"",
+                        span.start, span.end
+                    )
+                })
+                .unwrap_or_default();
             let data_semantic = if let Some((_, data)) = badge {
                 data
             } else if let Some(unit) = unit {
@@ -916,12 +926,16 @@ fn render_block(
             };
             let _ = write!(
                 html,
-                "<h{} id=\"{}\" data-source-id=\"{}\" data-semantic=\"{}\">",
+                "<h{} id=\"{}\" data-source-id=\"{}\" data-semantic=\"{}\"
+                data-heading-start=\"{}\" data-heading-end=\"{}\">",
                 level,
                 escape_attr(slug),
                 source_id_id(model, *span),
                 data_semantic,
+                span.start,
+                span.end,
             );
+            let _ = section_span;
             if let Some(badge) = badge {
                 let _ = write!(
                     html,
@@ -1095,7 +1109,7 @@ fn resolve_heading_unit(
     model: &PresentationModel,
     heading_span: SourceSpan,
     level: u8,
-) -> Option<&crate::protocol::analysis_v2::SemanticUnit> {
+) -> Option<&crate::protocol::analysis_v3::SemanticUnit> {
     let projection = model.semantic.as_ref()?;
     // A function heading maps to its function unit exactly; never borrow the
     // ancestor function for H3/H4 sections (that would duplicate DOM ids).
@@ -1115,14 +1129,14 @@ fn resolve_heading_unit(
     projection
         .units
         .iter()
-        .filter(|unit| unit.level == level && unit.span == heading_span)
+        .filter(|unit| unit.level == level && unit.heading_span == Some(heading_span))
         .min_by_key(|unit| unit.span.len())
         .or_else(|| projection.unit_for_heading(heading_span, level))
 }
 
 fn display_heading_content(
     content: &[Inline],
-    unit: Option<&crate::protocol::analysis_v2::SemanticUnit>,
+    unit: Option<&crate::protocol::analysis_v3::SemanticUnit>,
 ) -> (Option<(&'static str, &'static str)>, Vec<Inline>) {
     let Some(unit) = unit else {
         return (None, content.to_vec());
@@ -1312,8 +1326,63 @@ fn render_inline(
             children,
         } => {
             let reference = projection.and_then(|projection| projection.reference_for_span(*span));
-            let state = reference.map(|reference| reference.state.as_str());
-            let target = resolve_link(url, current, model, &ctx.links);
+            let reference_state = reference.map(|reference| reference.state);
+            let reference_href = reference.and_then(|reference| match reference.state {
+                crate::protocol::analysis_v3::ReferenceState::Resolved => {
+                    // A resolved module target is linked through the project
+                    // document map; the fragment is preserved as written.
+                    reference.candidate_path.as_deref().and_then(|candidate| {
+                        crate::reader::source::SafeRelativePath::parse(candidate)
+                            .ok()
+                            .map(|target| {
+                                let mut href = ctx.links.document_href(current, &target);
+                                if let Some(fragment) = &reference.fragment {
+                                    if !fragment.is_empty() {
+                                        href.push('#');
+                                        href.push_str(&percent_encode_path(fragment));
+                                    }
+                                }
+                                href
+                            })
+                    })
+                }
+                crate::protocol::analysis_v3::ReferenceState::External => {
+                    resolve_link(url, current, model, &ctx.links)
+                }
+                _ => None,
+            });
+            let target = match reference {
+                // A local target the loaded catalog did not cover is shown as
+                // unverified, never as a broken link: keep the navigation href
+                // only when the document is known to the project.
+                Some(_reference)
+                    if reference_state
+                        == Some(crate::protocol::analysis_v3::ReferenceState::NotLoaded) =>
+                {
+                    resolve_link(url, current, model, &ctx.links)
+                }
+                Some(_) => reference_href,
+                None => resolve_link(url, current, model, &ctx.links),
+            };
+            let state = reference_state.map(|state| state.data_value());
+            let state_title = match reference_state {
+                Some(crate::protocol::analysis_v3::ReferenceState::NotLoaded) => {
+                    "未核验：当前加载目录未覆盖该本地目标"
+                }
+                Some(crate::protocol::analysis_v3::ReferenceState::Missing) => "引用目标缺失",
+                Some(crate::protocol::analysis_v3::ReferenceState::Ambiguous) => {
+                    "引用目标不唯一，请检查候选"
+                }
+                Some(crate::protocol::analysis_v3::ReferenceState::OutsideScope) => {
+                    "引用目标越出项目范围，已拒绝读取"
+                }
+                Some(crate::protocol::analysis_v3::ReferenceState::Invalid) => "引用地址无效",
+                _ => "",
+            };
+            let unverified = matches!(
+                reference_state,
+                Some(crate::protocol::analysis_v3::ReferenceState::NotLoaded)
+            );
             match target {
                 Some(href) => {
                     let _ = write!(html, "<a href=\"{href}\"", href = escape_attr(&href));
@@ -1323,14 +1392,27 @@ fn render_inline(
                     if let Some(state) = state {
                         let _ = write!(html, " data-reference-state=\"{}\"", escape_attr(state));
                     }
+                    if unverified {
+                        html.push_str(" class=\"mq-link-unverified\"");
+                    }
                     html.push('>');
                     render_inlines(html, children, model, ctx, current, assets_placeholder());
                     html.push_str("</a>");
                 }
                 None => {
-                    html.push_str(
-                        "<span class=\"mq-link-blocked\" title=\"链接地址已被安全策略移除\">",
-                    );
+                    let class = if state.is_some() {
+                        "mq-link-blocked mq-link-error"
+                    } else {
+                        "mq-link-blocked"
+                    };
+                    let _ = write!(html, "<span class=\"{class}\"");
+                    if let Some(state) = state {
+                        let _ = write!(html, " data-reference-state=\"{}\"", escape_attr(state));
+                    }
+                    if !state_title.is_empty() {
+                        let _ = write!(html, " title=\"{}\"", escape_attr(state_title));
+                    }
+                    html.push('>');
                     render_inlines(html, children, model, ctx, current, assets_placeholder());
                     html.push_str("</span>");
                 }
@@ -1472,14 +1554,19 @@ fn render_snapshot(html: &mut String, overlay: &super::snapshot::ExportResultOve
     } else {
         html.push_str("<p class=\"mq-colophon\">参数未包含</p>");
     }
-    let trace_status = match execution.trace_status.as_str() {
+    let observation_status = match execution.observation_status.as_str() {
         "verified" => "已验证",
-        "truncated" => "已验证，轨迹截断",
+        "truncated" => "已验证，观察截断",
         "invalid" => "无效",
+        "stale" => "已过期",
         _ => "不可用",
     };
-    let _ = write!(html, "<p class=\"mq-colophon\">Trace v2 {trace_status}</p>");
-    if let Some(counts) = &overlay.trace_counts {
+    let _ = write!(
+        html,
+        "<p class=\"mq-colophon\">Observation v1 {observation_status} · 捕获级别 {capture_level}</p>",
+        capture_level = escape_text(&execution.capture_level),
+    );
+    if let Some(counts) = &overlay.observation_counts {
         html.push_str("<dl class=\"mq-snapshot-counts\">");
         for (kind, count) in counts {
             let _ = write!(html, "<dt>{}</dt><dd>{count}</dd>", escape_text(kind));
@@ -1584,7 +1671,7 @@ fn render_run_chips(html: &mut String, model: &PresentationModel, statement_span
     };
     let _ = write!(
         html,
-        "<span class=\"mq-run-chip\" data-run-seq=\"{seq}\" data-run-kind=\"{kinds}\" title=\"真实 Trace 事件：{count} 条（{kinds}）\">{detail}{suffix}</span>",
+        "<span class=\"mq-run-chip\" data-run-seq=\"{seq}\" data-run-kind=\"{kinds}\" title=\"真实 Observation 事件：{count} 条（{kinds}）\">{detail}{suffix}</span>",
         seq = summary.last_seq,
         kinds = escape_attr(&summary.kinds.join(",")),
         count = summary.count,
@@ -1596,7 +1683,7 @@ fn render_run_chips(html: &mut String, model: &PresentationModel, statement_span
 fn function_at(
     model: &PresentationModel,
     span: SourceSpan,
-) -> Option<&crate::protocol::analysis_v2::SemanticFunction> {
+) -> Option<&crate::protocol::analysis_v3::SemanticFunction> {
     model
         .semantic
         .as_ref()?
@@ -1606,7 +1693,7 @@ fn function_at(
 }
 
 fn function_call_button(
-    function: &crate::protocol::analysis_v2::SemanticFunction,
+    function: &crate::protocol::analysis_v3::SemanticFunction,
     label: &str,
 ) -> String {
     format!(
@@ -1616,7 +1703,7 @@ fn function_call_button(
     )
 }
 
-fn function_params_json(function: &crate::protocol::analysis_v2::SemanticFunction) -> String {
+fn function_params_json(function: &crate::protocol::analysis_v3::SemanticFunction) -> String {
     serde_json::json!(function
         .signature
         .params

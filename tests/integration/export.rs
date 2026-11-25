@@ -25,7 +25,7 @@ fn exported_dir(name: &str) -> PathBuf {
 
 fn fake_core_for_welcome(name: &str) -> FakeCore {
     let core = FakeCore::new(name);
-    let golden = std::fs::read(repo_root().join("tests/golden/analysis-v2/welcome.json")).unwrap();
+    let golden = std::fs::read(repo_root().join("tests/golden/analysis-v3/welcome.json")).unwrap();
     core.set_analysis(std::str::from_utf8(&golden).unwrap());
     core
 }
@@ -104,6 +104,14 @@ fn exports_offline_site_with_shared_renderer_and_relative_links() {
     assert_eq!(manifest["schema_version"], 1);
     assert_eq!(manifest["executed"], false);
     assert_eq!(manifest["view"]["name"], "marqdo-view");
+    assert_eq!(manifest["requires"]["api_revision"], 1);
+    assert_eq!(manifest["requires"]["analysis"], 3);
+    assert_eq!(manifest["requires"]["observation"], 1);
+    assert_eq!(manifest["producers"]["view"]["name"], "marqdo-view");
+    let view_sha = manifest["producers"]["view"]["binary_sha256"]
+        .as_str()
+        .expect("view binary sha");
+    assert!(view_sha.len() == 64 || view_sha == "unavailable");
     assert!(manifest["pages"].as_array().unwrap().len() >= 2);
     assert!(manifest["assets"].as_array().unwrap().len() >= 5);
     let manifest_text = serde_json::to_string(&manifest).unwrap();
@@ -141,7 +149,7 @@ fn export_never_executes_side_effects() {
     let out = exported_dir("export-no-exec");
     let core = FakeCore::new("export-core-noexec");
     let golden =
-        std::fs::read(repo_root().join("tests/golden/analysis-v2/control-flow.json")).unwrap();
+        std::fs::read(repo_root().join("tests/golden/analysis-v3/control-flow.json")).unwrap();
     core.set_analysis(std::str::from_utf8(&golden).unwrap());
     let output = export(&project, &out, &[], Some(&core));
     assert_eq!(
@@ -168,7 +176,7 @@ fn no_annotations_keeps_prose_but_removes_anchors() {
     let out = exported_dir("export-no-annotations");
     let core = FakeCore::new("export-core-noannot");
     let golden =
-        std::fs::read(repo_root().join("tests/golden/analysis-v2/mixed-modes.json")).unwrap();
+        std::fs::read(repo_root().join("tests/golden/analysis-v3/mixed-modes.json")).unwrap();
     core.set_analysis(std::str::from_utf8(&golden).unwrap());
     let output = export(&project, &out, &["--no-annotations"], Some(&core));
     assert_eq!(
@@ -291,7 +299,7 @@ fn exported_html_has_no_remote_subresources() {
     let out = exported_dir("export-offline");
     let core = FakeCore::new("export-core-offline");
     let golden =
-        std::fs::read(repo_root().join("tests/golden/analysis-v2/tables-math.json")).unwrap();
+        std::fs::read(repo_root().join("tests/golden/analysis-v3/tables-math.json")).unwrap();
     core.set_analysis(std::str::from_utf8(&golden).unwrap());
     let output = export(&project, &out, &[], Some(&core));
     assert_eq!(output.status.code(), Some(0));

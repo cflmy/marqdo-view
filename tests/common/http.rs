@@ -26,21 +26,21 @@ impl Drop for TestServer {
 }
 
 /// Start the real `marqdo-view` binary on an OS-chosen loopback port with a
-/// scripted fake Core. Golden Analysis must match the project's exact source.
+/// scripted fake Core. The Analysis golden must match the project's exact source;
+/// the optional Observation v1 goldens are the exact JSONL stream and snapshot of
+/// one execution.
 pub fn start(
     project: &str,
     analysis_golden: &str,
-    run_golden: Option<&str>,
-    trace_golden: Option<&str>,
+    observation_golden: Option<(&str, &str)>,
 ) -> TestServer {
-    start_with_env(project, analysis_golden, run_golden, trace_golden, &[])
+    start_with_env(project, analysis_golden, observation_golden, &[])
 }
 
 pub fn start_with_env(
     project: &str,
     analysis_golden: &str,
-    run_golden: Option<&str>,
-    trace_golden: Option<&str>,
+    observation_golden: Option<(&str, &str)>,
     envs: &[(&str, &str)],
 ) -> TestServer {
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -50,11 +50,11 @@ pub fn start_with_env(
     let core = FakeCore::new(&format!("http-core-{seq}"));
     let golden = std::fs::read(repo_root.join(analysis_golden)).unwrap();
     core.set_analysis(std::str::from_utf8(&golden).unwrap());
-    if let Some(run_golden) = run_golden {
-        let run = std::fs::read_to_string(repo_root.join(run_golden)).unwrap();
-        let trace =
-            trace_golden.map(|trace| std::fs::read_to_string(repo_root.join(trace)).unwrap());
-        core.set_run(0, &run, trace.as_deref());
+    if let Some((jsonl_path, snapshot_path)) = observation_golden {
+        let jsonl = std::fs::read_to_string(repo_root.join(jsonl_path)).unwrap();
+        let snapshot = std::fs::read_to_string(repo_root.join(snapshot_path)).unwrap();
+        core.set_check_json(r#"{"command":"check","diagnostics":[],"errors":0,"success":true}"#);
+        core.set_observation(0, &jsonl, Some(&snapshot));
     }
 
     let mut command = Command::new(view_bin());
@@ -63,9 +63,7 @@ pub fn start_with_env(
         .args([project, "--port", "0", "--no-open", "--marqdo-bin"])
         .arg(&core.script)
         .env_remove("MARQDO_BIN")
-        .env_remove("MARQDO_TOOL_PROTOCOL")
-        .env_remove("MARQDO_PROTOCOL_ANALYSIS")
-        .env_remove("MARQDO_PROTOCOL_TRACE")
+        .env_remove("MARQDO_API_REVISION")
         .stdout(Stdio::null())
         .stderr(Stdio::piped());
     for (key, value) in envs {
@@ -404,7 +402,12 @@ pub fn collect_until_terminal(reader: &mut SseReader) -> Vec<SseFrame> {
             .map(|state| {
                 matches!(
                     state,
-                    "succeeded" | "failed" | "cancelled" | "timed_out" | "unavailable"
+                    "succeeded"
+                        | "failed"
+                        | "cancelled"
+                        | "timed_out"
+                        | "unavailable"
+                        | "incomplete"
                 )
             })
             .unwrap_or(false);

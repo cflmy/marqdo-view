@@ -10,24 +10,22 @@ use crate::common::http::{
 };
 use std::time::{Duration, Instant};
 
-const RUN_GOLDEN: &str = "tests/golden/trace-v2/control-flow.run.json";
-const TRACE_GOLDEN: &str = "tests/golden/trace-v2/control-flow.trace.json";
-const ANALYSIS_GOLDEN: &str = "tests/golden/analysis-v2/control-flow.json";
+const OBS_JSONL: &str = "tests/golden/observation-v1/control-flow.jsonl";
+const OBS_SNAPSHOT: &str = "tests/golden/observation-v1/control-flow.snapshot.json";
+const ANALYSIS_GOLDEN: &str = "tests/golden/analysis-v3/control-flow.json";
 
 fn control_flow() -> TestServer {
     http::start(
         "examples/control-flow",
         ANALYSIS_GOLDEN,
-        Some(RUN_GOLDEN),
-        Some(TRACE_GOLDEN),
+        Some((OBS_JSONL, OBS_SNAPSHOT)),
     )
 }
 
 fn welcome() -> TestServer {
     http::start(
         "examples/welcome",
-        "tests/golden/analysis-v2/welcome.json",
-        None,
+        "tests/golden/analysis-v3/welcome.json",
         None,
     )
 }
@@ -160,8 +158,11 @@ fn explicit_run_streams_sse_accepted_running_and_terminal_with_verified_trace() 
     assert_eq!(data["run_id"], run_id.as_str());
     assert_eq!(data["state"], "succeeded");
     assert_eq!(data["result"]["success"], true);
-    assert_eq!(data["trace"]["status"], "verified");
-    assert!(!data["trace"]["events"].as_array().unwrap().is_empty());
+    assert_eq!(data["observation_summary"]["status"], "verified");
+    assert!(!data["observation_summary"]["events"]
+        .as_array()
+        .unwrap()
+        .is_empty());
     let states: Vec<_> = frames
         .iter()
         .filter_map(|frame| frame.data.as_ref().and_then(|data| data["state"].as_str()))
@@ -277,8 +278,7 @@ fn cancel_is_idempotent_and_yields_one_terminal_state() {
     let server = http::start_with_env(
         "examples/control-flow",
         ANALYSIS_GOLDEN,
-        Some(RUN_GOLDEN),
-        Some(TRACE_GOLDEN),
+        Some((OBS_JSONL, OBS_SNAPSHOT)),
         &[("MARQDO_VIEW_SSE_HEARTBEAT_SECS", "1")],
     );
     server.core.set_sleep_seconds(10);
@@ -333,7 +333,12 @@ fn cancel_is_idempotent_and_yields_one_terminal_state() {
                 .map(|state| {
                     matches!(
                         state,
-                        "succeeded" | "failed" | "cancelled" | "timed_out" | "unavailable"
+                        "succeeded"
+                            | "failed"
+                            | "cancelled"
+                            | "timed_out"
+                            | "unavailable"
+                            | "incomplete"
                     )
                 })
                 .unwrap_or(false)
@@ -352,8 +357,7 @@ fn sse_heartbeats_keep_a_slow_job_connected() {
     let server = http::start_with_env(
         "examples/control-flow",
         ANALYSIS_GOLDEN,
-        Some(RUN_GOLDEN),
-        Some(TRACE_GOLDEN),
+        Some((OBS_JSONL, OBS_SNAPSHOT)),
         &[("MARQDO_VIEW_SSE_HEARTBEAT_SECS", "1")],
     );
     server.core.set_sleep_seconds(3);
@@ -386,8 +390,7 @@ fn sse_heartbeats_keep_a_slow_job_connected() {
 fn document_without_main_is_rejected_without_running_another_function() {
     let server = http::start(
         "examples/tables-math",
-        "tests/golden/analysis-v2/tables-math.json",
-        None,
+        "tests/golden/analysis-v3/tables-math.json",
         None,
     );
     let (session, _) = open_session(&server, "/");
@@ -408,8 +411,7 @@ fn at_most_two_sse_observers_per_run() {
     let server = http::start_with_env(
         "examples/control-flow",
         ANALYSIS_GOLDEN,
-        Some(RUN_GOLDEN),
-        Some(TRACE_GOLDEN),
+        Some((OBS_JSONL, OBS_SNAPSHOT)),
         &[("MARQDO_VIEW_SSE_HEARTBEAT_SECS", "1")],
     );
     server.core.set_sleep_seconds(5);

@@ -58,6 +58,11 @@ impl TempProject {
 
 /// A scriptable shell-based fake core. Every behaviour is controlled by files
 /// in its directory, so tests never mutate global environment variables.
+///
+/// The current contract is Analysis v3 (`check --emit`) plus Observation v1
+/// (`run|call --output jsonl [--observation-file PATH]`). The fake core emits the
+/// exact bytes stored in `analysis.json`, `observation.jsonl` and
+/// `observation.snapshot.json`; it never fakes a successful verification.
 pub struct FakeCore {
     pub dir: PathBuf,
     pub script: PathBuf,
@@ -75,35 +80,34 @@ dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 } >> "$dir/argv.txt"
 case "$1" in
   --version)
-    if [ -f "$dir/version" ]; then cat "$dir/version"; else printf 'marqdo 3.0.0-beta.1\n'; fi
+    if [ -f "$dir/version" ]; then cat "$dir/version"; else printf 'marqdo 3.0.0-rc.4\n'; fi
     exit 0
     ;;
   check)
-    if [ -f "$dir/check_stderr" ]; then cat "$dir/check_stderr" >&2; fi
-    if [ -f "$dir/check_json" ]; then cat "$dir/check_json"; fi
     emit=""
     prev=""
     for a in "$@"; do
       if [ "$prev" = "--emit" ]; then emit="$a"; fi
       prev="$a"
     done
+    if [ -f "$dir/check_stderr" ]; then cat "$dir/check_stderr" >&2; fi
+    if [ -f "$dir/check_json" ]; then cat "$dir/check_json"; fi
     if [ -f "$dir/analysis.json" ] && [ -n "$emit" ]; then cp "$dir/analysis.json" "$emit"; fi
     if [ -f "$dir/check_exit" ]; then exit "$(cat "$dir/check_exit")"; fi
     exit 0
     ;;
   run|call)
     : > "$dir/run-was-called"
-    if [ -f "$dir/sleep" ]; then
-      sleep "$(cat "$dir/sleep")"
-    fi
-    trace=""
+    obs=""
     prev=""
     for a in "$@"; do
-      if [ "$prev" = "--trace-file" ]; then trace="$a"; fi
+      if [ "$prev" = "--observation-file" ]; then obs="$a"; fi
       prev="$a"
     done
-    if [ -f "$dir/trace.json" ] && [ -n "$trace" ]; then cp "$dir/trace.json" "$trace"; fi
-    if [ -f "$dir/run.json" ]; then cat "$dir/run.json"; else printf '{"command":"run","success":true}\n'; fi
+    if [ -f "$dir/run_stderr" ]; then cat "$dir/run_stderr" >&2; fi
+    if [ -f "$dir/sleep" ]; then sleep "$(cat "$dir/sleep")"; fi
+    if [ -f "$dir/observation.jsonl" ]; then cat "$dir/observation.jsonl"; fi
+    if [ -f "$dir/observation.snapshot.json" ] && [ -n "$obs" ]; then cp "$dir/observation.snapshot.json" "$obs"; fi
     if [ -f "$dir/run_exit" ]; then exit "$(cat "$dir/run_exit")"; fi
     exit 0
     ;;
@@ -140,21 +144,31 @@ esac
         std::fs::write(self.dir.join("analysis.json"), analysis).expect("write analysis");
     }
 
-    pub fn set_run(&self, exit_code: i32, json: &str, trace: Option<&str>) {
+    /// Terminal code/stderr plus the exact Observation v1 stream and snapshot.
+    pub fn set_observation(&self, exit_code: i32, jsonl: &str, snapshot: Option<&str>) {
         std::fs::write(self.dir.join("run_exit"), exit_code.to_string()).expect("write run exit");
-        std::fs::write(self.dir.join("run.json"), json).expect("write run json");
-        match trace {
-            Some(trace) => {
-                std::fs::write(self.dir.join("trace.json"), trace).expect("write trace");
+        std::fs::write(self.dir.join("observation.jsonl"), jsonl).expect("write observation");
+        match snapshot {
+            Some(snapshot) => {
+                std::fs::write(self.dir.join("observation.snapshot.json"), snapshot)
+                    .expect("write snapshot");
             }
             None => {
-                let _ = std::fs::remove_file(self.dir.join("trace.json"));
+                let _ = std::fs::remove_file(self.dir.join("observation.snapshot.json"));
             }
         }
     }
 
+    pub fn set_run_stderr(&self, stderr: &str) {
+        std::fs::write(self.dir.join("run_stderr"), stderr).expect("write run stderr");
+    }
+
     pub fn set_sleep_seconds(&self, seconds: u32) {
         std::fs::write(self.dir.join("sleep"), seconds.to_string()).expect("write sleep");
+    }
+
+    pub fn run_was_called(&self) -> bool {
+        self.dir.join("run-was-called").exists()
     }
 
     pub fn argv_lines(&self) -> Vec<String> {
@@ -190,29 +204,55 @@ pub fn run_view(args: &[&str], cwd: &Path, envs: &[(&str, Option<&str>)]) -> Out
     command.output().expect("run marqdo-view")
 }
 
-/// Minimal valid Analysis v2 JSON for a single module, with a caller-provided
-/// source digest and schema version.
-pub fn minimal_analysis(relative_path: &str, source_digest: &str, schema_version: u32) -> String {
+/// Minimal valid Analysis v3 JSON for a single module, with a caller-provided
+/// schema version. The root document/unit spans cover the exact source.
+pub fn minimal_analysis(relative_path: &str, source: &str, schema_version: u32) -> String {
+    let digest = sha256_hex(source.as_bytes());
+    let module_id = format!("root:fixture@0.1.0::{relative_path}");
+    let len = source.len() as u64;
     serde_json::json!({
         "schema": "marqdo.analysis",
         "schema_version": schema_version,
         "producer": {
             "name": "marqdo",
-            "version": "3.0.0-beta.1",
+            "version": "3.0.0-rc.4",
             "markdown_profile": "marqdo.md.v1"
         },
         "project": {
             "root_id": "root:fixture@0.1.0",
             "identity_kind": "manifest",
+            "entry_module_id": module_id,
             "lock_digest": "",
-            "stdlib": null
+            "manifest_digest": "",
+            "stdlib": null,
+            "extensions": []
         },
         "modules": [{
-            "id": "root:fixture@0.1.0::index.mq.md",
+            "id": module_id,
             "package_instance_id": "root:fixture@0.1.0",
             "relative_path": relative_path,
-            "source_digest": source_digest,
-            "units": [],
+            "source_digest": digest,
+            "source": source,
+            "document": {
+                "kind": "document",
+                "span": {"start": 0, "end": len},
+                "children": []
+            },
+            "units": [{
+                "id": format!("{module_id}#"),
+                "path": [],
+                "parent_id": null,
+                "kind": "root",
+                "name": "",
+                "level": 0,
+                "mode": "knowledge",
+                "mode_origin": "default",
+                "mode_source_unit_id": format!("{module_id}#"),
+                "heading_span": null,
+                "span": {"start": 0, "end": len},
+                "function": null
+            }],
+            "anchors": [],
             "functions": [],
             "imports": [],
             "references": [],
@@ -222,6 +262,17 @@ pub fn minimal_analysis(relative_path: &str, source_digest: &str, schema_version
         "diagnostics": []
     })
     .to_string()
+}
+
+/// The committed golden for one example, as exact bytes.
+pub fn golden_bytes(path: &str) -> Vec<u8> {
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    std::fs::read(root.join(path)).unwrap_or_else(|err| panic!("read {path}: {err}"))
+}
+
+/// The committed golden for one example, as text.
+pub fn golden_text(path: &str) -> String {
+    String::from_utf8(golden_bytes(path)).expect("golden is UTF-8")
 }
 
 pub fn sha256_hex(bytes: &[u8]) -> String {

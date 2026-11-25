@@ -181,9 +181,66 @@ fn tool_manifest_matches_package_and_protocols() {
         env!("CARGO_PKG_VERSION"),
         "tool.json version must match Cargo package version"
     );
-    assert_eq!(tool["compatibility"]["marqdo"], ">=3.0.0-beta.1,<4.0.0");
-    assert_eq!(tool["compatibility"]["analysis"], serde_json::json!([2, 3]));
-    assert_eq!(tool["compatibility"]["trace"], serde_json::json!([2]));
+    assert_eq!(
+        tool["requires"],
+        serde_json::json!({"api_revision": 1, "analysis": 3, "observation": 1}),
+        "the manifest must declare exact current revisions"
+    );
+    assert!(
+        tool.get("compatibility").is_none(),
+        "the retired compatibility negotiation block must not return"
+    );
+    let keys: Vec<&str> = tool
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
+    assert_eq!(
+        keys,
+        vec![
+            "command",
+            "entrypoint",
+            "name",
+            "requires",
+            "schema",
+            "schema_version",
+            "version"
+        ],
+        "tool.json must not carry retired fields"
+    );
+}
+
+#[test]
+fn source_has_no_legacy_protocol_or_runtime_probing() {
+    let root = manifest_dir();
+    let mut sources = Vec::new();
+    collect_files(&root.join("src"), "rs", &mut sources);
+    let banned = [
+        "analysis_v2",
+        "trace_v2",
+        "execution_events_v1",
+        "MARQDO_TOOL_PROTOCOL",
+        "MARQDO_PROTOCOL_ANALYSIS",
+        "MARQDO_PROTOCOL_TRACE",
+        "--trace-file",
+        "--event-stream",
+        "compatibility",
+    ];
+    for path in sources {
+        // Unit-test modules may assert that a retired flag is absent; the gate
+        // scans production source only.
+        let text = read(&path);
+        let production = text.split("#[cfg(test)]").next().unwrap_or("").to_string();
+        for needle in banned {
+            assert!(
+                !production.contains(needle),
+                "{} still references retired contract marker {:?}",
+                path.display(),
+                needle
+            );
+        }
+    }
 }
 
 #[test]

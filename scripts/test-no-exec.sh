@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# RFC-VIEW-0002 §13.4 / §6 / §10.3: opening, searching, switching and exporting
-# must never execute a document. Uses the unsafe-side-effect fixture and checks
+# Opening, searching, switching and exporting must never execute a document
+# (zero-execution baseline, current rc.4 contracts). Uses the unsafe-side-effect fixture and checks
 # source/lock hashes plus the absence of any write sentinel around the whole
 # read-only operation set.
 #

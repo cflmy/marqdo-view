@@ -4,7 +4,8 @@
 Usage: python3 scripts/acceptance-run.py http://127.0.0.1:PORT/
 Prints a PASS line and exits non-zero on any failure. Never polls: it creates
 one run, observes one SSE stream until the single terminal event, and asserts
-the verified Trace binding.
+the verified Observation v1 binding (source analysis digest, contiguous seq,
+unique terminal) instead of any retired trace protocol.
 """
 import http.cookiejar
 import json
@@ -74,8 +75,18 @@ with opener.open(events_url, timeout=120) as stream:
 assert terminal is not None, "no terminal SSE event"
 assert terminal["state"] == "succeeded", terminal
 assert terminal["result"]["success"] is True, terminal["result"]
-assert terminal["trace"]["status"] == "verified", terminal.get("trace")
+assert terminal["result"]["observation_status"] == "verified", terminal["result"]
+assert terminal["result"]["observation_protocol"] == 1, terminal["result"]
+assert terminal["result"]["observation_truncated"] is False, terminal["result"]
+summary = terminal.get("observation_summary") or terminal["result"].get("observation_summary")
+assert summary is not None, "missing observation summary"
+assert summary.get("status") in ("verified", "ok"), summary
+event_count = 0
+if isinstance(summary.get("events"), list):
+    event_count = len(summary["events"])
+elif isinstance(summary.get("counts"), dict):
+    event_count = sum(int(value) for value in summary["counts"].values())
 print(
-    "explicit real run: PASS (run_id=%s events=%d)"
-    % (accepted["run_id"], len(terminal["trace"]["events"]))
+    "explicit real run: PASS (run_id=%s observation=%s events=%d)"
+    % (accepted["run_id"], terminal["result"]["observation_status"], event_count)
 )

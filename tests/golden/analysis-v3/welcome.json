@@ -1,0 +1,716 @@
+{
+  "schema": "marqdo.analysis",
+  "schema_version": 3,
+  "producer": {
+    "name": "marqdo",
+    "version": "3.0.0-rc.4",
+    "markdown_profile": "marqdo.md.v1"
+  },
+  "project": {
+    "root_id": "root:welcome-demo@0.1.0",
+    "identity_kind": "manifest",
+    "entry_module_id": "root:welcome-demo@0.1.0::00-welcome.mq.md",
+    "lock_digest": "",
+    "manifest_digest": "sha256:69ce9ddb5e526f335adb51f374ada998db8752185fab11f686002dbbb567b46f",
+    "stdlib": {
+      "version": "0.1.0",
+      "digest": "sha256:5407d3665ba2fe105820d0f1af5efaafa10c277a69eb819c3225719813c8c713",
+      "instance_id": "std:marqdo-stdlib@0.1.0#5407d3665ba2fe105820d0f1af5efaafa10c277a69eb819c3225719813c8c713"
+    },
+    "extensions": []
+  },
+  "modules": [
+    {
+      "id": "root:welcome-demo@0.1.0::00-welcome.mq.md",
+      "package_instance_id": "root:welcome-demo@0.1.0",
+      "relative_path": "00-welcome.mq.md",
+      "source_digest": "879215bf0dc432b78924800a08eac37d353a9694652c5542294f4ce7fe6da173",
+      "source": "# @knowledge 欢迎来到 Marqdo\n\nMarqdo 把 Markdown 当作可执行文档的语言：标题声明 `@exec` / `@knowledge` 模式，\n强调、斜体与行内代码是**等价的单语句载体**，而 `if` / `else` / `while` / `end` /\n`return` 决定真正的操作。\n\n| 阅读态 | 内容 | 是否执行 |\n| --- | --- | --- |\n| 文档 | 原始 Markdown 排版 | 否 |\n| 源码 | 逐行原文，包含全部标记 | 否 |\n| 运行 | 用户显式确认后才出现 | 是（需要确认） |\n\n继续阅读：[语法演示](./guide.mq.md)。\n\n> 这份欢迎页只是 `view.json` 显式指定的站点首页，普通 `welcome` 文件名不会自动变成 Hero。\n",
+      "document": {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [],
+                "kind": "text",
+                "literal": "@knowledge 欢迎来到 Marqdo",
+                "span": {
+                  "end": 32,
+                  "start": 2
+                }
+              }
+            ],
+            "kind": "heading",
+            "level": 1,
+            "setext": false,
+            "span": {
+              "end": 32,
+              "start": 0
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "kind": "text",
+                "literal": "Marqdo 把 Markdown 当作可执行文档的语言：标题声明 ",
+                "span": {
+                  "end": 100,
+                  "start": 34
+                }
+              },
+              {
+                "children": [],
+                "kind": "code",
+                "literal": "@exec",
+                "span": {
+                  "end": 107,
+                  "start": 100
+                },
+                "ticks": 1
+              },
+              {
+                "children": [],
+                "kind": "text",
+                "literal": " / ",
+                "span": {
+                  "end": 110,
+                  "start": 107
+                }
+              },
+              {
+                "children": [],
+                "kind": "code",
+                "literal": "@knowledge",
+                "span": {
+                  "end": 122,
+                  "start": 110
+                },
+                "ticks": 1
+              },
+              {
+                "children": [],
+                "kind": "text",
+                "literal": " 模式，",
+                "span": {
+                  "end": 132,
+                  "start": 122
+                }
+              },
+              {
+                "children": [],
+                "kind": "soft_break",
+                "span": {
+                  "end": 133,
+                  "start": 132
+                }
+              },
+              {
+                "children": [],
+                "kind": "text",
+                "literal": "强调、斜体与行内代码是",
+                "span": {
+                  "end": 166,
+                  "start": 133
+                }
+              },
+              {
+                "children": [
+                  {
+                    "children": [],
+                    "kind": "text",
+                    "literal": "等价的单语句载体",
+                    "span": {
+                      "end": 192,
+                      "start": 168
+                    }
+                  }
+                ],
+                "kind": "strong",
+                "span": {
+                  "end": 194,
+                  "start": 166
+                }
+              },
+              {
+                "children": [],
+                "kind": "text",
+                "literal": "，而 ",
+                "span": {
+                  "end": 201,
+                  "start": 194
+                }
+              },
+              {
+                "children": [],
+                "kind": "code",
+                "literal": "if",
+                "span": {
+                  "end": 205,
+                  "start": 201
+                },
+                "ticks": 1
+              },
+              {
+                "children": [],
+                "kind": "text",
+                "literal": " / ",
+                "span": {
+                  "end": 208,
+                  "start": 205
+                }
+              },
+              {
+                "children": [],
+                "kind": "code",
+                "literal": "else",
+                "span": {
+                  "end": 214,
+                  "start": 208
+                },
+                "ticks": 1
+              },
+              {
+                "children": [],
+                "kind": "text",
+                "literal": " / ",
+                "span": {
+                  "end": 217,
+                  "start": 214
+                }
+              },
+              {
+                "children": [],
+                "kind": "code",
+                "literal": "while",
+                "span": {
+                  "end": 224,
+                  "start": 217
+                },
+                "ticks": 1
+              },
+              {
+                "children": [],
+                "kind": "text",
+                "literal": " / ",
+                "span": {
+                  "end": 227,
+                  "start": 224
+                }
+              },
+              {
+                "children": [],
+                "kind": "code",
+                "literal": "end",
+                "span": {
+                  "end": 232,
+                  "start": 227
+                },
+                "ticks": 1
+              },
+              {
+                "children": [],
+                "kind": "text",
+                "literal": " /",
+                "span": {
+                  "end": 234,
+                  "start": 232
+                }
+              },
+              {
+                "children": [],
+                "kind": "soft_break",
+                "span": {
+                  "end": 235,
+                  "start": 234
+                }
+              },
+              {
+                "children": [],
+                "kind": "code",
+                "literal": "return",
+                "span": {
+                  "end": 243,
+                  "start": 235
+                },
+                "ticks": 1
+              },
+              {
+                "children": [],
+                "kind": "text",
+                "literal": " 决定真正的操作。",
+                "span": {
+                  "end": 268,
+                  "start": 243
+                }
+              }
+            ],
+            "kind": "paragraph",
+            "span": {
+              "end": 268,
+              "start": 34
+            }
+          },
+          {
+            "alignments": [
+              "none",
+              "none",
+              "none"
+            ],
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [],
+                        "kind": "text",
+                        "literal": "阅读态",
+                        "span": {
+                          "end": 281,
+                          "start": 272
+                        }
+                      }
+                    ],
+                    "kind": "table_cell",
+                    "span": {
+                      "end": 282,
+                      "start": 271
+                    }
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [],
+                        "kind": "text",
+                        "literal": "内容",
+                        "span": {
+                          "end": 290,
+                          "start": 284
+                        }
+                      }
+                    ],
+                    "kind": "table_cell",
+                    "span": {
+                      "end": 291,
+                      "start": 283
+                    }
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [],
+                        "kind": "text",
+                        "literal": "是否执行",
+                        "span": {
+                          "end": 305,
+                          "start": 293
+                        }
+                      }
+                    ],
+                    "kind": "table_cell",
+                    "span": {
+                      "end": 306,
+                      "start": 292
+                    }
+                  }
+                ],
+                "header": true,
+                "kind": "table_row",
+                "span": {
+                  "end": 307,
+                  "start": 270
+                }
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [],
+                        "kind": "text",
+                        "literal": "文档",
+                        "span": {
+                          "end": 336,
+                          "start": 330
+                        }
+                      }
+                    ],
+                    "kind": "table_cell",
+                    "span": {
+                      "end": 337,
+                      "start": 329
+                    }
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [],
+                        "kind": "text",
+                        "literal": "原始 Markdown 排版",
+                        "span": {
+                          "end": 361,
+                          "start": 339
+                        }
+                      }
+                    ],
+                    "kind": "table_cell",
+                    "span": {
+                      "end": 362,
+                      "start": 338
+                    }
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [],
+                        "kind": "text",
+                        "literal": "否",
+                        "span": {
+                          "end": 367,
+                          "start": 364
+                        }
+                      }
+                    ],
+                    "kind": "table_cell",
+                    "span": {
+                      "end": 368,
+                      "start": 363
+                    }
+                  }
+                ],
+                "header": false,
+                "kind": "table_row",
+                "span": {
+                  "end": 369,
+                  "start": 328
+                }
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [],
+                        "kind": "text",
+                        "literal": "源码",
+                        "span": {
+                          "end": 378,
+                          "start": 372
+                        }
+                      }
+                    ],
+                    "kind": "table_cell",
+                    "span": {
+                      "end": 379,
+                      "start": 371
+                    }
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [],
+                        "kind": "text",
+                        "literal": "逐行原文，包含全部标记",
+                        "span": {
+                          "end": 414,
+                          "start": 381
+                        }
+                      }
+                    ],
+                    "kind": "table_cell",
+                    "span": {
+                      "end": 415,
+                      "start": 380
+                    }
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [],
+                        "kind": "text",
+                        "literal": "否",
+                        "span": {
+                          "end": 420,
+                          "start": 417
+                        }
+                      }
+                    ],
+                    "kind": "table_cell",
+                    "span": {
+                      "end": 421,
+                      "start": 416
+                    }
+                  }
+                ],
+                "header": false,
+                "kind": "table_row",
+                "span": {
+                  "end": 422,
+                  "start": 370
+                }
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [],
+                        "kind": "text",
+                        "literal": "运行",
+                        "span": {
+                          "end": 431,
+                          "start": 425
+                        }
+                      }
+                    ],
+                    "kind": "table_cell",
+                    "span": {
+                      "end": 432,
+                      "start": 424
+                    }
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [],
+                        "kind": "text",
+                        "literal": "用户显式确认后才出现",
+                        "span": {
+                          "end": 464,
+                          "start": 434
+                        }
+                      }
+                    ],
+                    "kind": "table_cell",
+                    "span": {
+                      "end": 465,
+                      "start": 433
+                    }
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [],
+                        "kind": "text",
+                        "literal": "是（需要确认）",
+                        "span": {
+                          "end": 488,
+                          "start": 467
+                        }
+                      }
+                    ],
+                    "kind": "table_cell",
+                    "span": {
+                      "end": 489,
+                      "start": 466
+                    }
+                  }
+                ],
+                "header": false,
+                "kind": "table_row",
+                "span": {
+                  "end": 490,
+                  "start": 423
+                }
+              }
+            ],
+            "kind": "table",
+            "span": {
+              "end": 490,
+              "start": 270
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "kind": "text",
+                "literal": "继续阅读：",
+                "span": {
+                  "end": 507,
+                  "start": 492
+                }
+              },
+              {
+                "children": [
+                  {
+                    "children": [],
+                    "kind": "text",
+                    "literal": "语法演示",
+                    "span": {
+                      "end": 520,
+                      "start": 508
+                    }
+                  }
+                ],
+                "kind": "link",
+                "span": {
+                  "end": 536,
+                  "start": 507
+                },
+                "title": "",
+                "url": "./guide.mq.md"
+              },
+              {
+                "children": [],
+                "kind": "text",
+                "literal": "。",
+                "span": {
+                  "end": 539,
+                  "start": 536
+                }
+              }
+            ],
+            "kind": "paragraph",
+            "span": {
+              "end": 539,
+              "start": 492
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [],
+                    "kind": "text",
+                    "literal": "这份欢迎页只是 ",
+                    "span": {
+                      "end": 565,
+                      "start": 543
+                    }
+                  },
+                  {
+                    "children": [],
+                    "kind": "code",
+                    "literal": "view.json",
+                    "span": {
+                      "end": 576,
+                      "start": 565
+                    },
+                    "ticks": 1
+                  },
+                  {
+                    "children": [],
+                    "kind": "text",
+                    "literal": " 显式指定的站点首页，普通 ",
+                    "span": {
+                      "end": 614,
+                      "start": 576
+                    }
+                  },
+                  {
+                    "children": [],
+                    "kind": "code",
+                    "literal": "welcome",
+                    "span": {
+                      "end": 623,
+                      "start": 614
+                    },
+                    "ticks": 1
+                  },
+                  {
+                    "children": [],
+                    "kind": "text",
+                    "literal": " 文件名不会自动变成 Hero。",
+                    "span": {
+                      "end": 659,
+                      "start": 623
+                    }
+                  }
+                ],
+                "kind": "paragraph",
+                "span": {
+                  "end": 659,
+                  "start": 543
+                }
+              }
+            ],
+            "kind": "block_quote",
+            "span": {
+              "end": 659,
+              "start": 541
+            }
+          }
+        ],
+        "kind": "document",
+        "span": {
+          "end": 660,
+          "start": 0
+        }
+      },
+      "units": [
+        {
+          "id": "root:welcome-demo@0.1.0::00-welcome.mq.md#",
+          "path": [],
+          "parent_id": null,
+          "kind": "root",
+          "name": "",
+          "level": 0,
+          "mode": "knowledge",
+          "mode_origin": "default",
+          "mode_source_unit_id": "root:welcome-demo@0.1.0::00-welcome.mq.md#",
+          "heading_span": null,
+          "span": {
+            "start": 0,
+            "end": 660
+          },
+          "function": null
+        },
+        {
+          "id": "root:welcome-demo@0.1.0::00-welcome.mq.md#欢迎来到 Marqdo",
+          "path": [
+            "欢迎来到 Marqdo"
+          ],
+          "parent_id": "root:welcome-demo@0.1.0::00-welcome.mq.md#",
+          "kind": "namespace",
+          "name": "欢迎来到 Marqdo",
+          "level": 1,
+          "mode": "knowledge",
+          "mode_origin": "explicit",
+          "mode_source_unit_id": "root:welcome-demo@0.1.0::00-welcome.mq.md#欢迎来到 Marqdo",
+          "heading_span": {
+            "start": 0,
+            "end": 32
+          },
+          "span": {
+            "start": 0,
+            "end": 660
+          },
+          "function": null
+        }
+      ],
+      "anchors": [
+        {
+          "anchor": "欢迎来到-marqdo",
+          "unit_id": "root:welcome-demo@0.1.0::00-welcome.mq.md#欢迎来到 Marqdo"
+        }
+      ],
+      "functions": [],
+      "imports": [],
+      "references": [
+        {
+          "source": "root:welcome-demo@0.1.0::00-welcome.mq.md",
+          "source_unit": "root:welcome-demo@0.1.0::00-welcome.mq.md#欢迎来到 Marqdo",
+          "url": "./guide.mq.md",
+          "span": {
+            "start": 507,
+            "end": 536
+          },
+          "state": "not_loaded",
+          "target_kind": null,
+          "target_module": null,
+          "target_unit": null,
+          "candidate_package_instance_id": "root:welcome-demo@0.1.0",
+          "candidate_path": "guide.mq.md",
+          "fragment": null,
+          "candidates": []
+        }
+      ],
+      "calls": [],
+      "resources": []
+    }
+  ],
+  "diagnostics": []
+}

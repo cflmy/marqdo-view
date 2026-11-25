@@ -1,9 +1,11 @@
 //! The only way View talks to the frozen CLI.
 //!
-//! Invariants (RFC-VIEW-0001 §4.2, §10.3, §14.1):
+//! Invariants:
 //! * absolute `MARQDO_BIN`, argv arrays, never `sh -c`, never shell strings;
-//! * `check --emit` is the only static channel; `run --trace-file --json` the
-//!   only dynamic one; private Core IR dumps are never used;
+//! * `check --emit` is the only static channel; `run`/`call --output jsonl`
+//!   (optionally with `--observation-file`) is the only dynamic channel, and
+//!   both dynamic destinations come from the same execution;
+//! * private Core IR dumps, second parsers and protocol probing are never used;
 //! * stdout/stderr/exit status are handled separately; a stderr JSON blob is
 //!   never promoted to a successful Analysis;
 //! * temporary artifacts live in a private 0700 directory and are removed on
@@ -24,14 +26,18 @@ pub const DEFAULT_RUN_TIMEOUT: Duration = Duration::from_secs(120);
 /// Default View-level wall clock cap for one Core `check`.
 pub const DEFAULT_CHECK_TIMEOUT: Duration = Duration::from_secs(120);
 
-const ENV_MARQDO_BIN: &str = "MARQDO_BIN";
+/// Bounded observation budget sent on every explicit run. The protocol
+/// expresses exhaustion through `observation.truncated`; View never silently
+/// drops or amplifies events itself.
+pub const DEFAULT_OBSERVE_MAX_EVENTS: u64 = 10_000;
+pub const DEFAULT_OBSERVE_MAX_BYTES: u64 = 4_194_304;
+pub const DEFAULT_OBSERVE_MAX_VALUE_BYTES: u64 = 256;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SandboxMode {
     Pure,
     Project,
-    Strict,
 }
 
 impl SandboxMode {
@@ -39,7 +45,6 @@ impl SandboxMode {
         match self {
             SandboxMode::Pure => "pure",
             SandboxMode::Project => "project",
-            SandboxMode::Strict => "strict",
         }
     }
 }
@@ -59,14 +64,13 @@ pub struct Grants {
 #[derive(Debug, Clone, Default)]
 pub struct CheckOptions {
     /// `--refs` also validates Markdown link targets; it is a stricter check
-    /// and may fail where plain syntax succeeds.
+    /// and its artifact must never be used as the Observation binding input.
     pub refs: bool,
     pub timeout: Option<Duration>,
 }
 
 #[derive(Debug, Clone)]
 pub struct RunOptions {
-    pub event_stream: bool,
     pub mode: SandboxMode,
     pub grants: Grants,
     pub fuel: Option<u64>,
@@ -74,14 +78,19 @@ pub struct RunOptions {
     pub max_output: Option<u64>,
     pub timeout_seconds: Option<u64>,
     pub view_timeout: Option<Duration>,
-    pub trace_max_events: Option<u64>,
-    pub trace_max_bytes: Option<u64>,
+    pub observe_max_events: u64,
+    pub observe_max_bytes: u64,
+    pub observe_max_value_bytes: u64,
+    /// Explicit value selection. Empty by default: View never requests values
+    /// unless the user opts in (and Text additionally needs a second consent).
+    pub observe_variables: Vec<String>,
+    pub observe_parameters: Vec<String>,
+    pub observe_text_values: bool,
 }
 
 impl Default for RunOptions {
     fn default() -> Self {
         Self {
-            event_stream: false,
             mode: SandboxMode::Pure,
             grants: Grants::default(),
             fuel: None,
@@ -89,8 +98,12 @@ impl Default for RunOptions {
             max_output: None,
             timeout_seconds: None,
             view_timeout: Some(DEFAULT_RUN_TIMEOUT),
-            trace_max_events: None,
-            trace_max_bytes: None,
+            observe_max_events: DEFAULT_OBSERVE_MAX_EVENTS,
+            observe_max_bytes: DEFAULT_OBSERVE_MAX_BYTES,
+            observe_max_value_bytes: DEFAULT_OBSERVE_MAX_VALUE_BYTES,
+            observe_variables: Vec::new(),
+            observe_parameters: Vec::new(),
+            observe_text_values: false,
         }
     }
 }
@@ -101,13 +114,13 @@ pub struct CheckOutput {
     pub analysis_bytes: Vec<u8>,
     /// Lowercase hex SHA-256 of `analysis_bytes`.
     pub analysis_sha256: String,
-    /// Prefixed digest (`sha256:...`) for comparison with Trace v2.
+    /// Prefixed digest (`sha256:...`) used by the Observation binding.
     pub analysis_digest: String,
     pub stdout: String,
     pub stderr: String,
 }
 
-/// One compile diagnostic from `check --json`, normalized so no absolute
+/// One check diagnostic from `check --json`, normalized so no absolute
 /// machine path can leak into pages, exports or logs.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RawCheckDiagnostic {
@@ -128,7 +141,7 @@ pub struct RawCheckDiagnostic {
 }
 
 /// Result of one `check` invocation. A failed check is **not** an I/O error:
-/// the prose stays readable and diagnostics must be shown (RFC §12.3).
+/// the prose stays readable and diagnostics must be shown.
 #[derive(Debug)]
 pub struct CheckResponse {
     pub success: bool,
@@ -138,65 +151,39 @@ pub struct CheckResponse {
     pub stderr: String,
 }
 
-#[derive(Debug)]
-pub struct RunOutput {
-    /// Exactly one JSON document emitted on stdout by the Core.
-    pub json: serde_json::Value,
-    pub stdout: String,
-    pub stderr: String,
-    pub exit_code: i32,
-    /// Raw Trace v2 bytes when the Core wrote them (even for a failed run).
-    pub trace_bytes: Option<Vec<u8>>,
-    pub trace_sha256: Option<String>,
-}
-
 pub use crate::scratch::ScratchDir;
 
-/// Negotiated public-client for one frozen core binary.
+/// The public client for one frozen core binary.
 #[derive(Debug, Clone)]
 pub struct CoreClient {
     bin: PathBuf,
-    protocol_env: ProtocolEnv,
-}
-
-#[derive(Debug, Clone, Default)]
-struct ProtocolEnv {
-    tool: Option<String>,
-    analysis: Option<String>,
-    trace: Option<String>,
+    api_revision: Option<String>,
 }
 
 impl CoreClient {
     /// Build a client from `--marqdo-bin` (development) or `MARQDO_BIN`
-    /// (installed Tool Protocol). Never guesses a `PATH` binary: a wrong
-    /// version must fail loudly, not silently.
+    /// (installed Tool). Never guesses a `PATH` binary: a wrong version must
+    /// fail loudly, not silently.
     pub fn from_env(explicit: Option<&Path>) -> ViewResult<Self> {
         let bin = locate_bin(explicit)?;
         Self::with_bin(bin)
     }
 
-    /// Construct from an explicit binary path, still reading any negotiated
-    /// protocol environment. Useful for `--marqdo-bin` and integration tests;
-    /// production dispatch should prefer [`CoreClient::from_env`].
+    /// Construct from an explicit binary path, still reading the injected API
+    /// revision expectation. Useful for `--marqdo-bin` and integration tests.
     pub fn with_bin(bin: impl Into<PathBuf>) -> ViewResult<Self> {
         let bin = validate_bin(&bin.into(), "core binary")?;
-        Ok(Self {
-            bin,
-            protocol_env: ProtocolEnv {
-                tool: std::env::var(tool_v1::ENV_TOOL_PROTOCOL).ok(),
-                analysis: std::env::var(tool_v1::ENV_PROTOCOL_ANALYSIS).ok(),
-                trace: std::env::var(tool_v1::ENV_PROTOCOL_TRACE).ok(),
-            },
-        })
+        let api_revision = std::env::var(tool_v1::ENV_MARQDO_API_REVISION).ok();
+        tool_v1::validate_api_revision_env(api_revision.as_deref())?;
+        Ok(Self { bin, api_revision })
     }
 
-    /// Test-only constructor with an explicit binary and no environment
-    /// negotiation input.
+    /// Test-only constructor with no injected environment expectation.
     #[cfg(test)]
     pub fn for_test(bin: impl Into<PathBuf>) -> Self {
         Self {
             bin: bin.into(),
-            protocol_env: ProtocolEnv::default(),
+            api_revision: None,
         }
     }
 
@@ -204,15 +191,15 @@ impl CoreClient {
         &self.bin
     }
 
-    /// Run `--version`, validate the product range and any negotiated protocol
-    /// environment variables. A missing Development-mode env is allowed; an
-    /// unknown major is a hard error.
+    pub fn api_revision(&self) -> Option<&str> {
+        self.api_revision.as_deref()
+    }
+
+    /// Run `--version`, validate the product range and the injected API
+    /// revision. A missing Development-mode environment is allowed; an
+    /// unknown revision is a hard error.
     pub fn negotiate(&self) -> ViewResult<CoreVersion> {
-        tool_v1::negotiate_protocol_env(
-            self.protocol_env.tool.as_deref(),
-            self.protocol_env.analysis.as_deref(),
-            self.protocol_env.trace.as_deref(),
-        )?;
+        tool_v1::validate_api_revision_env(self.api_revision.as_deref())?;
         let output = self.execute(
             &[OsString::from("--version")],
             &std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
@@ -232,7 +219,7 @@ impl CoreClient {
         if !tool_v1::product_is_compatible(&version.version) {
             return Err(ViewError::ProtocolIncompatible {
                 detail: format!(
-                    "core {} is outside the supported range {}",
+                    "core {} is outside the supported range {}; install the current rc.3+ core",
                     version.version,
                     tool_v1::PRODUCT_RANGE
                 ),
@@ -241,9 +228,11 @@ impl CoreClient {
         Ok(version)
     }
 
-    /// `check --json --emit`. On success the exact Analysis v2 bytes are
-    /// returned; on failure the structured diagnostics are returned without
-    /// any absolute path. Only spawn/timeout/IO failures are hard errors.
+    /// `check --json --emit`. `--json` only selects the diagnostic summary on
+    /// stdout; it does not change the emitted Analysis bytes. On success the
+    /// exact Analysis bytes are returned; on failure the structured
+    /// diagnostics are returned without any absolute path. Only
+    /// spawn/timeout/IO failures are hard errors.
     pub fn check(
         &self,
         project: &Project,
@@ -320,62 +309,6 @@ impl CoreClient {
         })
     }
 
-    /// `run --trace-file --json`, only after an explicit user confirmation in
-    /// the calling layer. Returns the CLI JSON document and raw Trace bytes.
-    pub fn run(
-        &self,
-        project: &Project,
-        relative: &SafeRelativePath,
-        options: &RunOptions,
-    ) -> ViewResult<RunOutput> {
-        let entry = project.absolute_for(relative)?;
-        let scratch = ScratchDir::create("run")?;
-        let trace_path = scratch.file("trace.json");
-        let args = build_run_args(&entry, &trace_path, options);
-        let output = self.execute(
-            &args,
-            project.root(),
-            options.view_timeout.unwrap_or(DEFAULT_RUN_TIMEOUT),
-        )?;
-
-        let json: serde_json::Value =
-            serde_json::from_slice(&output.stdout_bytes).map_err(|err| ViewError::Io {
-                detail: format!(
-                    "`marqdo run --json` did not emit exactly one JSON document: {err}; stderr: {}",
-                    summarize_stderr(&output.stderr)
-                ),
-            })?;
-        if !json.is_object() {
-            return Err(ViewError::Io {
-                detail: "`marqdo run --json` emitted a non-object JSON document".to_string(),
-            });
-        }
-        let trace_bytes = match std::fs::read(&trace_path) {
-            Ok(bytes) => {
-                if bytes.is_empty() {
-                    None
-                } else {
-                    Some(bytes)
-                }
-            }
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => None,
-            Err(err) => {
-                return Err(ViewError::io(
-                    &format!("read trace {}", trace_path.display()),
-                    err,
-                ))
-            }
-        };
-        Ok(RunOutput {
-            json,
-            stdout: output.stdout,
-            stderr: output.stderr,
-            exit_code: output.exit_code,
-            trace_sha256: trace_bytes.as_deref().map(sha256_hex),
-            trace_bytes,
-        })
-    }
-
     /// Spawn the core through the single process adapter with an explicit
     /// argv, private cwd, bounded capture and a wall-clock cap.
     fn execute(&self, args: &[OsString], cwd: &Path, timeout: Duration) -> ViewResult<ExecOutput> {
@@ -410,30 +343,48 @@ struct ExecOutput {
     stderr: String,
 }
 
-/// Build the base `check` arguments. The caller appends `--emit <path>` and
-/// optionally `--refs`; this function exists so the argv shape is unit-testable.
+/// Build the base `check` arguments. The caller appends `--json`,
+/// `--emit <path>` and optionally `--refs`; this function exists so the argv
+/// shape is unit-testable and cannot drift to a retired flag.
 fn build_check_args(entry: &Path) -> Vec<OsString> {
     vec![OsString::from("check"), entry.as_os_str().to_os_string()]
 }
 
-/// Common explicit flags shared by `run` and `call`. Budgets are always sent
-/// explicitly by the execution controller (RFC-VIEW-0002 §6.7).
-fn append_common_args(args: &mut Vec<OsString>, trace_path: &Path, options: &RunOptions) {
+/// Common explicit flags shared by `run` and `call`.
+fn append_common_args(args: &mut Vec<OsString>, observation_file: &Path, options: &RunOptions) {
     fn push_pair(args: &mut Vec<OsString>, flag: &str, value: &str) {
         args.push(OsString::from(flag));
         args.push(OsString::from(value));
     }
     args.push(OsString::from("--mode"));
     args.push(OsString::from(options.mode.as_str()));
-    if options.event_stream {
-        push_pair(args, "--event-stream", "jsonl");
-        push_pair(args, "--observe-max-events", "10000");
-        push_pair(args, "--observe-max-bytes", "4194304");
-    } else {
-        args.push(OsString::from("--json"));
+    push_pair(args, "--output", "jsonl");
+    args.push(OsString::from("--observation-file"));
+    args.push(observation_file.as_os_str().to_os_string());
+    push_pair(
+        args,
+        "--observe-max-events",
+        &options.observe_max_events.to_string(),
+    );
+    push_pair(
+        args,
+        "--observe-max-bytes",
+        &options.observe_max_bytes.to_string(),
+    );
+    push_pair(
+        args,
+        "--observe-max-value-bytes",
+        &options.observe_max_value_bytes.to_string(),
+    );
+    for name in &options.observe_variables {
+        push_pair(args, "--observe-variable", name);
     }
-    args.push(OsString::from("--trace-file"));
-    args.push(trace_path.as_os_str().to_os_string());
+    for name in &options.observe_parameters {
+        push_pair(args, "--observe-parameter", name);
+    }
+    if options.observe_text_values {
+        args.push(OsString::from("--observe-text-values"));
+    }
     for glob in &options.grants.allow_read {
         push_pair(args, "--allow-read", glob);
     }
@@ -464,18 +415,16 @@ fn append_common_args(args: &mut Vec<OsString>, trace_path: &Path, options: &Run
     if let Some(timeout) = options.timeout_seconds {
         push_pair(args, "--timeout", &timeout.to_string());
     }
-    if let Some(max_events) = options.trace_max_events {
-        push_pair(args, "--trace-max-events", &max_events.to_string());
-    }
-    if let Some(max_bytes) = options.trace_max_bytes {
-        push_pair(args, "--trace-max-bytes", &max_bytes.to_string());
-    }
 }
 
 /// Build `run` arguments from an already user-approved request.
-pub fn build_run_args(entry: &Path, trace_path: &Path, options: &RunOptions) -> Vec<OsString> {
+pub fn build_run_args(
+    entry: &Path,
+    observation_file: &Path,
+    options: &RunOptions,
+) -> Vec<OsString> {
     let mut args = vec![OsString::from("run"), entry.as_os_str().to_os_string()];
-    append_common_args(&mut args, trace_path, options);
+    append_common_args(&mut args, observation_file, options);
     args
 }
 
@@ -485,7 +434,7 @@ pub fn build_call_args(
     entry: &Path,
     function: &str,
     arguments: &[(String, String)],
-    trace_path: &Path,
+    observation_file: &Path,
     options: &RunOptions,
 ) -> Vec<OsString> {
     let mut args = vec![
@@ -497,7 +446,7 @@ pub fn build_call_args(
         args.push(OsString::from("--arg"));
         args.push(OsString::from(format!("{name}={expression}")));
     }
-    append_common_args(&mut args, trace_path, options);
+    append_common_args(&mut args, observation_file, options);
     args
 }
 
@@ -505,18 +454,19 @@ fn locate_bin(explicit: Option<&Path>) -> ViewResult<PathBuf> {
     if let Some(path) = explicit {
         return validate_bin(path, "--marqdo-bin");
     }
-    if let Some(raw) = std::env::var_os(ENV_MARQDO_BIN) {
+    if let Some(raw) = std::env::var_os(tool_v1::ENV_MARQDO_BIN) {
         if raw.is_empty() {
             return Err(ViewError::CoreMissing {
-                detail: format!("{ENV_MARQDO_BIN} is set but empty"),
+                detail: format!("{} is set but empty", tool_v1::ENV_MARQDO_BIN),
             });
         }
-        return validate_bin(Path::new(&raw), ENV_MARQDO_BIN);
+        return validate_bin(Path::new(&raw), tool_v1::ENV_MARQDO_BIN);
     }
     Err(ViewError::CoreMissing {
         detail: format!(
-            "{ENV_MARQDO_BIN} is not set. Install this tool with `marqdo tool install <bundle>/tool.json`, \
-             or pass --marqdo-bin <path> when running marqdo-view directly."
+            "{} is not set. Install this tool with `marqdo tool install <bundle>/tool.json`, \
+             or pass --marqdo-bin <path> when running marqdo-view directly.",
+            tool_v1::ENV_MARQDO_BIN
         ),
     })
 }
@@ -545,25 +495,12 @@ fn validate_bin(path: &Path, origin: &str) -> ViewResult<PathBuf> {
     Ok(canonical)
 }
 
-fn summarize_stderr(stderr: &str) -> String {
-    let trimmed = stderr.trim();
-    if trimmed.is_empty() {
-        "(no stderr)".to_string()
-    } else {
-        let mut text: String = trimmed.chars().take(1200).collect();
-        if trimmed.chars().count() > 1200 {
-            text.push('…');
-        }
-        text
-    }
-}
-
 // ---------------------------------------------------------------------------
 // `marqdo view verify`: static Analysis/source binding check. Never executes.
 // ---------------------------------------------------------------------------
 
 use crate::cli::{RuntimeOpts, VerifyArgs};
-use crate::protocol::analysis_v2;
+use crate::protocol::analysis_v3;
 
 pub fn verify_command(opts: &RuntimeOpts, args: &VerifyArgs) -> ViewResult<i32> {
     let path = args
@@ -577,7 +514,6 @@ pub fn verify_command(opts: &RuntimeOpts, args: &VerifyArgs) -> ViewResult<i32> 
     let source = String::from_utf8(source_bytes).map_err(|err| ViewError::Io {
         detail: format!("{entry} is not valid UTF-8: {err}"),
     })?;
-    let source_index = crate::reader::source::SourceIndex::new(&source);
 
     let client = CoreClient::from_env(opts.marqdo_bin.as_deref())?;
     let core_version = client.negotiate()?;
@@ -627,12 +563,8 @@ pub fn verify_command(opts: &RuntimeOpts, args: &VerifyArgs) -> ViewResult<i32> 
             })
         }
     };
-    let verified = analysis_v2::verify_analysis(
-        &check.analysis_bytes,
-        &source,
-        &source_index,
-        entry.as_str(),
-    )?;
+    let verified =
+        analysis_v3::verify_analysis(&check.analysis_bytes, entry.as_str(), Some(&source))?;
     let projection = &verified.projection;
 
     if args.json {
@@ -643,6 +575,7 @@ pub fn verify_command(opts: &RuntimeOpts, args: &VerifyArgs) -> ViewResult<i32> 
             "core": {
                 "version": core_version.version.to_string(),
                 "supported_range": tool_v1::PRODUCT_RANGE,
+                "api_revision": tool_v1::API_REVISION,
             },
             "analysis": {
                 "schema": "marqdo.analysis",
@@ -652,13 +585,21 @@ pub fn verify_command(opts: &RuntimeOpts, args: &VerifyArgs) -> ViewResult<i32> 
                 "markdown_profile": projection.markdown_profile,
                 "functions": projection.functions.len(),
                 "units": projection.units.len(),
+                "references": projection.references.len(),
                 "diagnostics": projection.diagnostics.len(),
+                "requires": {
+                    "analysis": tool_v1::ANALYSIS_REVISION,
+                    "observation": tool_v1::OBSERVATION_REVISION,
+                },
             },
             "project": {
                 "root_id": projection.project_root_id,
                 "identity_kind": projection.identity_kind,
+                "entry_module_id": projection.entry_module_id,
                 "lock_digest": projection.lock_digest,
+                "manifest_digest": projection.manifest_digest,
                 "stdlib_version": projection.stdlib_version,
+                "extensions": projection.extensions.len(),
             },
             "document": {
                 "relative_path": entry.as_str(),
@@ -676,9 +617,10 @@ pub fn verify_command(opts: &RuntimeOpts, args: &VerifyArgs) -> ViewResult<i32> 
         );
     } else {
         println!(
-            "core: marqdo {} (supported {})",
+            "core: marqdo {} (supported {}, api revision {})",
             core_version.version,
-            tool_v1::PRODUCT_RANGE
+            tool_v1::PRODUCT_RANGE,
+            tool_v1::API_REVISION
         );
         println!(
             "project: {} ({})",
@@ -686,10 +628,11 @@ pub fn verify_command(opts: &RuntimeOpts, args: &VerifyArgs) -> ViewResult<i32> 
         );
         println!("document: {entry}");
         println!(
-            "analysis: schema=marqdo.analysis v{} modules={} functions={} digest={}",
+            "analysis: schema=marqdo.analysis v{} modules={} functions={} references={} digest={}",
             projection.schema_version,
             projection.modules.len(),
             projection.functions.len(),
+            projection.references.len(),
             projection.analysis_digest
         );
         println!("source digest: match");
@@ -702,41 +645,70 @@ pub fn verify_command(opts: &RuntimeOpts, args: &VerifyArgs) -> ViewResult<i32> 
 mod tests {
     use super::*;
 
+    fn text(args: &[OsString]) -> Vec<String> {
+        args.iter()
+            .map(|arg| arg.to_string_lossy().to_string())
+            .collect()
+    }
+
     #[test]
-    fn run_args_are_explicit_argv_never_shell() {
+    fn run_args_use_the_current_observation_flags_only() {
         let args = build_run_args(
             Path::new("/p/index.mq.md"),
-            Path::new("/t/trace.json"),
+            Path::new("/t/observation.json"),
             &RunOptions {
-                event_stream: false,
-                mode: SandboxMode::Pure,
+                mode: SandboxMode::Project,
                 grants: Grants {
                     allow_read: vec!["data/**".into()],
                     allow_net: vec!["example.com".into()],
                     ..Default::default()
                 },
                 fuel: Some(1000),
-                trace_max_events: Some(20),
+                observe_max_events: 20,
                 ..Default::default()
             },
         );
-        let text: Vec<String> = args
-            .iter()
-            .map(|arg| arg.to_string_lossy().to_string())
-            .collect();
+        let text = text(&args);
         assert_eq!(text[0], "run");
         assert_eq!(text[1], "/p/index.mq.md");
-        assert!(text.contains(&"pure".to_string()));
-        assert!(text.contains(&"--json".to_string()));
-        assert!(text.contains(&"--trace-file".to_string()));
+        assert!(text.contains(&"project".to_string()));
+        assert!(text.contains(&"--output".to_string()));
+        assert!(text.contains(&"jsonl".to_string()));
+        assert!(text.contains(&"--observation-file".to_string()));
+        assert!(text.contains(&"--observe-max-events".to_string()));
+        assert!(text.contains(&"--observe-max-bytes".to_string()));
+        assert!(text.contains(&"--observe-max-value-bytes".to_string()));
         assert!(text.contains(&"data/**".to_string()));
         assert!(text.contains(&"example.com".to_string()));
-        assert!(text.contains(&"1000".to_string()));
-        assert!(text.contains(&"20".to_string()));
-        // No token is a shell fragment: every argument is a separate value.
+        // Retired flags and any shell fragment must never appear.
+        for retired in [
+            "--json",
+            "--trace-file",
+            "--event-stream",
+            "--trace-max-events",
+            "--trace-max-bytes",
+        ] {
+            assert!(
+                !text.contains(&retired.to_string()),
+                "retired flag {retired}"
+            );
+        }
         assert!(!text
             .iter()
-            .any(|t| t.contains(';') || t.contains('|') || t.contains('&')));
+            .any(|token| token.contains(';') || token.contains('|') || token.contains('&')));
+    }
+
+    #[test]
+    fn run_defaults_do_not_request_values() {
+        let args = build_run_args(
+            Path::new("/p/index.mq.md"),
+            Path::new("/t/observation.json"),
+            &RunOptions::default(),
+        );
+        let text = text(&args);
+        assert!(!text.iter().any(|token| token == "--observe-variable"));
+        assert!(!text.iter().any(|token| token == "--observe-parameter"));
+        assert!(!text.iter().any(|token| token == "--observe-text-values"));
     }
 
     #[test]
@@ -767,12 +739,5 @@ mod tests {
         }
         drop(scratch);
         assert!(!path.exists());
-    }
-
-    #[test]
-    fn stderr_summary_is_bounded() {
-        let text = summarize_stderr(&"x".repeat(5000));
-        assert!(text.chars().count() <= 1201);
-        assert_eq!(summarize_stderr("  "), "(no stderr)");
     }
 }

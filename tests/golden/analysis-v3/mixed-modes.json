@@ -1,0 +1,790 @@
+{
+  "schema": "marqdo.analysis",
+  "schema_version": 3,
+  "producer": {
+    "name": "marqdo",
+    "version": "3.0.0-rc.4",
+    "markdown_profile": "marqdo.md.v1"
+  },
+  "project": {
+    "root_id": "root:mixed-modes@0.1.0",
+    "identity_kind": "manifest",
+    "entry_module_id": "root:mixed-modes@0.1.0::index.mq.md",
+    "lock_digest": "",
+    "manifest_digest": "sha256:b252a5e0d5519cfb5efe1ca7ebfe0660cc1919279fc4283cdebfb70028f5a984",
+    "stdlib": {
+      "version": "0.1.0",
+      "digest": "sha256:5407d3665ba2fe105820d0f1af5efaafa10c277a69eb819c3225719813c8c713",
+      "instance_id": "std:marqdo-stdlib@0.1.0#5407d3665ba2fe105820d0f1af5efaafa10c277a69eb819c3225719813c8c713"
+    },
+    "extensions": []
+  },
+  "modules": [
+    {
+      "id": "root:mixed-modes@0.1.0::index.mq.md",
+      "package_instance_id": "root:mixed-modes@0.1.0",
+      "relative_path": "index.mq.md",
+      "source_digest": "c5fed57a716e06a29b669c334d475ec03bf08442e27983451ec8dd791dc999ea",
+      "source": "# @knowledge 计算笔记\n\n这是一份关于简单运算的知识说明。**此处加粗是知识内容，不执行。**\n\n## @knowledge 算法说明\n\n下面描述算法的含义和适用范围；此处的 `n` 是惰性正文。\n\n# @exec 演示\n\n## @exec main\n\n`params(n: Int)`\n\n### @knowledge 用法\n\n调用方提供整数 `n`。这一小节不应该执行任何语句。\n\n### @exec 计算\n\n**if n > 0**\n\n`result = n * 2`\n\n*return result*\n\n**else**\n\n`return 0`\n\n**end**\n",
+      "document": {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [],
+                "kind": "text",
+                "literal": "@knowledge 计算笔记",
+                "span": {
+                  "end": 25,
+                  "start": 2
+                }
+              }
+            ],
+            "kind": "heading",
+            "level": 1,
+            "setext": false,
+            "span": {
+              "end": 25,
+              "start": 0
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "kind": "text",
+                "literal": "这是一份关于简单运算的知识说明。",
+                "span": {
+                  "end": 75,
+                  "start": 27
+                }
+              },
+              {
+                "children": [
+                  {
+                    "children": [],
+                    "kind": "text",
+                    "literal": "此处加粗是知识内容，不执行。",
+                    "span": {
+                      "end": 119,
+                      "start": 77
+                    }
+                  }
+                ],
+                "kind": "strong",
+                "span": {
+                  "end": 121,
+                  "start": 75
+                }
+              }
+            ],
+            "kind": "paragraph",
+            "span": {
+              "end": 121,
+              "start": 27
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "kind": "text",
+                "literal": "@knowledge 算法说明",
+                "span": {
+                  "end": 149,
+                  "start": 126
+                }
+              }
+            ],
+            "kind": "heading",
+            "level": 2,
+            "setext": false,
+            "span": {
+              "end": 149,
+              "start": 123
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "kind": "text",
+                "literal": "下面描述算法的含义和适用范围；此处的 ",
+                "span": {
+                  "end": 206,
+                  "start": 151
+                }
+              },
+              {
+                "children": [],
+                "kind": "code",
+                "literal": "n",
+                "span": {
+                  "end": 209,
+                  "start": 206
+                },
+                "ticks": 1
+              },
+              {
+                "children": [],
+                "kind": "text",
+                "literal": " 是惰性正文。",
+                "span": {
+                  "end": 228,
+                  "start": 209
+                }
+              }
+            ],
+            "kind": "paragraph",
+            "span": {
+              "end": 228,
+              "start": 151
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "kind": "text",
+                "literal": "@exec 演示",
+                "span": {
+                  "end": 244,
+                  "start": 232
+                }
+              }
+            ],
+            "kind": "heading",
+            "level": 1,
+            "setext": false,
+            "span": {
+              "end": 244,
+              "start": 230
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "kind": "text",
+                "literal": "@exec main",
+                "span": {
+                  "end": 259,
+                  "start": 249
+                }
+              }
+            ],
+            "kind": "heading",
+            "level": 2,
+            "setext": false,
+            "span": {
+              "end": 259,
+              "start": 246
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "kind": "code",
+                "literal": "params(n: Int)",
+                "span": {
+                  "end": 277,
+                  "start": 261
+                },
+                "ticks": 1
+              }
+            ],
+            "kind": "paragraph",
+            "span": {
+              "end": 277,
+              "start": 261
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "kind": "text",
+                "literal": "@knowledge 用法",
+                "span": {
+                  "end": 300,
+                  "start": 283
+                }
+              }
+            ],
+            "kind": "heading",
+            "level": 3,
+            "setext": false,
+            "span": {
+              "end": 300,
+              "start": 279
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "kind": "text",
+                "literal": "调用方提供整数 ",
+                "span": {
+                  "end": 324,
+                  "start": 302
+                }
+              },
+              {
+                "children": [],
+                "kind": "code",
+                "literal": "n",
+                "span": {
+                  "end": 327,
+                  "start": 324
+                },
+                "ticks": 1
+              },
+              {
+                "children": [],
+                "kind": "text",
+                "literal": "。这一小节不应该执行任何语句。",
+                "span": {
+                  "end": 372,
+                  "start": 327
+                }
+              }
+            ],
+            "kind": "paragraph",
+            "span": {
+              "end": 372,
+              "start": 302
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "kind": "text",
+                "literal": "@exec 计算",
+                "span": {
+                  "end": 390,
+                  "start": 378
+                }
+              }
+            ],
+            "kind": "heading",
+            "level": 3,
+            "setext": false,
+            "span": {
+              "end": 390,
+              "start": 374
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [],
+                    "kind": "text",
+                    "literal": "if n > 0",
+                    "span": {
+                      "end": 402,
+                      "start": 394
+                    }
+                  }
+                ],
+                "kind": "strong",
+                "span": {
+                  "end": 404,
+                  "start": 392
+                }
+              }
+            ],
+            "kind": "paragraph",
+            "span": {
+              "end": 404,
+              "start": 392
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "kind": "code",
+                "literal": "result = n * 2",
+                "span": {
+                  "end": 422,
+                  "start": 406
+                },
+                "ticks": 1
+              }
+            ],
+            "kind": "paragraph",
+            "span": {
+              "end": 422,
+              "start": 406
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [],
+                    "kind": "text",
+                    "literal": "return result",
+                    "span": {
+                      "end": 438,
+                      "start": 425
+                    }
+                  }
+                ],
+                "kind": "emph",
+                "span": {
+                  "end": 439,
+                  "start": 424
+                }
+              }
+            ],
+            "kind": "paragraph",
+            "span": {
+              "end": 439,
+              "start": 424
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [],
+                    "kind": "text",
+                    "literal": "else",
+                    "span": {
+                      "end": 447,
+                      "start": 443
+                    }
+                  }
+                ],
+                "kind": "strong",
+                "span": {
+                  "end": 449,
+                  "start": 441
+                }
+              }
+            ],
+            "kind": "paragraph",
+            "span": {
+              "end": 449,
+              "start": 441
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [],
+                "kind": "code",
+                "literal": "return 0",
+                "span": {
+                  "end": 461,
+                  "start": 451
+                },
+                "ticks": 1
+              }
+            ],
+            "kind": "paragraph",
+            "span": {
+              "end": 461,
+              "start": 451
+            }
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [],
+                    "kind": "text",
+                    "literal": "end",
+                    "span": {
+                      "end": 468,
+                      "start": 465
+                    }
+                  }
+                ],
+                "kind": "strong",
+                "span": {
+                  "end": 470,
+                  "start": 463
+                }
+              }
+            ],
+            "kind": "paragraph",
+            "span": {
+              "end": 470,
+              "start": 463
+            }
+          }
+        ],
+        "kind": "document",
+        "span": {
+          "end": 471,
+          "start": 0
+        }
+      },
+      "units": [
+        {
+          "id": "root:mixed-modes@0.1.0::index.mq.md#",
+          "path": [],
+          "parent_id": null,
+          "kind": "root",
+          "name": "",
+          "level": 0,
+          "mode": "knowledge",
+          "mode_origin": "default",
+          "mode_source_unit_id": "root:mixed-modes@0.1.0::index.mq.md#",
+          "heading_span": null,
+          "span": {
+            "start": 0,
+            "end": 471
+          },
+          "function": null
+        },
+        {
+          "id": "root:mixed-modes@0.1.0::index.mq.md#计算笔记",
+          "path": [
+            "计算笔记"
+          ],
+          "parent_id": "root:mixed-modes@0.1.0::index.mq.md#",
+          "kind": "namespace",
+          "name": "计算笔记",
+          "level": 1,
+          "mode": "knowledge",
+          "mode_origin": "explicit",
+          "mode_source_unit_id": "root:mixed-modes@0.1.0::index.mq.md#计算笔记",
+          "heading_span": {
+            "start": 0,
+            "end": 25
+          },
+          "span": {
+            "start": 0,
+            "end": 230
+          },
+          "function": null
+        },
+        {
+          "id": "root:mixed-modes@0.1.0::index.mq.md#计算笔记/算法说明",
+          "path": [
+            "计算笔记",
+            "算法说明"
+          ],
+          "parent_id": "root:mixed-modes@0.1.0::index.mq.md#计算笔记",
+          "kind": "knowledge",
+          "name": "算法说明",
+          "level": 2,
+          "mode": "knowledge",
+          "mode_origin": "explicit",
+          "mode_source_unit_id": "root:mixed-modes@0.1.0::index.mq.md#计算笔记/算法说明",
+          "heading_span": {
+            "start": 123,
+            "end": 149
+          },
+          "span": {
+            "start": 123,
+            "end": 230
+          },
+          "function": null
+        },
+        {
+          "id": "root:mixed-modes@0.1.0::index.mq.md#演示",
+          "path": [
+            "演示"
+          ],
+          "parent_id": "root:mixed-modes@0.1.0::index.mq.md#",
+          "kind": "namespace",
+          "name": "演示",
+          "level": 1,
+          "mode": "exec",
+          "mode_origin": "explicit",
+          "mode_source_unit_id": "root:mixed-modes@0.1.0::index.mq.md#演示",
+          "heading_span": {
+            "start": 230,
+            "end": 244
+          },
+          "span": {
+            "start": 230,
+            "end": 471
+          },
+          "function": null
+        },
+        {
+          "id": "root:mixed-modes@0.1.0::index.mq.md#演示/main",
+          "path": [
+            "演示",
+            "main"
+          ],
+          "parent_id": "root:mixed-modes@0.1.0::index.mq.md#演示",
+          "kind": "function",
+          "name": "main",
+          "level": 2,
+          "mode": "exec",
+          "mode_origin": "explicit",
+          "mode_source_unit_id": "root:mixed-modes@0.1.0::index.mq.md#演示/main",
+          "heading_span": {
+            "start": 246,
+            "end": 259
+          },
+          "span": {
+            "start": 246,
+            "end": 471
+          },
+          "function": "root:mixed-modes@0.1.0::index.mq.md::演示.main"
+        },
+        {
+          "id": "root:mixed-modes@0.1.0::index.mq.md#演示/main/用法",
+          "path": [
+            "演示",
+            "main",
+            "用法"
+          ],
+          "parent_id": "root:mixed-modes@0.1.0::index.mq.md#演示/main",
+          "kind": "section",
+          "name": "用法",
+          "level": 3,
+          "mode": "knowledge",
+          "mode_origin": "explicit",
+          "mode_source_unit_id": "root:mixed-modes@0.1.0::index.mq.md#演示/main/用法",
+          "heading_span": {
+            "start": 279,
+            "end": 300
+          },
+          "span": {
+            "start": 279,
+            "end": 374
+          },
+          "function": null
+        },
+        {
+          "id": "root:mixed-modes@0.1.0::index.mq.md#演示/main/计算",
+          "path": [
+            "演示",
+            "main",
+            "计算"
+          ],
+          "parent_id": "root:mixed-modes@0.1.0::index.mq.md#演示/main",
+          "kind": "section",
+          "name": "计算",
+          "level": 3,
+          "mode": "exec",
+          "mode_origin": "explicit",
+          "mode_source_unit_id": "root:mixed-modes@0.1.0::index.mq.md#演示/main/计算",
+          "heading_span": {
+            "start": 374,
+            "end": 390
+          },
+          "span": {
+            "start": 374,
+            "end": 471
+          },
+          "function": "root:mixed-modes@0.1.0::index.mq.md::演示.main"
+        }
+      ],
+      "anchors": [
+        {
+          "anchor": "main",
+          "unit_id": "root:mixed-modes@0.1.0::index.mq.md#演示/main"
+        },
+        {
+          "anchor": "演示",
+          "unit_id": "root:mixed-modes@0.1.0::index.mq.md#演示"
+        },
+        {
+          "anchor": "用法",
+          "unit_id": "root:mixed-modes@0.1.0::index.mq.md#演示/main/用法"
+        },
+        {
+          "anchor": "算法说明",
+          "unit_id": "root:mixed-modes@0.1.0::index.mq.md#计算笔记/算法说明"
+        },
+        {
+          "anchor": "计算",
+          "unit_id": "root:mixed-modes@0.1.0::index.mq.md#演示/main/计算"
+        },
+        {
+          "anchor": "计算笔记",
+          "unit_id": "root:mixed-modes@0.1.0::index.mq.md#计算笔记"
+        }
+      ],
+      "functions": [
+        {
+          "id": "root:mixed-modes@0.1.0::index.mq.md::演示.main",
+          "unit_id": "root:mixed-modes@0.1.0::index.mq.md#演示/main",
+          "local_name": "main",
+          "namespace": "演示",
+          "span": {
+            "start": 246,
+            "end": 470
+          },
+          "heading_span": {
+            "start": 246,
+            "end": 259
+          },
+          "signature": {
+            "kind": "explicit",
+            "params": [
+              {
+                "name": "n",
+                "required": true,
+                "type": "Int",
+                "default": null,
+                "span": {
+                  "start": 268,
+                  "end": 274
+                }
+              }
+            ]
+          },
+          "effects": [
+            "unknown"
+          ],
+          "body": [
+            {
+              "arms": [
+                {
+                  "body": [
+                    {
+                      "kind": "assign",
+                      "span": {
+                        "end": 422,
+                        "start": 406
+                      },
+                      "target": "result",
+                      "value": {
+                        "kind": "binary",
+                        "left": {
+                          "kind": "variable",
+                          "name": "n",
+                          "span": {
+                            "end": 417,
+                            "start": 416
+                          }
+                        },
+                        "op": "mul",
+                        "right": {
+                          "kind": "literal",
+                          "span": {
+                            "end": 0,
+                            "start": 0
+                          },
+                          "type": "int",
+                          "value": "2"
+                        },
+                        "span": {
+                          "end": 421,
+                          "start": 416
+                        }
+                      }
+                    },
+                    {
+                      "kind": "return",
+                      "span": {
+                        "end": 439,
+                        "start": 424
+                      },
+                      "value": {
+                        "kind": "variable",
+                        "name": "result",
+                        "span": {
+                          "end": 438,
+                          "start": 432
+                        }
+                      }
+                    }
+                  ],
+                  "condition": {
+                    "kind": "binary",
+                    "left": {
+                      "kind": "variable",
+                      "name": "n",
+                      "span": {
+                        "end": 398,
+                        "start": 397
+                      }
+                    },
+                    "op": "gt",
+                    "right": {
+                      "kind": "literal",
+                      "span": {
+                        "end": 0,
+                        "start": 0
+                      },
+                      "type": "int",
+                      "value": "0"
+                    },
+                    "span": {
+                      "end": 402,
+                      "start": 397
+                    }
+                  },
+                  "condition_span": {
+                    "end": 404,
+                    "start": 392
+                  },
+                  "span": {
+                    "end": 404,
+                    "start": 392
+                  }
+                },
+                {
+                  "body": [
+                    {
+                      "kind": "return",
+                      "span": {
+                        "end": 461,
+                        "start": 451
+                      },
+                      "value": {
+                        "kind": "literal",
+                        "span": {
+                          "end": 0,
+                          "start": 0
+                        },
+                        "type": "int",
+                        "value": "0"
+                      }
+                    }
+                  ],
+                  "condition": {
+                    "kind": "literal",
+                    "span": {
+                      "end": 0,
+                      "start": 0
+                    },
+                    "type": "bool",
+                    "value": true
+                  },
+                  "condition_span": {
+                    "end": 449,
+                    "start": 441
+                  },
+                  "span": {
+                    "end": 449,
+                    "start": 441
+                  }
+                }
+              ],
+              "kind": "branch",
+              "span": {
+                "end": 404,
+                "start": 392
+              }
+            }
+          ]
+        }
+      ],
+      "imports": [],
+      "references": [],
+      "calls": [],
+      "resources": []
+    }
+  ],
+  "diagnostics": []
+}

@@ -1,5 +1,11 @@
 # RFC-VIEW-0001：Marqdo View 3.0 独立阅读器架构与开发验收规范
 
+
+> **历史设计（0.1.0 时代）**：本文中的协议名称与命令面只记录当时设计，不是 0.3.0
+> 的当前契约。当前实现只使用 Analysis revision 3（ADR-0069）与 Observation
+> revision 1；见 [`observation-v1-and-analysis-v3.md`](observation-v1-and-analysis-v3.md)
+> 与 [ADR-0012](../decisions/0012-rc4-current-contracts.md)。
+
 > 状态：**Proposed / 可实施设计规范，不代表功能已经实现**  
 > 目标仓库：`marqdo-view`（独立 Git 仓库；首次开发时新建）  
 > 文档版本：`1.0-draft`  

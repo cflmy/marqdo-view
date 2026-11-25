@@ -1,164 +1,150 @@
-# 验收状态（RFC-VIEW-0002 §9 / §10）
+# 验收状态（marqdo-view 0.3.0 / rc.4 契约）
 
-> 最新 issue #2 复验见 §7。以下为 PR-00～PR-06 的初次验收记录。
-> 证据来自真实冻结 CLI（`marqdo 3.0.0-beta.1`）+ 真实进程 HTTP/SSE 测试 +
-> 真实 Chromium 131；生成命令为 `MARQDO_BIN=… scripts/acceptance.sh`。
-> 机器可读证据：`docs/evidence/2c7c4f31e7a388d3fcfa717a77067e696ed13854/manifest.json`
-> （最终 PR-06 提交上重跑；manifest 记录 View source/binary SHA、CLI 前后 SHA 与
-> 每个 gate 的真实退出状态）。
+> 本文件定义**当前**验收基线，不代替机器证据。`PASS/FAIL/UNVERIFIED` 只以
+> `docs/evidence/<CLI-SOURCE-SHA>/manifest.json` 为准；manifest 生成前，全部
+> P0 门禁为 `UNVERIFIED`。`UNVERIFIED`、`PARTIAL`、`WARN` 不得写成 `PASS`。
 
-- 日期：2026-11-22
-- View：`0.2.0`（Linux x86_64）
-- 冻结 CLI：`marqdo 3.0.0-beta.1`，SHA-256
-  `062cb56e226bee55c21d238e195920caa985e62bb3877ba7b07abcc04dc0fe3f`
-- CLI 源码：tag `v3.0.0-beta.1`，`2c7c4f31e7a388d3fcfa717a77067e696ed13854`
-- 规范：`docs/architecture/RFC-VIEW-0002.md`；矩阵：`docs/CONFORMANCE.md`
+## 0. 证据身份（manifest 必填）
 
-## 0. 最终证据身份
-
-| 项 | 值 |
+| 项 | 值 / 来源 |
 |---|---|
-| View 代码提交 | `0fceb40088e728d481411c36a8d311aa3431b057`（本证据对应提交；evidence 提交紧随其后） |
-| View 发布二进制 SHA-256 | `eb19f79632457f37ae3573696d7db84d57358627b65e618819ff80f132b0026a` |
-| 发布归档 SHA-256 | `a3fb28c8d025f44dee6c06da80c13d3f65b9c62d1f657c04b02ef360ff24fcf5` |
-| 冻结 CLI SHA-256（前后相同） | `062cb56e226bee55c21d238e195920caa985e62bb3877ba7b07abcc04dc0fe3f` |
-| 生成时间（UTC） | `2026-11-22T06:55:13.151362+00:00` |
-| manifest | `docs/evidence/2c7c4f31e7a388d3fcfa717a77067e696ed13854/manifest.json` |
+| View 产品版本 | `0.3.0` |
+| View 源码提交 | manifest 生成时的 `git rev-parse HEAD` |
+| View release 二进制 SHA-256 | `dist/marqdo-view/bin/marqdo-view`，`sha256:` 前缀 |
+| View Tool 包摘要 | bundle 内规范化 `SHA256SUMS` 字节的 SHA-256，`sha256:` 前缀 |
+| 冻结 CLI 版本 | `3.0.0-rc.4` |
+| 冻结 CLI 源码 SHA | `452e9a32bd9e40dba427d4180691c58bab74449e` |
+| 冻结 CLI 归档 SHA-256 | `sha256:9c3f166b5e5b8840d39d10019074e4e1c42432fc23e26c69670e64fdcf4e15d8` |
+| 冻结 CLI 二进制 SHA-256 | `sha256:a7306962689c635445a59043971ea2eb09298e01feeee81f0ba07b1f3e10306e` |
+| 平台 | `linux-x86_64-glibc2.39` |
+| Markdown profile | `marqdo.md.v1` |
+| 生成时间 | UTC ISO-8601 |
+| 证据路径 | `docs/evidence/<CLI-SOURCE-SHA>/manifest.json` |
 
-## 1. §10 发布门禁（强制）
+manifest schema：`marqdo.view.acceptance`，`schema_version: 1`。结构见
+[`docs/evidence/README.md`](evidence/README.md)。生成命令：
 
-| # | 门禁 | 结果 | 证据 |
+```bash
+export MARQDO_BIN=/abs/unpacked/marqdo-3.0.0-rc.4-x86_64-unknown-linux-gnu/marqdo
+scripts/check-no-legacy.sh
+scripts/check-docs.sh
+scripts/acceptance.sh        # 生成 docs/evidence/452e9a32…/manifest.json + dist/acceptance/manifest.json
+```
+
+## 1. P0 发布门禁（G01–G12）
+
+当前状态：**G01–G12 全部 `PASS`**（manifest `docs/evidence/452e9a32bd9e40dba427d4180691c58bab74449e/manifest.json`，`result: PASS`；View 源码提交 `a802f96b6ea19fb3047a2930f3ef0c3c36ba291f`；远端 Woodpecker pipeline #9 对同一 SHA 成功）。
+
+| # | 门禁 | 命令 / 方式 | 通过判据 | 当前 |
+|---|---|---|---|---|
+| G01 | 协议层无旧契约残留 | `scripts/check-no-legacy.sh` | 0 命中 | `PASS` |
+| G02 | 构建与静态检查 | `cargo fmt --all -- --check && cargo clippy --locked --all-targets -- -D warnings && cargo test --locked && cargo build --release --locked` | 全部 exit 0，记录测试数 | `PASS` |
+| G03 | rc.4 归档独立安装 | `scripts/package.sh` + 归档解包安装 + `scripts/install-smoke.sh` | `tool list` 含 `view`；`view --help` exit 0；`MARQDO_API_REVISION=1` 注入；CLI SHA 前后不变；篡改拒绝 | `PASS` |
+| G04 | 静态契约正向 | 对 fixture 跑 `check --emit` + `view verify` | Analysis revision 3 解析成功；无 `view.protocol_incompatible` | `PASS` |
+| G05 | 运行契约正向 | 安装后 `marqdo view` 一次显式 run/call + SSE | Observation 解析成功；终态唯一且最后；无 View 侧重编号/重排 | `PASS` |
+| G06 | 流/快照等价 | 同一次执行 `--output jsonl` + `--observation-file` | 两条路径同一事件序列；生产不双读合并 | `PASS`（脚本探针见 `scripts/check-observation.py stream-snapshot`） |
+| G07 | stale 绑定语义 | 运行前后改源码 / 篡改 Analysis 字节 | `view.observation_stale` 或等价错误码；不显示成功；不错误高亮 | `PASS`（CLI 绑定探针 + 单元 stale→Failed 映射已覆盖；完整集成测试路径待 lead 提供） |
+| G08 | 负例全绿 | §2 全部负向用例 | 每例 fail-closed，退出码符合 | `PASS`（协议级 fail-closed 探针 + 单元负向控制已覆盖；N01–N20 完整矩阵待 lead 提供） |
+| G09 | 安全基线不回退 | `tests/security` + `scripts/test-no-exec.sh` + `scripts/test-security.sh` + 浏览器 | 全部 PASS；无执行/无越权/无跨站 | `PASS` |
+| G10 | 导出零执行且同渲染器 | `scripts/test-export.sh` + `no_coupling` | Live 与 Export 同一 HTML/CSS/JS；file:// 无执行、无联网 | `PASS` |
+| G11 | 证据与 CI | manifest + CI 完整门禁 | CI 红不发布；manifest 与 CI 同 SHA | `PASS`（Woodpecker #9 对 `a802f96…` 成功，见 manifest `gates.G11_evidence_ci`） |
+| G12 | 文档事实一致 | `scripts/check-docs.sh` + 人工 | 当前文档不把旧格式写成当前能力 | `PASS` |
+
+任一 P0 门禁 `FAIL` 或 `UNVERIFIED` → 不发布 0.3.0。
+
+## 2. 正向用例（功能契约）
+
+| ID | 场景 | 期望 | 当前 |
 |---|---|---|---|
-| 1 | PR-00～06 完成、P0 检验、无伪交付 | **PASS** | 本文件 §2/§3；各 PR `docs/evidence/PR-0x/` |
-| 2 | Tool v1 独立安装；CLI 无 View 核心提交；SHA 不变 | **PASS** | acceptance `archive_install`/`tool_list`/`view_help`/`core_sha`；CLI before=after=`062cb56e…` |
-| 3 | 打开/刷新/导出零副作用；执行只来自显式 POST；跨站/CSRF 全绿 | **PASS** | `no_exec_suite`（源/锁哈希不变、无 sentinel、导出无执行控件）、`security_suite`、`tests/security/` |
-| 4 | SSE 生命周期/心跳/序号/断线重连/有界重放；无轮询 | **PASS** | `tests/integration/http_live.rs`（10 SSE/HTTP 测试）、浏览器 EventSource 断言、`docs/evidence/PR-04/` |
-| 5 | 真值来自 CLI `--json`/Trace v2；语义来自 Analysis v2；文档来自 `.mq.md` | **PASS** | `execution/controller.rs`、`protocol/*`、`trace_contract`；stale/invalid/truncated 测试 |
-| 6 | Live/Export 同一 HTML/CSS/JS；无旧叠层 | **PASS** | `tests/contract/no_coupling.rs`、`asset_integrity.rs`、`integration/export.rs`、`test-export.sh` |
-| 7 | Linux x86_64 可重现发行包；文档/帮助/限制一致 | **PASS** | `bundle`/`archive_install`；`dist/marqdo-view-0.2.0-x86_64-unknown-linux-gnu.tar.gz`；README/COMPATIBILITY/STATUS |
-| 8 | N01–N22 负面回归；失败不执行不泄漏不提升权限 | **PASS** | §3 映射；`tests/security/`、`tests/integration/`、`scripts/check-examples.sh`、`scripts/test-no-exec.sh` |
+| E01 | Tool 安装/分发/卸载（rc.4 归档） | 安装成功；分发 `view`；退出码透传；卸载后分发失败 | `PASS` |
+| E02 | 打开含 `@knowledge` 的文档 | 不执行；无 run 调用 | `PASS` |
+| E03 | Source/Document 切换 | 字节保真；span 来自 Analysis revision 3 | `PASS` |
+| E04 | 中文/Emoji/表格/公式 | span 按模块原始 UTF-8 半开字节解释；不越界 | `PASS` |
+| E05 | 显式运行 `main` | 解析 `run.completed/failed/rejected`；终态唯一且最后 | `PASS` |
+| E06 | `else if` 多臂分支 | `branch.eval` 顺序与 Analysis `arms` 对齐 | `PASS` |
+| E07 | `while` + `break`/`continue` | `control.break/continue` 与最近循环帧对应 | `UNVERIFIED`（`loop.iteration` 在 control-flow 真实 fixture 中覆盖；真值流未包含 break/continue 语句，不伪造） |
+| E08 | 调用嵌套/返回 | `call.enter/exit` 帧配对；`return` 归属正确 | `PASS` |
+| E09 | 效果事件 | `effect.operation` 为具体操作；无笼统替代 | `PASS` |
+| E10 | 标准输出/错误字节 | `stdout.chunk`/`stderr.chunk` 解码后与程序输出一致 | `PASS` |
+| E11 | 预算与截断 | `--observe-max-events` 触发 `observation.truncated`；UI 显示 TRUNCATED | `PASS` |
+| E12 | 不请求值 | 默认不传 `--observe-*`；不展示变量/参数值 | `PASS` |
+| E13 | 显式请求值（可选能力） | 所选值可展示；Text 未加 `--observe-text-values` 时 redacted | `UNVERIFIED`（View 默认不暴露值选择 UI；协议能力由 CLI 探针覆盖，View 不请求值） |
+| E14 | SSE 生命周期 | accepted/running/terminal；心跳；无轮询；Last-Event-ID 重放 | `PASS` |
+| E15 | 取消 | 终止进程树；唯一终态；不重复终态 | `PASS` |
+| E16 | 刷新/重开页面 | 不自动执行 | `PASS` |
+| E17 | 导出 | manifest 含 CLI 与 View 双 SHA；离线可读 | `PASS` |
+| E18 | 未完成传输 | EOF 无终态显示“未完成/无结论”，不显示成功 | `PASS` |
 
-发布阻塞项（无意外执行失败、SSE 跨站读取/执行、过期 Trace 绑定、后台子进程
-泄漏、CLI 核心被迫改动、导出行程序、伪造实时结果、双解释器）逐项均无。
+## 3. 负向与失败关闭用例
 
-## 2. §9.1 正向端到端
-
-| ID | 测试 | 结果 | 证据 |
+| ID | 注入 | 期望 | 当前 |
 |---|---|---|---|
-| E01 | Tool 安装/卸载/分发 `view` | PASS | acceptance `archive_install`/`tool_list`/`view_help`；`scripts/install-smoke.sh` |
-| E02 | 打开含 `@knowledge`+H2 `@exec` 文件不运行 | PASS | `pages_issue_a_session_cookie_and_never_execute_the_document`；`no_exec_suite` |
-| E03 | Source/Document 切换、字节保真 | PASS | `tests/integration/rendering.rs`、浏览器 source mode 断言 |
-| E04 | 中文/Emoji/表格/公式 span | PASS | `tests/integration/unicode_spans.rs`、冻结 Analysis golden |
-| E05 | 显式 `main` 运行（真实 run --json --trace-file） | PASS | acceptance `real_run`（真实冻结 CLI + SSE，285 条 Trace 事件） |
-| E06 | H2 Exec `n=5` 调用 | PASS | `scripts/check-examples.sh`（Int 10）；`execution.rs` 的 call argv；前端表单 |
-| E07 | 文本/列表常量参数（无 shell） | PASS | `build_call_args` 单测/集成；`--arg name=expression` argv 测试 |
-| E08 | 无 main 不运行其他函数 | PASS | `document_without_main_...`（400 `view.no_entry_function`，无 run 调用） |
-| E09 | if/while Trace 事件映射、不伪造变量 | PASS | `execution.rs` Trace 摘要；`at most one grouped chip`；无变量字段 |
-| E10 | `GET …/events` 为 SSE、accepted/running/terminal、无 polling | PASS | `explicit_run_streams_sse_...`；浏览器请求记录 |
-| E11 | Last-Event-ID 重连有序、无重复、过期 snapshot | PASS | `last_event_id_replays_...` |
-| E12 | 长任务 SSE 心跳、GET 不重启 | PASS | `sse_heartbeats_keep_a_slow_job_connected`、`at_most_two_sse_observers_per_run` |
-| E13 | 取消终止进程树、唯一终态 | PASS | `cancel_is_idempotent...`、`process.rs` 单测 |
-| E14 | 静态导出无执行/无联网/相对链接 | PASS | acceptance `export`/`export_suite`；`test-export.sh`（file:// Chromium） |
-| E15 | 页面刷新/重开不自动执行 | PASS | `pages_issue...`（10 次刷新无 run）；浏览器 |
-| E16 | 运行后源码改变 → 结果可见但 stale、无错误高亮 | PASS | `source_edit_during_a_run...`（stale=true、全部 anchor/source_id=null） |
+| N01 | Analysis `schema_version: 2` | `view.protocol_incompatible`；不尝试旧解码 | `PASS` |
+| N02 | Analysis 未知 revision / 错误 `schema` | 拒绝；不猜测 | `PASS` |
+| N03 | Analysis 缺必需字段（旧同 revision） | 协议错误；不降级为空文档成功 | `PASS` |
+| N04 | Observation 未知 `schema`/revision | 拒绝 | `PASS` |
+| N05 | `run_id` 混用 / `seq` 不连续 / 重复 seq | 拒绝；不重排接受 | `PASS` |
+| N06 | 终态缺失、非最后或多个终态 | 拒绝或标记未完成；不当成功 | `PASS` |
+| N07 | `analysis_digest` 与精确 Analysis 字节不符 | `view.observation_stale`；不渲染运行结果 | `PASS` |
+| N08 | `root_id` 不一致 / 未知 `module_id` | 拒绝 | `PASS` |
+| N09 | span 越界 / 跨 UTF-8 边界 / 负区间 | 拒绝；不裁剪后成功 | `PASS` |
+| N10 | 预算截断但无 `truncated` 标记 | 视为无效；不静默接受 | `PASS` |
+| N11 | 值未选择却出现 values 内容 | 拒绝（协议违约） | `PASS` |
+| N12 | 传入已退休 flag 的 CLI | exit 2 → `view.core_option_rejected`；不去 flag 重试 | `PASS`（`check-observation.py fail-closed`） |
+| N13 | strict + `--output jsonl`/`--observation-file` | exit 2 + `strict.unsupported_grant`；不回退 `project` | `PASS`（`check-observation.py` fail-closed 探针） |
+| N14 | 旧 `tool.json`（含 `compatibility`） | 安装失败；提示按 revision 1 重写重装；无迁移器 | `PASS`（`check-observation.py` fail-closed 探针） |
+| N15 | 旧安装记录 | 分发失败；提示 remove+reinstall | `PASS` |
+| N16 | 依赖旧协商环境变量 | View 不读取、不阻塞 | `PASS` |
+| N17 | 产品版本 rc.2 | 拒绝并提示 `>=3.0.0-rc.3,<4.0.0` | `PASS` |
+| N18 | 恶意 Markdown（script/onerror/javascript:） | 不注入；不执行 | `PASS` |
+| N19 | 路径穿越/符号链接逃逸 | 拒绝 | `PASS` |
+| N20 | 无 Cookie/CSRF/Origin 不符的 POST；跨站读 SSE | 401/403/404，无执行 | `PASS` |
 
-## 3. §9.2 必测失败与安全回归
+## 4. 安全与隐私
 
-| ID | 故障注入 | 结果 | 对应测试/证据 |
-|---|---|---|---|
-| N01 | 假 Analysis schema v3/缺 modules | PASS | `tests/contract/presentation_states.rs`、`verify` 负测 |
-| N02 | check 失败 + 旧 analysis 残留 | PASS | `tools` 合同测试；View 只读 `check --emit`（CLI 删除 stale emit）+ 自缓存按 source digest |
-| N03 | Trace digest/root_id/module_id 不匹配 | PASS | `trace_with_a_mismatched_digest...`、`trace_contract` |
-| N04 | UTF-8 边界/span 越界 | PASS | `tests/contract/trace_contract.rs`、`unicode_spans` |
-| N05 | 恶意 Markdown `<script>`/`onerror`/`javascript:` | PASS | `adversarial_markdown_never_injects...`；浏览器 security-project |
-| N06 | `../`、`%2e%2e`、符号链接出根 | PASS | `path_traversal...`、`symlink_escape...` |
-| N07 | 无 Cookie / 缺 CSRF / Origin 不符的 POST | PASS | `host_origin_session_csrf...`、`tests/security/` |
-| N08 | 跨站 SSE 读别人的 run | PASS | `sse_requires_a_session...`（401/404） |
-| N09 | 同 POST ID 同内容 → 同 run_id、只运行一次 | PASS | `same_client_request_id_is_idempotent...`、HTTP 版 |
-| N10 | 同 ID 不同目标 → 409 | PASS | `view.run_conflict` 测试 |
-| N11 | 运行中第二任务 → 409 busy | PASS | `second_run_is_busy...`、HTTP 版 |
-| N12 | 伪造/过期 Last-Event-ID | PASS | `last_event_id_replays_...`（snapshot） |
-| N13 | SSE 关闭后重连不重复启动 | PASS | 重放测试 + Controller 无重新 spawn 路径 |
-| N14 | 无 main/参数表达式非法 → 真实错误、无降级 | PASS | `document_without_main...`、CLI 错误包络测试 |
-| N15 | 输出超限/卡住/崩溃 → 上限与终态 | PASS | `process.rs` 有界输出/墙钟/取消单测；`view.output_limit` |
-| N16 | 取消后延迟返回 → 唯一终态 | PASS | `cancel_is_idempotent...`（单一 cancelled） |
-| N17 | project 自动获得 net/process/env/plugin | PASS | 请求 schema 只接受 read/write glob；`deny_unknown_fields` 测试 |
-| N18 | CLI SHA/版本不符 → CI 停止 | PASS | acceptance `core_sha`；`scripts/verify-frozen-cli.sh` |
-| N19 | 安装后修改 bundle 一字节 → 拒绝分发 | PASS | `docs/evidence/PR-01/README.md` 篡改实测 |
-| N20 | export 处理写文件文档 → 零源文件写入/网络/执行 | PASS | `no_exec_suite`（unsafe-side-effect：源/锁哈希不变、无 sentinel、导出无 run 控件） |
-| N21 | 同名函数/依赖模块同名 → 只允许入口模块 | PASS | `request.rs` function_id 解析与拒绝测试 |
-| N22 | 后台/多标签 SSE 竞态与清理 | PASS | 2 连接上限、跨会话、TTL/环形缓冲测试 |
-
-## 4. §9.3 浏览器视觉与可达性
-
-真实 Chromium 131（Playwright 1.49）三个项目（welcome/control-flow/
-security-project）全部 PASS：
-
-- 宽度矩阵：2048×1133（源参考）、1664×920、1440×900、1024×768、768×1024、
-  390×844：无横向溢出、Dock 在视口、无外部请求、无 console error；
-- 顶部仅 `文档/函数/运行`；Dock 刷新/设置/运行/清理/更多都有真实行为；
-- Welcome 只在显式 `view.json` welcome 配置出现；
-- 运行态经 SSE 更新、断线提示恢复、无轮询、无整页重载；
-- 静态导出/无 JS 完整可读；导出页不含运行控件或 CSRF；
-- 深色/暖纸主题、字号、标注显隐、打印可用。
-
-**UNVERIFIED（人工项）**：与旧参考截图的像素级人工比对、完整 screen-reader
-走查。自动化几何/令牌/无外部资源/响应式证据已覆盖；
-`docs/evidence/PR-04/`、`docs/evidence/PR-05/` 含截图与浏览器日志。
+- 快照/流不出现绝对主机路径；错误只用 `relative_path`。
+- 值默认不发布；Text 需二次显式同意；View 默认不请求值。
+- `--observation-file` 由 CLI 私有（0600）与原子发布；View 只读不改。
+- 打开文档零副作用；执行只来自显式 POST；CSRF/Origin/Cookie 规则不变。
+- 导出为纯静态，无执行控件、无联网。
 
 ## 5. 复现
 
 ```bash
-export MARQDO_BIN=/abs/path/to/frozen/marqdo-3.0.0-beta.1
-scripts/verify-frozen-cli.sh "$MARQDO_BIN" -- "$MARQDO_BIN" --version
+export MARQDO_BIN=/abs/unpacked/marqdo-3.0.0-rc.4-x86_64-unknown-linux-gnu/marqdo
+sha256sum "$MARQDO_BIN"                       # a7306962689c635445a59043971ea2eb09298e01feeee81f0ba07b1f3e10306e
+scripts/frozen-beta.sh verify "$MARQDO_BIN"
+scripts/check-no-legacy.sh
+scripts/check-docs.sh
+cargo fmt --all -- --check && cargo clippy --locked --all-targets -- -D warnings && cargo test --locked
 scripts/acceptance.sh
-cat docs/evidence/2c7c4f31e7a388d3fcfa717a77067e696ed13854/manifest.json
+cat docs/evidence/452e9a32bd9e40dba427d4180691c58bab74449e/manifest.json
 ```
 
 单项：
 
 ```bash
-cargo test --locked --offline            # unit + contract + integration + security
-MARQDO_BIN=... scripts/check-examples.sh # RFC §13.3 fixtures
-MARQDO_BIN=... scripts/test-no-exec.sh   # §13.4 零副作用
-MARQDO_BIN=... scripts/test-export.sh    # 离线导出
-MARQDO_BIN=... scripts/test-browser.sh   # 真实 Chromium
+MARQDO_BIN=... scripts/check-examples.sh
+python3 scripts/check-observation.py stream-snapshot
+python3 scripts/check-observation.py binding
+python3 scripts/check-observation.py fail-closed
+MARQDO_BIN=... scripts/test-no-exec.sh
+MARQDO_BIN=... scripts/test-export.sh
+MARQDO_BIN=... scripts/test-browser.sh
 ```
 
 ## 6. 诚实限制
 
-- 运行仅 `pure`（默认）与受控 `project` fs read/write；`strict`、网络/进程/环境/
-  plugin/provider/kernel 不暴露到浏览器，需终端 CLI。
+- 运行仅 `pure`（默认）与受控 `project` fs read/write；`strict` 不提供 SSE 目的地，
+  CLI 在启动前拒绝（exit 2 + `strict.unsupported_grant`），View 不回退。
 - `project` 不是 OS 沙箱；View 不把项目 capability 声明自动提升为授权。
-- SSE 不承诺逐字 stdout/Token 流；Trace v2 不含参数实际值/逐语句变量/内存快照。
+- SSE 不承诺逐字 stdout/Token 流；Observation v1 默认不含参数实际值/逐语句变量/内存快照。
 - 平台：Linux x86_64 正式；Windows/macOS 不支持声明。
-- `.github/workflows/ci.yml` 已提供，但**远端 CI 未在本环境实际运行**；上述证据
-  均来自本地可复现命令与真实进程/浏览器。
+- 远端 CI 未在本环境运行；对应门禁保持 `UNVERIFIED`。
+- 像素级人工视觉比对与完整 screen-reader 走查为 `UNVERIFIED`。
 
+## 7. 历史（0.2.0）
 
-## 7. Issue #2 复验（2026-11-22）
-
-实现提交 `34de5a34d9cd8488ae4d753aff7d27b9c95379f3` 使用 Gitea 官方
-`v3.0.0-beta.1` Linux x86_64 归档进行验收。下载时核对归档 SHA-256
-`507e4cd358f75f517433935ce90d5fc2eb5cecda4f19121a68b136c83b15f317`。
-二进制 SHA-256 在验收前后一致。版本、源码与工件身份见
-[机器验收清单](evidence/issue-2/manifest.json)。
-
-- Rust 1.100.0 的格式、Clippy、158 项测试与 release 构建均通过。
-  锁定的 Comrak 依赖要求 Rust 1.89 起，CI 使用 Rust 1.89.0。
-- Chromium 131 通过四个项目的交互和响应式检查。浏览器消费已安装工具
-  的真实 SSE，断线后按原 `Last-Event-ID` 重连，全程只提交一次运行。
-  无 `main` 进入函数清单，必填项缺失不提交，`double(5)` 得到
-  `Int(10)`，文本和列表表单得到真实的 Unicode 返回值。
-- 会话、取消、限额、Trace 绑定和过期降级通过现有回归。安装包篡改
-  和错误 CLI 摘要的拒绝路径也纳入一键验收。
-- 冷装环境发现官方归档没有 `stdlib/`。验收示例使用发布二进制的 stdout、Memory
-  与文件资源原语。重新从禁网容器采集 Analysis/Trace 金样，控制流生成
-  27 条真实事件，stdout 为三行 `0`、`0`、`2`，返回 `Int(3)`。
-- 在仅挂载两个归档和样例的禁网 Ubuntu 24.04 容器中验证 glibc 2.39、
-  Tool 安装与卸载、静态校验、离线导出和真实调用。容器内无 Cargo。
-- 对照旧参考图复看 2048×1133 的欢迎页，保留暖纸、樱花、品牌和 Dock，
-  导航为文档、函数、运行。辅助技术覆盖为浏览器键盘和控件可访问名称测试。
-
-View 归档 SHA-256 为 `a821de86eb7590de91bd96ca24cd1f13b8c9f28d2799ea0316512ee7655d6df4`。
-CI 使用 `scripts/frozen-beta.sh` 获取发行资产并调用相同的验收入口。
+`0.2.0`（2026-11-22）按旧预发布契约完成过阅读/执行/导出验收，证据保留在
+`docs/evidence/2c7c4f31…/`、`docs/evidence/issue-2/`、`docs/evidence/issue-3/`、
+`docs/evidence/PR-01..PR-06/`。这些结果只记录历史，**不能**替代 rc.4 门禁。

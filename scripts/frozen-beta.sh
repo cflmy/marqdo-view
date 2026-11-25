@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
-# Identity of the released CLI used by the RFC-VIEW-0002 acceptance gate.
+# Identity of the released CLI used by the marqdo-view 0.3.0 acceptance gate.
+#
+# The pinned release is the current public-contract baseline:
+#   marqdo 3.0.0-rc.4 (Analysis v3 / ADR-0069, Observation v1, CLI Tool revision 1)
+# The script only downloads, unpacks and verifies the official archive; it never
+# rebuilds or modifies the CLI.
 set -euo pipefail
 
-version=3.0.0-beta.1
-source_sha=2c7c4f31e7a388d3fcfa717a77067e696ed13854
-binary_sha=062cb56e226bee55c21d238e195920caa985e62bb3877ba7b07abcc04dc0fe3f
-archive_sha=507e4cd358f75f517433935ce90d5fc2eb5cecda4f19121a68b136c83b15f317
+version=3.0.0-rc.4
+source_sha=452e9a32bd9e40dba427d4180691c58bab74449e
+binary_sha=a7306962689c635445a59043971ea2eb09298e01feeee81f0ba07b1f3e10306e
+archive_sha=9c3f166b5e5b8840d39d10019074e4e1c42432fc23e26c69670e64fdcf4e15d8
 artifact="marqdo-$version-x86_64-unknown-linux-gnu"
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -24,8 +29,20 @@ verify() {
   fi
 }
 
+if [[ "${1:-}" == "metadata" && $# -eq 1 ]]; then
+  case "$1" in
+    metadata)
+      printf 'version=%s\n' "$version"
+      printf 'source_sha=%s\n' "$source_sha"
+      printf 'binary_sha=%s\n' "$binary_sha"
+      printf 'archive_sha=%s\n' "$archive_sha"
+      printf 'artifact=%s\n' "$artifact"
+      exit 0
+      ;;
+  esac
+fi
 if [[ $# != 2 ]]; then
-  echo "usage: $0 fetch EMPTY_DIRECTORY | $0 verify /absolute/path/to/marqdo" >&2
+  echo "usage: $0 fetch EMPTY_DIRECTORY | $0 verify /absolute/path/to/marqdo | $0 metadata" >&2
   exit 2
 fi
 case "$1" in

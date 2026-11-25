@@ -5,8 +5,8 @@
 //! Assembly from Analysis/Trace happens in `reader::assemble`.
 
 use crate::config::ViewConfig;
-use crate::protocol::analysis_v2::{CoreDiagnostic, SemanticProjection, ViewWarning};
-use crate::protocol::trace_v2::{RunDisplayState, RunProjection};
+use crate::protocol::analysis_v3::{CoreDiagnostic, SemanticProjection, ViewWarning};
+use crate::protocol::observation_v1::{RunDisplayState, RunProjection};
 use crate::reader::markdown::DocumentModel;
 use crate::reader::source::{Project, SafeRelativePath};
 
@@ -17,7 +17,7 @@ pub const PRESENTATION_VERSION: u32 = 1;
 pub enum SourceStatus {
     /// No usable `MARQDO_BIN`; prose only, semantics explicitly unverified.
     CoreUnavailable,
-    /// `check` succeeded and Analysis v2 was verified.
+    /// `check` succeeded and Analysis v3 was verified.
     StaticOk,
     /// `check` failed; diagnostics shown, semantics revoked.
     CoreError,
@@ -180,7 +180,7 @@ pub fn anchor_for_span(start: u64, end: u64) -> String {
     format!("mq-h-{start:x}-{end:x}")
 }
 
-/// Analysis v2 function ids are `<module id>::<canonical name>`.
+/// Analysis v3 function ids are `<module id>::<canonical name>`.
 fn canonical_function_name(function_id: &str, module_id: &str) -> String {
     function_id
         .strip_prefix(&format!("{module_id}::"))

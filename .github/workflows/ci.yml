@@ -5,10 +5,50 @@ on:
   pull_request:
   workflow_dispatch:
 
+env:
+  CARGO_TERM_COLOR: always
+  RUST_MIN_STACK: "8388608"
+
 jobs:
-  frozen-acceptance:
-    name: frozen CLI acceptance (Tool install / SSE / export / browser)
+  no-legacy:
+    name: no retired contracts (G01/G12)
     runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Fail on retired Analysis/Trace/flags/Tool negotiation
+        shell: bash
+        run: scripts/check-no-legacy.sh
+      - name: Current docs describe the rc.4 baseline
+        shell: bash
+        run: scripts/check-docs.sh
+
+  quality:
+    name: fmt / clippy / tests
+    runs-on: ubuntu-24.04
+    env:
+      CARGO_HOME: ${{ github.workspace }}/.cargo-home
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.89.0"
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Clippy
+        run: cargo clippy --locked --all-targets -- -D warnings
+      - name: Tests
+        run: cargo test --locked
+
+  frozen-acceptance:
+    name: frozen rc.4 acceptance (install / Observation / SSE / export / browser)
+    runs-on: ubuntu-24.04
+    needs: [no-legacy, quality]
     env:
       CARGO_TERM_COLOR: always
       RUST_MIN_STACK: "8388608"
@@ -25,23 +65,26 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Fetch the official frozen core and verify its identity
+      - name: Fetch the official frozen rc.4 CLI and verify its identity
         shell: bash
         run: |
           set -euo pipefail
           frozen="$(scripts/frozen-beta.sh fetch "$RUNNER_TEMP/marqdo-frozen")"
           echo "MARQDO_BIN=$frozen" >> "$GITHUB_ENV"
-      - name: Install Chromium and run the full acceptance gate
+      - name: Install Chromium
         run: |
           (cd tests/browser && npm ci --no-audit --no-fund)
           (cd tests/browser && npx playwright install --with-deps chromium)
-          scripts/acceptance.sh
+      - name: Run one-command acceptance (G01-G12)
+        run: scripts/acceptance.sh
       - name: Upload acceptance evidence
         uses: actions/upload-artifact@v4
         with:
           name: view-evidence-${{ github.sha }}
           path: |
+            docs/evidence/452e9a32bd9e40dba427d4180691c58bab74449e/manifest.json
             dist/acceptance/manifest.json
+            dist/acceptance/logs/
             dist/marqdo-view-*.tar.gz
             dist/marqdo-view-*.tar.gz.sha256
           if-no-files-found: error

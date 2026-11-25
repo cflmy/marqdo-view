@@ -289,8 +289,8 @@ function localHostOnly(url) {
     check("run panel visible", await page.locator("#mq-run-panel").isVisible());
     check("run chips anchored", (await page.locator(".mq-run-chip").count()) > 0);
     check(
-      "observed chips carry trace provenance",
-      (await page.locator('.mq-run-chip[data-annotation-source="trace"]').count()) > 0
+      "observed chips carry observation provenance",
+      (await page.locator('.mq-run-chip[data-annotation-source="observation"]').count()) > 0
     );
     check(
       "static statement anchors carry analysis provenance",
@@ -313,7 +313,7 @@ function localHostOnly(url) {
         }))
     );
     check(
-      "trace event list rendered",
+      "observation event list rendered",
       (await page.locator("#mq-run-events li").count()) > 0
     );
     check(
@@ -366,14 +366,14 @@ function localHostOnly(url) {
     await page.click('[data-action="run-confirm"]');
     await page.waitForSelector('body[data-run-state="succeeded"]');
     check("installed tool displays the real double(5) result",
-      await page.locator("#mq-run-summary").innerText().then((text) => text.includes("返回值：Int(10)")));
+      await page.locator("#mq-run-summary").innerText().then((text) => text.includes("返回值：10")));
 
     await page.click('.mq-tabs [data-action="functions"]');
     await call("format_arguments").click();
     await page.fill('[data-param-name="label"]', '"浏览器 "');
     await page.fill('[data-param-name="items"]', '["列表", 7]');
     await page.click('[data-action="run-confirm"]');
-    await page.getByText("返回值：Text(浏览器 列表 · 7)", { exact: true }).waitFor();
+    await page.getByText("返回值：浏览器 列表 · 7", { exact: true }).waitFor();
     check("CLI round-tripped Unicode Text and a List through the form", submittedRuns === 2);
   }
 

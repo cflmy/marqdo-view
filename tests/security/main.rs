@@ -15,17 +15,18 @@ use crate::common::http::{
 fn control_flow() -> TestServer {
     http::start(
         "examples/control-flow",
-        "tests/golden/analysis-v2/control-flow.json",
-        Some("tests/golden/trace-v2/control-flow.run.json"),
-        Some("tests/golden/trace-v2/control-flow.trace.json"),
+        "tests/golden/analysis-v3/control-flow.json",
+        Some((
+            "tests/golden/observation-v1/control-flow.jsonl",
+            "tests/golden/observation-v1/control-flow.snapshot.json",
+        )),
     )
 }
 
 fn welcome() -> TestServer {
     http::start(
         "examples/welcome",
-        "tests/golden/analysis-v2/welcome.json",
-        None,
+        "tests/golden/analysis-v3/welcome.json",
         None,
     )
 }
@@ -160,8 +161,7 @@ fn oversized_and_unknown_fields_are_rejected_before_execution() {
 fn session_cookie_and_headers_are_hardened() {
     let server = http::start(
         "examples/welcome",
-        "tests/golden/analysis-v2/welcome.json",
-        None,
+        "tests/golden/analysis-v3/welcome.json",
         None,
     );
     let page = http::get(server.port, "/");
@@ -196,9 +196,11 @@ fn session_cookie_and_headers_are_hardened() {
 fn sec_fetch_site_cross_site_is_rejected_even_with_a_valid_token() {
     let server = http::start(
         "examples/control-flow",
-        "tests/golden/analysis-v2/control-flow.json",
-        Some("tests/golden/trace-v2/control-flow.run.json"),
-        Some("tests/golden/trace-v2/control-flow.trace.json"),
+        "tests/golden/analysis-v3/control-flow.json",
+        Some((
+            "tests/golden/observation-v1/control-flow.jsonl",
+            "tests/golden/observation-v1/control-flow.snapshot.json",
+        )),
     );
     let (session, _) = open_session(&server, "/");
     let body = run_body(
@@ -225,8 +227,7 @@ fn symlink_escape_outside_the_project_root_is_rejected() {
     symlink(&outside.dir, project.dir.join("link")).expect("create symlink");
     let server = http::start(
         project.dir.to_str().expect("utf8 path"),
-        "tests/golden/analysis-v2/welcome.json",
-        None,
+        "tests/golden/analysis-v3/welcome.json",
         None,
     );
     for path in [
@@ -247,8 +248,7 @@ fn symlink_escape_outside_the_project_root_is_rejected() {
 fn adversarial_markdown_never_injects_markup_or_handlers() {
     let server = http::start(
         "tests/fixtures/security-project",
-        "tests/golden/analysis-v2/welcome.json",
-        None,
+        "tests/golden/analysis-v3/welcome.json",
         None,
     );
     let page = http::get(server.port, "/");
@@ -266,9 +266,11 @@ fn adversarial_markdown_never_injects_markup_or_handlers() {
 fn sse_requires_a_session_and_only_the_owning_session_can_read_or_cancel() {
     let server = http::start(
         "examples/control-flow",
-        "tests/golden/analysis-v2/control-flow.json",
-        Some("tests/golden/trace-v2/control-flow.run.json"),
-        Some("tests/golden/trace-v2/control-flow.trace.json"),
+        "tests/golden/analysis-v3/control-flow.json",
+        Some((
+            "tests/golden/observation-v1/control-flow.jsonl",
+            "tests/golden/observation-v1/control-flow.snapshot.json",
+        )),
     );
     let (owner, _) = open_session(&server, "/");
     let (other, _) = open_session(&server, "/");
@@ -318,8 +320,7 @@ fn sse_requires_a_session_and_only_the_owning_session_can_read_or_cancel() {
 fn aggressive_markdown_links_cannot_become_a_file_read_api() {
     let server = http::start(
         "examples/welcome",
-        "tests/golden/analysis-v2/welcome.json",
-        None,
+        "tests/golden/analysis-v3/welcome.json",
         None,
     );
     let page = http::get(server.port, "/");
@@ -336,9 +337,11 @@ fn aggressive_markdown_links_cannot_become_a_file_read_api() {
 fn cancel_cannot_be_replayed_to_start_a_new_process() {
     let server = http::start(
         "examples/control-flow",
-        "tests/golden/analysis-v2/control-flow.json",
-        Some("tests/golden/trace-v2/control-flow.run.json"),
-        Some("tests/golden/trace-v2/control-flow.trace.json"),
+        "tests/golden/analysis-v3/control-flow.json",
+        Some((
+            "tests/golden/observation-v1/control-flow.jsonl",
+            "tests/golden/observation-v1/control-flow.snapshot.json",
+        )),
     );
     let (session, _) = open_session(&server, "/");
     let body = run_body(

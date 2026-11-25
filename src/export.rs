@@ -200,13 +200,30 @@ fn build_site(
     let mut manifest = serde_json::json!({
         "schema": MANIFEST_SCHEMA,
         "schema_version": 1,
-        "view": {"name": "marqdo-view", "version": env!("CARGO_PKG_VERSION")},
-        "compatibility": {
+        "view": {
+            "name": "marqdo-view",
+            "version": env!("CARGO_PKG_VERSION"),
+            "binary_sha256": current_view_sha256(),
+        },
+        "producers": {
+            "view": {
+                "name": "marqdo-view",
+                "version": env!("CARGO_PKG_VERSION"),
+                "binary_sha256": current_view_sha256(),
+            },
+            "cli": match context.core() {
+                Some(core) => serde_json::json!({
+                    "version": entry_model.core_version,
+                    "binary_sha256": sha256_file(core.bin()),
+                }),
+                None => serde_json::Value::Null,
+            },
+        },
+        "requires": {
             "marqdo": crate::protocol::tool_v1::PRODUCT_RANGE,
-            "tool_protocol": crate::protocol::tool_v1::TOOL_PROTOCOL,
-            "analysis": crate::protocol::tool_v1::ANALYSIS_PROTOCOL,
-            "analysis_supported": crate::protocol::tool_v1::ANALYSIS_PROTOCOLS,
-            "trace": crate::protocol::tool_v1::TRACE_PROTOCOL,
+            "api_revision": crate::protocol::tool_v1::API_REVISION,
+            "analysis": crate::protocol::tool_v1::ANALYSIS_REVISION,
+            "observation": crate::protocol::tool_v1::OBSERVATION_REVISION,
             "markdown_profile": "marqdo.md.v1",
         },
         "core_version": entry_model.core_version,
@@ -238,6 +255,22 @@ fn build_site(
         entries: writer.entries.into_iter().collect(),
         manifest_sha256: sha256_hex(&manifest_bytes),
     })
+}
+
+/// Lowercase hex SHA-256 of the running View executable, used to bind the
+/// exported manifest to the exact producer binary. Never a machine path.
+fn current_view_sha256() -> String {
+    let Ok(exe) = std::env::current_exe() else {
+        return "unavailable".to_string();
+    };
+    sha256_file(&exe)
+}
+
+fn sha256_file(path: &std::path::Path) -> String {
+    match std::fs::read(path) {
+        Ok(bytes) => sha256_hex(&bytes),
+        Err(_) => "unavailable".to_string(),
+    }
 }
 
 pub struct SnapshotArchive {

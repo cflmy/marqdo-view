@@ -7,7 +7,7 @@
 //! - `request`: schema/target/parameter/mode/grant validation
 //! - `process`: the one cancellable Core process adapter with bounded capture
 //! - `events`: bounded, sequenced View-owned run events and SSE frames
-//! - `controller`: single-job lifecycle, dedupe, cancel, Trace binding
+//! - `controller`: single-job lifecycle, dedupe, cancel, Observation v1 binding
 
 pub mod controller;
 pub mod events;

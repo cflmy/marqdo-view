@@ -1,7 +1,12 @@
 //! A bounded projection retained only inside an existing terminal Job.
+//!
+//! The overlay is bound to the verified Observation v1 terminal (run id, state,
+//! capture level, truncation) and to the exact pre-run Analysis bytes; it never
+//! re-parses the CLI JSON and never widens the value consent the user gave.
 
 use crate::execution::events::RunState;
 use crate::execution::request::ExecutionPlan;
+use crate::protocol::observation_v1::{EventCounts, RunProjection};
 use crate::reader::assemble::StaticDocument;
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
@@ -16,11 +21,13 @@ pub struct TerminalExportCandidate {
     pub project_root_id: String,
     pub module_id: String,
     pub analysis_digest: String,
+    /// Analysis revision carried by the exact pre-run artifact (3).
     pub analysis_version: u32,
     pub source_sha256: String,
     pub lock_digest: String,
     pub media: BTreeMap<String, String>,
-    pub core_run_id: String,
+    /// Observation v1 run id (`run.id`/`run_id`).
+    pub observation_run_id: String,
     pub core_version: String,
     pub mode: String,
     pub terminal_at: String,
@@ -30,8 +37,9 @@ pub struct TerminalExportCandidate {
     pub stdout: String,
     pub stderr: String,
     pub arguments: Vec<(String, String)>,
-    pub trace_status: String,
-    pub trace_counts: Option<BTreeMap<String, u64>>,
+    pub observation_status: String,
+    pub observation_counts: Option<BTreeMap<String, u64>>,
+    pub capture_level: String,
     pub output_complete: bool,
     pub result_complete: bool,
     pub observation_truncated: bool,
@@ -43,12 +51,19 @@ impl TerminalExportCandidate {
         plan: &ExecutionPlan,
         document: &StaticDocument,
         result: &Value,
-        trace: Option<&Value>,
+        observation: Option<&RunProjection>,
     ) -> Option<Self> {
-        if !matches!(state, RunState::Succeeded | RunState::Failed)
+        if !matches!(state, RunState::Succeeded | RunState::Failed) {
+            return None;
+        }
+        let observation = observation?;
+        if !observation.source_verified
             || result.get("source_verified").and_then(Value::as_bool) != Some(true)
-            || result.get("event_protocol").and_then(Value::as_u64) != Some(1)
         {
+            return None;
+        }
+        let observation_status = result.get("observation_status").and_then(Value::as_str)?;
+        if !matches!(observation_status, "verified" | "truncated") {
             return None;
         }
         let projection = &document.verified.projection;
@@ -58,48 +73,19 @@ impl TerminalExportCandidate {
             .find(|function| function.id == plan.function_id)?;
         let (stdout, stdout_complete) = bounded_text(result["stdout"].as_str());
         let (stderr, stderr_complete) = bounded_text(result["stderr"].as_str());
-        let wire = &result["value"];
-        let value_is_scalar = matches!(
-            wire["type"].as_str(),
-            Some("int" | "float" | "bool" | "unit" | "none" | "text")
-        );
-        let value_text = match state {
-            RunState::Succeeded if value_is_scalar => {
-                result["value_text"].as_str().map(str::to_string)
-            }
-            RunState::Succeeded if crate::protocol::value_wire_v1::transferable(wire) => {
-                Some(wire.to_string())
-            }
-            _ => None,
-        };
-        let (value, value_complete) = match value_text {
-            Some(text) => {
-                let (text, complete) = bounded_text(Some(&text));
-                (Some(text), complete)
-            }
-            None => (None, false),
-        };
-        let trace_status = match &result["trace_status"] {
-            Value::String(status) if status == "verified" => {
-                if trace.is_some_and(|trace| !trace["truncated"].is_null()) {
-                    "truncated"
-                } else {
-                    "verified"
+        // Only a public scalar result value is exportable without an extra
+        // sensitive-output confirmation; container/text values stay omitted.
+        let (value, value_complete, value_is_public_scalar) =
+            match observation.result_value.as_ref() {
+                Some(run) if public_scalar_type(&run.ty) => {
+                    let (text, complete) = bounded_text(Some(run.display.as_str()));
+                    (Some(text), complete, true)
                 }
-            }
-            Value::String(status) if status == "invalid" => "invalid",
-            _ => "unavailable",
-        };
-        let trace_counts = trace
-            .filter(|trace| trace["status"] == "verified")
-            .and_then(|trace| trace["counts"].as_object())
-            .map(|counts| {
-                counts
-                    .iter()
-                    .filter_map(|(kind, count)| Some((kind.clone(), count.as_u64()?)))
-                    .collect()
-            });
-        let value_is_public_scalar = value_is_scalar && wire["type"] != "text";
+                Some(_) => (None, false, false),
+                None => (None, true, false),
+            };
+        let observation_truncated = observation.truncated.is_some();
+        let observation_counts = Some(counts_map(&observation.counts));
         Some(Self {
             document: plan.document.to_string(),
             function_id: function.id.clone(),
@@ -111,7 +97,7 @@ impl TerminalExportCandidate {
             source_sha256: document.source_sha256.clone(),
             lock_digest: projection.lock_digest.clone(),
             media: document.media_digests.clone(),
-            core_run_id: result["core_run_id"].as_str()?.to_string(),
+            observation_run_id: observation.run_id.clone(),
             core_version: projection.producer_version.clone(),
             mode: plan.mode.as_str().to_string(),
             terminal_at: crate::execution::events::utc_now(),
@@ -121,13 +107,16 @@ impl TerminalExportCandidate {
             stdout,
             stderr,
             arguments: plan.arguments.clone(),
-            trace_status: trace_status.to_string(),
-            trace_counts,
+            observation_status: observation_status.to_string(),
+            observation_counts,
+            capture_level: observation.capture_level.clone(),
             output_complete: result["output_complete"].as_bool() == Some(true)
                 && stdout_complete
                 && stderr_complete,
-            result_complete: state == RunState::Succeeded && value_complete,
-            observation_truncated: result["observation_truncated"].as_bool().unwrap_or(false),
+            result_complete: state == RunState::Succeeded
+                && !observation_truncated
+                && value_complete,
+            observation_truncated,
         })
     }
 
@@ -140,13 +129,39 @@ impl TerminalExportCandidate {
             "stdout_bytes": self.stdout.len(),
             "stderr_bytes": self.stderr.len(),
             "arguments_count": self.arguments.len(),
-            "trace_summary": self.trace_counts.is_some(),
-            "trace_status": self.trace_status,
+            "observation_summary": self.observation_counts.is_some(),
+            "observation_status": self.observation_status,
+            "capture_level": self.capture_level,
             "observation_truncated": self.observation_truncated,
             "output_complete": self.output_complete,
             "result_complete": self.result_complete,
         })
     }
+}
+
+fn public_scalar_type(ty: &str) -> bool {
+    matches!(
+        ty.to_ascii_lowercase().as_str(),
+        "int" | "float" | "bool" | "unit" | "none"
+    )
+}
+
+fn counts_map(counts: &EventCounts) -> BTreeMap<String, u64> {
+    [
+        ("total", counts.total()),
+        ("call_enter", counts.call_enter),
+        ("call_exit", counts.call_exit),
+        ("branch_eval", counts.branch_eval),
+        ("loop_iteration", counts.loop_iteration),
+        ("control_break", counts.control_break),
+        ("control_continue", counts.control_continue),
+        ("return", counts.return_events),
+        ("effect", counts.effect),
+        ("other", counts.other),
+    ]
+    .into_iter()
+    .map(|(kind, count)| (kind.to_string(), count as u64))
+    .collect()
 }
 
 fn bounded_text(value: Option<&str>) -> (String, bool) {
@@ -158,4 +173,27 @@ fn bounded_text(value: Option<&str>) -> (String, bool) {
         end -= 1;
     }
     (text[..end].to_string(), end == text.len())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn public_scalar_types_exclude_text_and_containers() {
+        for accepted in ["Int", "float", "Bool", "Unit", "none"] {
+            assert!(public_scalar_type(accepted), "{accepted}");
+        }
+        for rejected in ["Text", "List", "Map", "Table", "Memory", "Resource"] {
+            assert!(!public_scalar_type(rejected), "{rejected}");
+        }
+    }
+
+    #[test]
+    fn bounded_text_never_splits_utf8() {
+        let text = "é".repeat(MAX_TEXT);
+        let (bounded, complete) = bounded_text(Some(&text));
+        assert!(bounded.is_char_boundary(bounded.len()));
+        assert!(!complete);
+    }
 }

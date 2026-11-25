@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Browser acceptance for the Live reader: real Chromium, real frozen core.
+# Browser acceptance for the Live reader: real Chromium, real frozen core
+# pinned to marqdo 3.0.0-rc.4 (Analysis revision 3, Observation revision 1).
 #
 # Usage:
 #   MARQDO_BIN=/abs/path/marqdo scripts/test-browser.sh

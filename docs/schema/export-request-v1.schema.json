@@ -43,7 +43,7 @@
         "stderr": {
           "type": "boolean"
         },
-        "trace_summary": {
+        "observation_summary": {
           "type": "boolean"
         },
         "arguments": {
@@ -54,7 +54,7 @@
         "result_value",
         "stdout",
         "stderr",
-        "trace_summary",
+        "observation_summary",
         "arguments"
       ],
       "additionalProperties": false

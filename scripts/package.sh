@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
-# Build and assemble the Tool Protocol v1 release bundle.
+# Build and assemble the CLI Tool revision 1 release bundle for marqdo-view 0.3.0.
 #
 # Produces:
-#   dist/marqdo-view/                                  stable bundle path (RFC §18)
+#   dist/marqdo-view/                                  stable bundle path
 #   dist/marqdo-view-<version>-<target>.tar.gz (+ .sha256)
 #
 # The bundle contains only the runtime binary, the manifest and the legal /
-# compatibility files. CSS/JS/images are compiled into the binary (ADR-0002),
+# release-note files. CSS/JS/images are compiled into the binary (ADR-0002),
 # so there is exactly one asset source for Live and Export.
+#
+# The current public contracts are exact: api_revision 1, Analysis 3 and
+# Observation 1. There is no version negotiation and no `compatibility` field.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -67,6 +70,11 @@ import sys
 bundle = pathlib.Path(sys.argv[1])
 version, target, source_sha = sys.argv[2], sys.argv[3], sys.argv[4]
 tool = json.loads((bundle / 'tool.json').read_text())
+requires = tool.get('requires') or {}
+if 'compatibility' in tool:
+    raise SystemExit('tool.json must not contain a compatibility field')
+if requires != {'api_revision': 1, 'analysis': 3, 'observation': 1}:
+    raise SystemExit('tool.json requires must be exactly api_revision 1 / analysis 3 / observation 1')
 files = []
 for path in sorted(bundle.rglob('*')):
     if not path.is_file():
@@ -88,12 +96,15 @@ info = {
     'command': 'view',
     'target': target,
     'source_sha': source_sha,
-    'compatibility': {
-        'marqdo': '>=3.0.0-beta.1,<4.0.0',
-        'analysis': tool['compatibility']['analysis'],
-        'trace': [2],
-        'tool_protocol': 1,
+    'requires': {
+        'api_revision': 1,
+        'analysis': 3,
+        'observation': 1,
+    },
+    'release': {
+        'product_range': '>=3.0.0-rc.3,<4.0.0',
         'markdown_profile': 'marqdo.md.v1',
+        'platform': 'linux-x86_64-glibc2.39',
     },
     'files': files,
 }

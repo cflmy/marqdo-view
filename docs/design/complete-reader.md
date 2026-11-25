@@ -1,5 +1,9 @@
 # 完整阅读与结果导出设计
 
+
+> 契约提示：当前实现以 Analysis revision 3 与 Observation revision 1 为准，
+> 见 [`docs/architecture/observation-v1-and-analysis-v3.md`](../architecture/observation-v1-and-analysis-v3.md)。
+
 [高保真设计图](complete-reader.png)由内置 ImageGen 生成，参考旧版 View 截图。实现沿用旧版居中品牌、暖纸色、衬线正文、金色函数标记和橄榄色结果边框。示意图右侧是独立的导出确认状态，窄屏使用单列。
 
 提示词见下方。

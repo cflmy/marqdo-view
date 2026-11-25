@@ -291,8 +291,8 @@
       case "unsupported":
         showUnsupported(
           "变量快照 / 内存检查 / 调试器 / 证明状态",
-          "Trace v2 不提供逐语句赋值后的实际值或内存快照，公开协议也没有断点/单步通道；" +
-            "知识证明属于独立 Prove 工具。View 绝不猜测这些运行事实，相应能力在具备公开、受版本约束的协议前不会出现。"
+          "Observation v1 支持显式请求 --observe-variable / --observe-parameter，但 View 默认不请求任何变量或参数值；" +
+            "它不提供内存快照、断点或单步通道；知识证明属于独立 Prove 工具。View 绝不猜测这些运行事实。"
         );
         break;
       case "theme":
@@ -439,9 +439,9 @@
     if (stderr) stderr.hidden = true;
     var exportButton = $("#mq-export-result");
     if (exportButton) exportButton.hidden = true;
-    var traceTitle = $("#mq-run-trace-title");
-    if (traceTitle) traceTitle.textContent = "实时结构事件";
-    var traceWrap = $("#mq-run-trace-wrap");
+    var traceTitle = $("#mq-run-observation-title");
+    if (traceTitle) traceTitle.textContent = "实时结构观察事件";
+    var traceWrap = $("#mq-run-observation-wrap");
     if (traceWrap) traceWrap.hidden = true;
     $$(".mq-run-chip[data-view-chip]").forEach(function (chip) {
       chip.remove();
@@ -485,8 +485,7 @@
     var preview = $("#mq-run-command");
     if (!preview || !pendingRun) return;
     var mode = selectedMode();
-    var protocol = reader.dataset.executionEvents === "true" ? ["--event-stream", "jsonl"] : ["--json"];
-    var args = ["--mode", mode].concat(protocol, ["--trace-file", "<临时文件>"]);
+    var args = ["--mode", mode, "--output", "jsonl", "--observation-file", "<临时文件>"];
     var parts = [];
     if (pendingRun.kind === "entry") {
       parts = ["marqdo", "run", reader.dataset.document].concat(args);
@@ -723,7 +722,7 @@
       output.append(document.createTextNode(decoders[stream].decode(bytes, { stream: true })));
       output.hidden = false;
     } else if (/^(branch|loop|control|call)\./.test(observation.kind)) {
-      var wrap = $("#mq-run-trace-wrap");
+      var wrap = $("#mq-run-observation-wrap");
       if (wrap) wrap.hidden = false;
       var events = $("#mq-run-events");
       if (events && events.childElementCount < 100) {
@@ -755,12 +754,12 @@
     setRunBusy(false);
     if (data.result) renderRunResult(data.result, data.state, data.error);
     else if (data.error) renderRunResult(null, data.state, data.error);
-    if (data.trace) {
-      var traceTitle = $("#mq-run-trace-title");
-      if (traceTitle && data.trace.status === "verified") traceTitle.textContent = "已验证的 Trace v2 事件";
-      renderTrace(data.trace);
+    if (data.observation_summary) {
+      var traceTitle = $("#mq-run-observation-title");
+      if (traceTitle && data.observation_summary.status === "verified") traceTitle.textContent = "已验证的 Observation v1 事件";
+      renderTrace(data.observation_summary);
     }
-    else if (data.result && data.result.trace_status) renderTraceStatus(data.result.trace_status);
+    else if (data.result && data.result.observation_status) renderTraceStatus(data.result.observation_status);
     if (data.state === "succeeded") toast("运行完成");
     else toast("运行" + stateLabel(data.state));
   }
@@ -774,7 +773,7 @@
     var preview = data.result.export_preview;
     return data.state !== "succeeded" || !preview.output_complete ||
       !preview.result_complete || preview.observation_truncated ||
-      preview.trace_status === "truncated";
+      preview.observation_status === "truncated";
   }
 
   function updateExportConfirm() {
@@ -791,7 +790,7 @@
     var result = data.result;
     var preview = result.export_preview;
     var fields = $("#mq-export-fields");
-    var counts = preview.trace_summary && data.trace && data.trace.counts;
+    var counts = preview.observation_summary && data.observation_summary && data.observation_summary.counts;
     var argumentsText = (activeRun.parameters || []).map(function (parameter) {
       return parameter.name + " = " + parameter.expression;
     }).join("\n");
@@ -802,7 +801,7 @@
       ["result_value", "返回值", preview.value_bytes, preview.value_is_public_scalar, preview.value],
       ["stdout", "stdout", preview.stdout_bytes, false, previewBytes(result.stdout, preview.stdout_bytes)],
       ["stderr", "stderr", preview.stderr_bytes, false, previewBytes(result.stderr, preview.stderr_bytes)],
-      ["trace_summary", "轨迹摘要", counts ? new TextEncoder().encode(JSON.stringify(counts)).length : null, true, counts && JSON.stringify(counts, null, 2)],
+      ["observation_summary", "观察摘要", counts ? new TextEncoder().encode(JSON.stringify(counts)).length : null, true, counts && JSON.stringify(counts, null, 2)],
       ["arguments", "已提交的参数", preview.arguments_count ? new TextEncoder().encode(argumentsText).length : null, false, argumentsText]
     ].forEach(function (field) {
       var label = document.createElement("label");
@@ -901,8 +900,23 @@
       if (result.value_text) {
         appendLine(summary, "p", "mq-run-result", "返回值：" + result.value_text);
       }
+      var observationState = result.observation_status;
+      if (observationState === "truncated") {
+        var badge = document.createElement("span");
+        badge.className = "mq-truncated-badge";
+        badge.textContent = "TRUNCATED";
+        appendLine(summary, "p", "mq-run-warning", "观察事件达到协议预算，已截断；本次结果不再宣称完整。");
+        summary.lastChild.appendChild(badge);
+      } else if (observationState === "invalid") {
+        appendLine(summary, "p", "mq-run-warning", "Observation 无效：不绘制任何执行标注，也不显示为成功。");
+      } else if (observationState === "stale") {
+        appendLine(summary, "p", "mq-run-warning", "Observation 与当前 Analysis 不匹配：结果标记为过期，不显示为成功。");
+      }
       if (result.stale) {
         appendLine(summary, "p", "mq-run-warning", "源码在运行后发生变化：结果可见但标记为过期，不在当前正文上绘制执行标注。");
+      }
+      if (result.output_complete === false && observationState !== "truncated") {
+        appendLine(summary, "p", "mq-run-warning", "本次输出未完整交付（未完成/已被截断）；不声明完整结果。");
       }
       if (result.stdout) {
         var stdout = $("#mq-run-stdout");
@@ -943,14 +957,14 @@
     var summary = $("#mq-run-summary");
     if (!summary) return;
     var message = status === "invalid"
-      ? "Trace 与本次 Analysis 不匹配或格式无效：不绘制执行标注，也不声称观察到完整过程。"
-      : "本次运行没有可用的 Trace v2（unavailable）：只展示 CLI 返回值与输出。";
+      ? "Observation 与本次 Analysis 不匹配或格式无效：不绘制执行标注，也不声称观察到完整过程。"
+      : "本次运行没有可用的 Observation v1（unavailable）：只展示 CLI 返回值与输出。";
     appendLine(summary, "p", "mq-run-warning", message);
   }
 
   function renderTrace(trace) {
     var summary = $("#mq-run-summary");
-    var wrap = $("#mq-run-trace-wrap");
+    var wrap = $("#mq-run-observation-wrap");
     var list = $("#mq-run-events");
     if (!wrap || !list) return;
     list.textContent = "";
@@ -962,11 +976,11 @@
     wrap.hidden = false;
     if (summary) {
       if (trace.stale) {
-        appendLine(summary, "p", "mq-run-warning", "Trace 属于运行时的源码：当前源码已变化，本次不绘制执行标注。");
+        appendLine(summary, "p", "mq-run-warning", "Observation 属于运行时的源码：当前源码已变化，本次不绘制执行标注。");
       }
       if (trace.truncated) {
         var label = trace.truncated.label || (trace.truncated.reason + "（上限 " + trace.truncated.limit + "）");
-        appendLine(summary, "p", "mq-run-warning", "Trace 被截断：" + label + "；这不代表程序终止。");
+        appendLine(summary, "p", "mq-run-warning", "Observation 被截断：" + label + "；这不代表程序终止。");
       }
     }
     var entryEvents = Array.isArray(trace.events) ? trace.events : [];
@@ -1000,13 +1014,13 @@
         var chip = document.createElement("span");
         chip.className = "mq-run-chip";
         chip.dataset.viewChip = "1";
-        chip.dataset.annotationSource = "trace";
+        chip.dataset.annotationSource = "observation";
         chip.dataset.runSeq = String(last.seq);
         chip.dataset.runKind = kinds.join(",");
         var text = last.detail || last.kind;
         if (group.length > 3) text += " ×" + group.length;
         chip.textContent = text;
-        chip.title = "本次 Trace 事件：" + group.length + " 条（" + kinds.join(",") + "）";
+        chip.title = "本次 Observation 事件：" + group.length + " 条（" + kinds.join(",") + "）";
         bySource[sourceId].appendChild(chip);
       });
     }
