@@ -41,8 +41,8 @@
 
 > 证据规则：`PASS/FAIL/UNVERIFIED` 只能由 `scripts/acceptance.sh` 生成并写入
 > `docs/evidence/<CLI-SOURCE-SHA>/manifest.json`。当前 manifest 对 View 源码提交
-> `340ecb0b6ea19fb3047a2930f3ef0c3c36ba291f` 的 `result` 为 `PASS`（G11 引用
-> Woodpecker #9）；`UNVERIFIED`、`PARTIAL`、`WARN` 一律不得写成 `PASS`。
+> `340ecb035fbde0a825c1e5edf1d28b41342d1002` 的 `result` 为 `PASS`（G11 引用
+> Woodpecker #10）；`UNVERIFIED`、`PARTIAL`、`WARN` 一律不得写成 `PASS`。
 
 | # | 门禁 | 当前证据状态 |
 |---|---|---|
@@ -97,7 +97,7 @@
 
 | 内容 | 路径 |
 |---|---|
-| 一键验收 + manifest（G01–G12） | `scripts/acceptance.sh`；`docs/evidence/452e9a32…/manifest.json`（**待生成**） |
+| 一键验收 + manifest（G01–G12） | `scripts/acceptance.sh`；`docs/evidence/452e9a32…/manifest.json`（**result: PASS**，G01–G12 全 PASS） |
 | 证据目录说明与 manifest schema | `docs/evidence/README.md` |
 | 验收标准 | `docs/ACCEPTANCE.md` |
 | 合规矩阵 | `docs/CONFORMANCE.md` |

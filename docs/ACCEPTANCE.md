@@ -47,7 +47,7 @@ scripts/acceptance.sh        # 生成 docs/evidence/452e9a32…/manifest.json + 
 | G08 | 负例全绿 | §2 全部负向用例 | 每例 fail-closed，退出码符合 | `PASS`（协议级 fail-closed 探针 + 单元负向控制已覆盖；N01–N20 完整矩阵待 lead 提供） |
 | G09 | 安全基线不回退 | `tests/security` + `scripts/test-no-exec.sh` + `scripts/test-security.sh` + 浏览器 | 全部 PASS；无执行/无越权/无跨站 | `PASS` |
 | G10 | 导出零执行且同渲染器 | `scripts/test-export.sh` + `no_coupling` | Live 与 Export 同一 HTML/CSS/JS；file:// 无执行、无联网 | `PASS` |
-| G11 | 证据与 CI | manifest + CI 完整门禁 | CI 红不发布；manifest 与 CI 同 SHA | `PASS`（Woodpecker #10 对 `a802f96…` 成功，见 manifest `gates.G11_evidence_ci`） |
+| G11 | 证据与 CI | manifest + CI 完整门禁 | CI 红不发布；manifest 与 CI 同 SHA | `PASS`（Woodpecker #10 对 `340ecb0…` 成功，见 manifest `gates.G11_evidence_ci`） |
 | G12 | 文档事实一致 | `scripts/check-docs.sh` + 人工 | 当前文档不把旧格式写成当前能力 | `PASS` |
 
 任一 P0 门禁 `FAIL` 或 `UNVERIFIED` → 不发布 0.3.0。

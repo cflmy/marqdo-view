@@ -56,7 +56,7 @@ issue #4，验收 issue #5）。随后 `marqdo-cli` 的公共静态分析边界�
 ## 验证
 
 复现与机器证据见 `docs/ACCEPTANCE.md` 和
-`docs/evidence/452e9a32bd9e40dba427d4180691c58bab74449e/manifest.json`（待生成）：
+`docs/evidence/452e9a32bd9e40dba427d4180691c58bab74449e/manifest.json`（`result: PASS`，G01–G12 全 PASS，Woodpecker #10）：
 
 ```bash
 scripts/frozen-beta.sh verify /abs/unpacked/marqdo-3.0.0-rc.4-x86_64-unknown-linux-gnu/marqdo
