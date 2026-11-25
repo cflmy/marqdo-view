@@ -1,0 +1,1 @@
+check-docs: PASS (README/COMPATIBILITY/CHANGELOG/STATUS/ACCEPTANCE describe the rc.4 baseline; CHANGELOG history is explicit)

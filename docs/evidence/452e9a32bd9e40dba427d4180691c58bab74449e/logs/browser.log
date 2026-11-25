@@ -1,0 +1,200 @@
+==> browser suite: examples/welcome
+ok   reader root rendered
+ok   document title has Marqdo
+ok   one stylesheet
+ok   one script
+ok   no external requests
+ok   no browser console errors
+ok   dock has all actions
+ok   dock run control present
+ok   interactive controls have accessible names
+ok   Tab reaches named controls
+ok   more dialog opens
+ok   source mode attribute
+ok   source pane visible
+ok   document hidden in source mode
+ok   document mode restored
+ok   search dialog opens
+ok   search returns local results
+ok   text size toggled
+ok   annotations toggled
+ok   welcome hero only on configured page
+ok   grammar statement is a real element
+ok   GFM table rendered
+ok   dark theme applied
+ok   theme preference persisted
+ok   paper theme restored
+ok   no horizontal overflow at 2048
+ok   dock inside viewport at 2048
+ok   no horizontal overflow at 1664
+ok   dock inside viewport at 1664
+ok   no horizontal overflow at 1440
+ok   dock inside viewport at 1440
+ok   no horizontal overflow at 1024
+ok   dock inside viewport at 1024
+ok   no horizontal overflow at 768
+ok   dock inside viewport at 768
+ok   no horizontal overflow at 390
+ok   dock inside viewport at 390
+ok   no-JS document remains readable
+ok   no-JS exposes no active run UI
+ok   print hides dock
+ok   print keeps prose
+ok   browsing, refresh, search and settings never submit runs
+
+browser: PASS
+==> browser suite: examples/control-flow
+ok   reader root rendered
+ok   document title has Marqdo
+ok   one stylesheet
+ok   one script
+ok   no external requests
+ok   no browser console errors
+ok   dock has all actions
+ok   dock run control present
+ok   interactive controls have accessible names
+ok   Tab reaches named controls
+ok   more dialog opens
+ok   source mode attribute
+ok   source pane visible
+ok   document hidden in source mode
+ok   document mode restored
+ok   search dialog opens
+ok   search returns local results
+ok   text size toggled
+ok   annotations toggled
+ok   dark theme applied
+ok   theme preference persisted
+ok   paper theme restored
+ok   no horizontal overflow at 2048
+ok   dock inside viewport at 2048
+ok   no horizontal overflow at 1664
+ok   dock inside viewport at 1664
+ok   no horizontal overflow at 1440
+ok   dock inside viewport at 1440
+ok   no horizontal overflow at 1024
+ok   dock inside viewport at 1024
+ok   no horizontal overflow at 768
+ok   dock inside viewport at 768
+ok   no horizontal overflow at 390
+ok   dock inside viewport at 390
+ok   no-JS document remains readable
+ok   no-JS exposes no active run UI
+ok   print hides dock
+ok   print keeps prose
+ok   browsing, refresh, search and settings never submit runs
+ok   run dialog opens
+ok   run dialog mentions pure mode
+ok   run dialog previews the command
+ok   run state succeeded via SSE
+ok   run panel visible
+ok   run chips anchored
+ok   observed chips carry observation provenance
+ok   static statement anchors carry analysis provenance
+ok   at most one grouped chip per anchor
+ok   observation event list rendered
+ok   stdout rendered escaped
+ok   Chromium reconnected with the original Last-Event-ID
+ok   reconnect did not submit a second run or poll status
+ok   clear hides run panel
+ok   page was never reloaded by the run
+
+browser: PASS
+==> browser suite: examples/function-params.mq.md
+ok   reader root rendered
+ok   document title has Marqdo
+ok   one stylesheet
+ok   one script
+ok   no external requests
+ok   no browser console errors
+ok   dock has all actions
+ok   dock run control present
+ok   interactive controls have accessible names
+ok   Tab reaches named controls
+ok   more dialog opens
+ok   source mode attribute
+ok   source pane visible
+ok   document hidden in source mode
+ok   document mode restored
+ok   search dialog opens
+ok   search returns local results
+ok   text size toggled
+ok   annotations toggled
+ok   dark theme applied
+ok   theme preference persisted
+ok   paper theme restored
+ok   no horizontal overflow at 2048
+ok   dock inside viewport at 2048
+ok   no horizontal overflow at 1664
+ok   dock inside viewport at 1664
+ok   no horizontal overflow at 1440
+ok   dock inside viewport at 1440
+ok   no horizontal overflow at 1024
+ok   dock inside viewport at 1024
+ok   no horizontal overflow at 768
+ok   dock inside viewport at 768
+ok   no horizontal overflow at 390
+ok   dock inside viewport at 390
+ok   no-JS document remains readable
+ok   no-JS exposes no active run UI
+ok   print hides dock
+ok   print keeps prose
+ok   browsing, refresh, search and settings never submit runs
+ok   no-main Dock opens the functions list
+ok   no-main Dock did not submit a run
+ok   Analysis marks n required and Int
+ok   missing required parameter leaves the form open
+ok   missing required parameter did not submit
+ok   call preview includes the chosen value
+ok   installed tool displays the real double(5) result
+ok   CLI round-tripped Unicode Text and a List through the form
+
+browser: PASS
+==> browser suite: tests/fixtures/security-project
+ok   reader root rendered
+ok   document title has Marqdo
+ok   one stylesheet
+ok   one script
+ok   no external requests
+ok   no browser console errors
+ok   dock has all actions
+ok   dock run control present
+ok   interactive controls have accessible names
+ok   Tab reaches named controls
+ok   more dialog opens
+ok   source mode attribute
+ok   source pane visible
+ok   document hidden in source mode
+ok   document mode restored
+ok   search dialog opens
+ok   search returns local results
+ok   text size toggled
+ok   annotations toggled
+ok   adversarial doc has no alert dialog
+ok   adversarial doc has no external requests
+ok   raw HTML omitted note rendered
+ok   prose survives sanitization
+ok   javascript link neutralized
+ok   dark theme applied
+ok   theme preference persisted
+ok   paper theme restored
+ok   no horizontal overflow at 2048
+ok   dock inside viewport at 2048
+ok   no horizontal overflow at 1664
+ok   dock inside viewport at 1664
+ok   no horizontal overflow at 1440
+ok   dock inside viewport at 1440
+ok   no horizontal overflow at 1024
+ok   dock inside viewport at 1024
+ok   no horizontal overflow at 768
+ok   dock inside viewport at 768
+ok   no horizontal overflow at 390
+ok   dock inside viewport at 390
+ok   no-JS document remains readable
+ok   no-JS exposes no active run UI
+ok   print hides dock
+ok   print keeps prose
+ok   browsing, refresh, search and settings never submit runs
+
+browser: PASS
+browser: PASS (core sha256 a7306962689c635445a59043971ea2eb09298e01feeee81f0ba07b1f3e10306e unchanged; screenshots: /root/work/marqdo-view/tests/browser/artifacts)

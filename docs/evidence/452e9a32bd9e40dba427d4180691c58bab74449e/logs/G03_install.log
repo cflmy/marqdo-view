@@ -1,0 +1,55 @@
+CHANGELOG.md: OK
+COMPATIBILITY.md: OK
+LICENSE-APACHE: OK
+LICENSE-MIT: OK
+README.md: OK
+SOURCE_SHA: OK
+bin/marqdo-view: OK
+tool.json: OK
+== bundle digest: sha256:7fa5e3ae590cd42e29b50f083a39dbb465a4eb114fc9336581a38b6747cd6658
+installed tool `view` version 0.3.0 (marqdo-view)
+view 0.3.0 (marqdo-view)
+Marqdo View renders the original Markdown and attaches verified Analysis v3 facts. Running is never implicit: it requires an explicit user action. Export is always a pure read-only operation.
+
+Usage: marqdo-view [OPTIONS] [PATH] [COMMAND]
+
+Commands:
+  export  Write a static, read-only HTML site (never executes the document)
+  verify  Check CLI/Analysis/source binding only; never executes
+
+Arguments:
+  [PATH]
+          A `.mq.md` document or a project directory (default: `.`)
+
+Options:
+      --marqdo-bin <PATH>
+          Development only: explicit path to the frozen `marqdo` binary. Installed Tool Protocol runs get the path from `MARQDO_BIN`
+
+      --host <HOST>
+          Loopback host for the Live reader (default 127.0.0.1)
+          
+          [default: 127.0.0.1]
+
+      --port <PORT>
+          Port for the Live reader; `0` lets the OS choose and prints the real URL
+          
+          [default: 7429]
+
+      --no-open
+          Do not open a browser (the full local URL is still printed)
+
+      --run-timeout <RUN_TIMEOUT>
+          Wall-clock limit for one explicit run, in seconds (RFC-VIEW-0002 §6.7). The frozen Core receives the same value via `--timeout`
+          
+          [default: 30]
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+  -V, --version
+          Print version
+manifest: PASS (revision 1 requires api_revision=1 analysis=3 observation=1)
+install-smoke: PASS (view installed/dispatched, api_revision 1 injected, core sha256 a7306962689c635445a59043971ea2eb09298e01feeee81f0ba07b1f3e10306e unchanged, tool home /root/work/marqdo-view/dist/smoke-tool-home.LyX5Qz)
+removed tool `view`
+error: unknown command `view`; install a tool with `marqdo tool install <tool.json>`
+installed tool `view` version 0.3.0 (marqdo-view)

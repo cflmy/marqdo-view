@@ -1,0 +1,19 @@
+core: marqdo 3.0.0-rc.4 (supported >=3.0.0-rc.3,<4.0.0, api revision 1)
+project: root:mixed-modes@0.1.0 (manifest)
+document: index.mq.md
+analysis: schema=marqdo.analysis v3 modules=1 functions=1 references=0 digest=sha256:fd686ba0851c34a897f3e432c579ed4c64188914e5b6aec5e24b8ee4f444b01f
+source digest: match
+result: PASS (static only; document not executed)
+==> check all five example documents (one static source: check --emit)
+Analysis v3: PASS (schema_version 3, exact source/document/entry present)
+==> call function-params.double(n=5) -> 10 via Observation v1
+call double(5): PASS (Observation v1, Int 10)
+==> run branch-loop main -> Int 0 with loop/return events
+run branch-loop: PASS (Int 0, contiguous seq, kinds: stream.opened,run.started,call.enter,variable.assigned,loop.iteration,variable.assigned,loop.iteration,variable.assigned,loop.iteration,variable.assigned,loop.iteration,return,call.exit,run.completed)
+==> knowledge-only has no main (truthful rejection, no fallback)
+knowledge-only: PASS (explicit sem.no_entry_function)
+==> unsafe-side-effect writes nothing in pure mode
+unsafe-side-effect pure: PASS (permission.denied, no file)
+==> unsafe-side-effect writes only with explicit project grants
+unsafe-side-effect project+grants: PASS (sentinel written explicitly)
+examples: PASS (frozen CLI sha256 a7306962689c635445a59043971ea2eb09298e01feeee81f0ba07b1f3e10306e unchanged)

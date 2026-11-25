@@ -23,7 +23,7 @@
 每项 `state ∈ {PASS, FAIL, UNVERIFIED}`，并带 `command`/`exit_code`/`log`。
 `unverified` 列出所有非 PASS 门禁；`UNVERIFIED`/`PARTIAL`/`WARN` 不得读作或写成 PASS。
 
-**当前状态：`manifest.json` 已由真实命令生成，`result: PASS`（G01–G12 全部 PASS，含远端 Woodpecker #9 与同 SHA 校验；`extras.browser: PASS`）。** manifest 只能由真实命令重新生成，禁止手写、复制历史 manifest 或从别处伪造：
+**当前状态：`manifest.json` 已由真实命令生成，`result: PASS`（G01–G12 全部 PASS，含远端 Woodpecker #10 与同 SHA 校验；`extras.browser: PASS`）。** manifest 只能由真实命令重新生成，禁止手写、复制历史 manifest 或从别处伪造：
 
 ```bash
 export MARQDO_BIN=/abs/unpacked/marqdo-3.0.0-rc.4-x86_64-unknown-linux-gnu/marqdo

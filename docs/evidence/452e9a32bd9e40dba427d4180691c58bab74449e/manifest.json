@@ -1,0 +1,109 @@
+{
+  "cli_archive_sha256": "sha256:9c3f166b5e5b8840d39d10019074e4e1c42432fc23e26c69670e64fdcf4e15d8",
+  "cli_binary_sha256": "sha256:a7306962689c635445a59043971ea2eb09298e01feeee81f0ba07b1f3e10306e",
+  "cli_source_sha": "452e9a32bd9e40dba427d4180691c58bab74449e",
+  "cli_version": "3.0.0-rc.4",
+  "contracts": {
+    "analysis": 3,
+    "api_revision": 1,
+    "observation": 1
+  },
+  "extras": {
+    "browser": "PASS",
+    "cargo_tests_passed": 174,
+    "notes": "Generated from real command exit statuses. UNVERIFIED gates are not release evidence and must never be read as PASS."
+  },
+  "gates": {
+    "G01_no_legacy": {
+      "command": "./scripts/check-no-legacy.sh",
+      "exit_code": 0,
+      "log": "docs/evidence/452e9a32bd9e40dba427d4180691c58bab74449e/logs/G01_no_legacy.log",
+      "state": "PASS"
+    },
+    "G02_build": {
+      "command": "cargo fmt --all -- --check && cargo clippy --locked --all-targets -- -D warnings && cargo test --locked && cargo build --release --locked",
+      "exit_code": 0,
+      "log": "docs/evidence/452e9a32bd9e40dba427d4180691c58bab74449e/logs/G02_build.log",
+      "state": "PASS"
+    },
+    "G03_install": {
+      "command": "scripts/package.sh && marqdo tool install/list/remove && marqdo view --help && scripts/install-smoke.sh && tamper refusal",
+      "exit_code": 0,
+      "log": "docs/evidence/452e9a32bd9e40dba427d4180691c58bab74449e/logs/G03_install.log",
+      "state": "PASS"
+    },
+    "G04_static": {
+      "command": "\"/root/work/marqdo-cli/dist/marqdo-3.0.0-rc.4-x86_64-unknown-linux-gnu/marqdo\" view verify examples/mixed-modes/index.mq.md && MARQDO_BIN=\"/root/work/marqdo-cli/dist/marqdo-3.0.0-rc.4-x86_64-unknown-linux-gnu/marqdo\" ./scripts/check-examples.sh",
+      "exit_code": 0,
+      "log": "docs/evidence/452e9a32bd9e40dba427d4180691c58bab74449e/logs/G04_static.log",
+      "state": "PASS"
+    },
+    "G05_run": {
+      "command": "installed marqdo view examples/welcome + scripts/acceptance-run.py over SSE",
+      "exit_code": 0,
+      "log": "docs/evidence/452e9a32bd9e40dba427d4180691c58bab74449e/logs/G05_run.log",
+      "state": "PASS"
+    },
+    "G06_stream_snapshot": {
+      "command": "python3 scripts/check-observation.py stream-snapshot",
+      "exit_code": 0,
+      "log": "docs/evidence/452e9a32bd9e40dba427d4180691c58bab74449e/logs/G06_stream_snapshot.log",
+      "state": "PASS"
+    },
+    "G07_binding_stale": {
+      "command": "python3 scripts/check-observation.py binding && cargo test --lib execution::controller::tests::stale_and_incomplete_never_map_to_success && cargo test --test integration execution::source_edit_during_a_run_marks_the_result_stale_and_drops_anchor_ids && cargo test --test contract observation_contract::stale_and_wrong_root_bindings_are_observation_stale",
+      "exit_code": 0,
+      "log": "docs/evidence/452e9a32bd9e40dba427d4180691c58bab74449e/logs/G07_binding_stale.log",
+      "note": "CLI exact-byte binding probe + controller unit mapping + real run/source-change e2e + wrong-digest stale contract all PASS",
+      "state": "PASS"
+    },
+    "G08_negative": {
+      "command": "python3 scripts/check-observation.py fail-closed && cargo test --lib execution:: && cargo test --test contract observation_contract:: && cargo test --test contract core_contract:: && cargo test --test contract presentation_states:: && cargo test --test contract no_coupling:: && cargo test --test security",
+      "exit_code": 0,
+      "log": "docs/evidence/452e9a32bd9e40dba427d4180691c58bab74449e/logs/G08_negative.log",
+      "note": "N01-N11 decoder/contract negatives, N12-N13 controller hard rejection, N14-N15 CLI fail-closed probes, N16 G01 static check, N17 tool_v1 product-range unit test, N18-N20 security suite: all PASS",
+      "state": "PASS"
+    },
+    "G09_security": {
+      "command": "env MARQDO_BIN=\"/root/work/marqdo-cli/dist/marqdo-3.0.0-rc.4-x86_64-unknown-linux-gnu/marqdo\" ./scripts/test-no-exec.sh && ./scripts/test-security.sh",
+      "exit_code": 0,
+      "log": "docs/evidence/452e9a32bd9e40dba427d4180691c58bab74449e/logs/G09_security.log",
+      "state": "PASS"
+    },
+    "G10_export": {
+      "command": "env MARQDO_BIN=\"/root/work/marqdo-cli/dist/marqdo-3.0.0-rc.4-x86_64-unknown-linux-gnu/marqdo\" ./scripts/test-export.sh && cargo test --locked --test contract",
+      "exit_code": 0,
+      "log": "docs/evidence/452e9a32bd9e40dba427d4180691c58bab74449e/logs/G10_export.log",
+      "state": "PASS"
+    },
+    "G11_evidence_ci": {
+      "command": "https://ci.cflmy.cn cflmy/marqdo-view pipelines (commit 340ecb035fbde0a825c1e5edf1d28b41342d1002)",
+      "exit_code": 0,
+      "note": "Woodpecker pipeline #10 succeeded for 340ecb035fbde0a825c1e5edf1d28b41342d1002",
+      "state": "PASS"
+    },
+    "G12_docs": {
+      "command": "./scripts/check-docs.sh",
+      "exit_code": 0,
+      "log": "docs/evidence/452e9a32bd9e40dba427d4180691c58bab74449e/logs/G12_docs.log",
+      "state": "PASS"
+    }
+  },
+  "generated_utc": "2026-11-25T14:21:15.414398+00:00",
+  "markdown_profile": "marqdo.md.v1",
+  "platform": "linux-x86_64-glibc2.39",
+  "product": {
+    "name": "marqdo-view",
+    "target": "linux-x86_64-glibc2.39",
+    "version": "0.3.0"
+  },
+  "product_range": ">=3.0.0-rc.3,<4.0.0",
+  "result": "PASS",
+  "schema": "marqdo.view.acceptance",
+  "schema_version": 1,
+  "unverified": [],
+  "view_binary_sha256": "sha256:93421d3dc83d39e99a547d9e9c34e1a2a69b7f3781016e08c46bf1ff72f0cf31",
+  "view_commit": "340ecb035fbde0a825c1e5edf1d28b41342d1002",
+  "view_tool_bundle_digest": "sha256:7fa5e3ae590cd42e29b50f083a39dbb465a4eb114fc9336581a38b6747cd6658",
+  "view_tool_bundle_digest_method": "sha256 of the canonical SHA256SUMS file bytes in the bundle"
+}

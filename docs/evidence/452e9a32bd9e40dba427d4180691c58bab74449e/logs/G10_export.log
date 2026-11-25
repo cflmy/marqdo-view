@@ -1,0 +1,67 @@
+marqdo view export: 2 page(s), 11 file(s) → /root/work/marqdo-view/dist/test-export-site
+manifest: sha256:eddaeed21ff402892b31b31485172156d6905795bd47a72cb85f5684686e51db
+executed: false (纯静态导出，未运行任何文档)
+export manifest: PASS (2 pages, 3 files)
+file:// offline browser check: PASS
+export: PASS (offline site at /root/work/marqdo-view/dist/test-export-site; core sha256 a7306962689c635445a59043971ea2eb09298e01feeee81f0ba07b1f3e10306e unchanged)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.04s
+     Running tests/contract/main.rs (target/debug/build/marqdo-view/4db88ce592e41fad/out/contract-4db88ce592e41fad)
+
+running 53 tests
+test cli_surface::degradation_without_core_keeps_prose_readable ... ok
+test asset_integrity::theme_has_one_token_layer_and_no_legacy_skin ... ok
+test cli_surface::missing_document_is_an_io_error ... ok
+test cli_surface::browse_on_missing_path_fails_without_starting_a_server ... ok
+test cli_surface::export_requires_an_output_directory ... ok
+test cli_surface::help_comes_from_view_not_core ... ok
+test cli_surface::non_loopback_bind_is_refused_by_default ... ok
+test cli_surface::version_is_the_tool_version ... ok
+test cli_surface::verify_without_core_is_an_argument_error ... ok
+test asset_integrity::reused_assets_match_their_recorded_hashes ... ok
+test core_contract::check_failure_preserves_core_stderr_and_code ... ok
+test core_contract::default_run_does_not_request_variable_or_parameter_values ... ok
+test core_contract::analysis_v2_revision_is_a_hard_protocol_error ... ok
+test core_contract::check_returns_exact_analysis_bytes_and_digest ... ok
+test core_contract::installed_tool_api_revision_is_enforced_at_the_process_boundary ... ok
+test core_contract::check_refs_is_forwarded_as_a_stricter_flag ... ok
+test core_contract::missing_required_analysis_fields_are_rejected ... ok
+test core_contract::current_rc_version_is_accepted ... ok
+test core_contract::run_and_call_argv_use_the_current_observation_flags_only ... ok
+test core_contract::failed_check_normalizes_diagnostics_without_absolute_paths ... ok
+test core_contract::strict_mode_run_request_is_rejected_by_view_validation ... ok
+test core_contract::tool_api_revision_environment_is_an_exact_expectation ... ok
+test core_contract::incompatible_product_version_is_rejected_before_any_work ... ok
+test core_contract::unknown_analysis_schema_name_or_major_is_rejected ... ok
+test core_contract::unknown_module_and_unit_references_are_rejected ... ok
+test no_coupling::no_private_core_crate_dependencies ... ok
+test no_coupling::release_lockfile_is_committed ... ok
+test core_contract::missing_emit_after_success_is_an_analysis_failure ... ok
+test core_contract::cli_verify_end_to_end_against_fake_core ... ok
+test no_coupling::exactly_one_reader_theme_and_script_entry ... ok
+test no_coupling::tool_manifest_matches_package_and_protocols ... ok
+test core_contract::retired_revision_3_shape_is_rejected_with_a_rebuild_hint ... ok
+test core_contract::source_digest_mismatch_is_not_silently_accepted ... ok
+test no_coupling::source_has_no_legacy_protocol_or_runtime_probing ... ok
+test observation_contract::eof_without_terminal_is_incomplete_never_success ... ok
+test observation_contract::rejected_before_start_is_a_valid_failed_terminal ... ok
+test asset_integrity::embedded_asset_bundle_matches_disk_and_has_one_theme ... ok
+test observation_contract::real_jsonl_stream_verifies_and_binds_to_analysis_digest ... ok
+test observation_contract::stale_and_wrong_root_bindings_are_observation_stale ... ok
+test observation_contract::unknown_schema_and_revision_are_rejected ... ok
+test presentation_states::external_projection_can_be_rendered_from_artifact_source ... ok
+test presentation_states::missing_core_stays_readable_and_explicitly_unverified ... ok
+test observation_contract::stream_and_snapshot_of_the_same_run_agree ... ok
+test observation_contract::truncated_observation_is_a_terminal_but_never_complete ... ok
+test no_coupling::source_never_reads_or_links_the_legacy_repositories ... ok
+test presentation_states::truncated_and_incomplete_runs_never_display_as_success ... ok
+test presentation_states::failed_check_keeps_prose_and_shows_core_diagnostics ... ok
+test presentation_states::invalid_analysis_span_is_rejected_not_trimmed ... ok
+test observation_contract::lifecycle_negative_cases_fail_closed ... ok
+test presentation_states::source_digest_mismatch_degrades_instead_of_misbinding ... ok
+test core_contract::cli_verify_rejects_schema_v2_and_digest_mismatch ... ok
+test presentation_states::unknown_analysis_schema_is_a_hard_protocol_error ... ok
+test presentation_states::run_attached_to_changed_source_becomes_stale ... ok
+
+test result: ok. 53 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+
+removed tool `view`

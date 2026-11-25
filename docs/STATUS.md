@@ -35,13 +35,13 @@
 | G01 无旧契约静态检查 | 通过 | `scripts/check-no-legacy.sh` |
 | G12 文档事实一致 | 通过 | `scripts/check-docs.sh` |
 | 验收 manifest G01–G12 + `unverified` | 已生成 `result: PASS` | `scripts/acceptance.sh` |
-| CI 钉 rc.4 + 独立 no-legacy job | 远端 Woodpecker pipeline #9 对 `a802f96` 成功 | `.github/workflows/ci.yml`、`.woodpecker.yml` |
+| CI 钉 rc.4 + 独立 no-legacy job | 远端 Woodpecker pipeline #10 对 `340ecb0` 成功 | `.github/workflows/ci.yml`、`.woodpecker.yml` |
 
 ## 发布门禁 G01–G12（issue #5）
 
 > 证据规则：`PASS/FAIL/UNVERIFIED` 只能由 `scripts/acceptance.sh` 生成并写入
 > `docs/evidence/<CLI-SOURCE-SHA>/manifest.json`。当前 manifest 对 View 源码提交
-> `a802f96b6ea19fb3047a2930f3ef0c3c36ba291f` 的 `result` 为 `PASS`（G11 引用
+> `340ecb0b6ea19fb3047a2930f3ef0c3c36ba291f` 的 `result` 为 `PASS`（G11 引用
 > Woodpecker #9）；`UNVERIFIED`、`PARTIAL`、`WARN` 一律不得写成 `PASS`。
 
 | # | 门禁 | 当前证据状态 |
