@@ -1,0 +1,126 @@
+fail-closed retired --json: PASS (exit 2, no fallback retry)
+fail-closed retired --trace-file: PASS (exit 2, no fallback retry)
+fail-closed retired --event-stream: PASS (exit 2, no fallback retry)
+fail-closed strict live destination: PASS (exit 2, strict.unsupported_grant)
+fail-closed retired tool.json: PASS (unknown field `compatibility`, no migrator)
+fail-closed retired record_version 1: PASS (dispatch refused, remove+reinstall hint)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.04s
+     Running unittests src/lib.rs (target/debug/build/marqdo-view/01b4917d83f17a50/out/marqdo_view-01b4917d83f17a50)
+
+running 25 tests
+test execution::controller::tests::exit_code_two_is_a_hard_option_rejection_never_a_retry ... ok
+test execution::controller::tests::run_ids_are_unguessable_and_unique ... ok
+test execution::controller::tests::stale_and_incomplete_never_map_to_success ... ok
+test execution::controller::tests::run_options_never_request_variable_values ... ok
+test execution::controller::tests::call_argv_carries_explicit_args_and_observation_file ... ok
+test execution::controller::tests::run_argv_is_observation_jsonl_and_never_retired_trace_flags ... ok
+test execution::events::tests::newest_cursor_replays_only_new_events ... ok
+test execution::events::tests::frames_have_event_id_and_matching_data_seq ... ok
+test execution::events::tests::states_have_stable_wire_values_and_terminals ... ok
+test execution::controller::tests::truncated_observation_is_terminal_but_never_labelled_complete ... ok
+test execution::events::tests::utc_formatting_is_stable ... ok
+test execution::events::tests::terminal_frame_carries_observation_summary_not_trace ... ok
+test execution::events::tests::terminal_job_replays_snapshot_and_closes ... ok
+test execution::export_candidate::tests::public_scalar_types_exclude_text_and_containers ... ok
+test execution::process::tests::bounded_capture_keeps_limit_and_drains ... ok
+test execution::process::tests::default_budget_matches_rfc ... ok
+test execution::export_candidate::tests::bounded_text_never_splits_utf8 ... ok
+test execution::events::tests::ring_is_bounded_and_old_cursor_gets_snapshot ... ok
+test execution::request::tests::entry_without_main_is_explicitly_rejected ... ok
+test execution::request::tests::rejects_unknown_fields_and_bad_modes ... ok
+test execution::request::tests::canonical_names_and_targets_resolve ... ok
+test execution::request::tests::rejects_absolute_and_parent_globs ... ok
+test execution::request::tests::unknown_parameter_names_are_rejected_before_execution ... ok
+test execution::process::tests::cancellation_terminates_the_process_group ... ok
+test execution::controller::tests::expired_terminal_job_is_never_returned_for_export ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.02s
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.04s
+     Running tests/contract/main.rs (target/debug/build/marqdo-view/4db88ce592e41fad/out/contract-4db88ce592e41fad)
+
+running 8 tests
+test observation_contract::rejected_before_start_is_a_valid_failed_terminal ... ok
+test observation_contract::unknown_schema_and_revision_are_rejected ... ok
+test observation_contract::real_jsonl_stream_verifies_and_binds_to_analysis_digest ... ok
+test observation_contract::eof_without_terminal_is_incomplete_never_success ... ok
+test observation_contract::truncated_observation_is_a_terminal_but_never_complete ... ok
+test observation_contract::stream_and_snapshot_of_the_same_run_agree ... ok
+test observation_contract::stale_and_wrong_root_bindings_are_observation_stale ... ok
+test observation_contract::lifecycle_negative_cases_fail_closed ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 45 filtered out; finished in 0.05s
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.04s
+     Running tests/contract/main.rs (target/debug/build/marqdo-view/4db88ce592e41fad/out/contract-4db88ce592e41fad)
+
+running 20 tests
+test core_contract::default_run_does_not_request_variable_or_parameter_values ... ok
+test core_contract::current_rc_version_is_accepted ... ok
+test core_contract::check_refs_is_forwarded_as_a_stricter_flag ... ok
+test core_contract::installed_tool_api_revision_is_enforced_at_the_process_boundary ... ok
+test core_contract::failed_check_normalizes_diagnostics_without_absolute_paths ... ok
+test core_contract::analysis_v2_revision_is_a_hard_protocol_error ... ok
+test core_contract::check_returns_exact_analysis_bytes_and_digest ... ok
+test core_contract::run_and_call_argv_use_the_current_observation_flags_only ... ok
+test core_contract::check_failure_preserves_core_stderr_and_code ... ok
+test core_contract::missing_required_analysis_fields_are_rejected ... ok
+test core_contract::tool_api_revision_environment_is_an_exact_expectation ... ok
+test core_contract::strict_mode_run_request_is_rejected_by_view_validation ... ok
+test core_contract::unknown_analysis_schema_name_or_major_is_rejected ... ok
+test core_contract::unknown_module_and_unit_references_are_rejected ... ok
+test core_contract::incompatible_product_version_is_rejected_before_any_work ... ok
+test core_contract::missing_emit_after_success_is_an_analysis_failure ... ok
+test core_contract::cli_verify_end_to_end_against_fake_core ... ok
+test core_contract::source_digest_mismatch_is_not_silently_accepted ... ok
+test core_contract::retired_revision_3_shape_is_rejected_with_a_rebuild_hint ... ok
+test core_contract::cli_verify_rejects_schema_v2_and_digest_mismatch ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 0.14s
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.04s
+     Running tests/contract/main.rs (target/debug/build/marqdo-view/4db88ce592e41fad/out/contract-4db88ce592e41fad)
+
+running 8 tests
+test presentation_states::missing_core_stays_readable_and_explicitly_unverified ... ok
+test presentation_states::external_projection_can_be_rendered_from_artifact_source ... ok
+test presentation_states::truncated_and_incomplete_runs_never_display_as_success ... ok
+test presentation_states::failed_check_keeps_prose_and_shows_core_diagnostics ... ok
+test presentation_states::unknown_analysis_schema_is_a_hard_protocol_error ... ok
+test presentation_states::source_digest_mismatch_degrades_instead_of_misbinding ... ok
+test presentation_states::invalid_analysis_span_is_rejected_not_trimmed ... ok
+test presentation_states::run_attached_to_changed_source_becomes_stale ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 45 filtered out; finished in 0.09s
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.04s
+     Running tests/contract/main.rs (target/debug/build/marqdo-view/4db88ce592e41fad/out/contract-4db88ce592e41fad)
+
+running 6 tests
+test no_coupling::release_lockfile_is_committed ... ok
+test no_coupling::tool_manifest_matches_package_and_protocols ... ok
+test no_coupling::no_private_core_crate_dependencies ... ok
+test no_coupling::exactly_one_reader_theme_and_script_entry ... ok
+test no_coupling::source_has_no_legacy_protocol_or_runtime_probing ... ok
+test no_coupling::source_never_reads_or_links_the_legacy_repositories ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.03s
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.04s
+     Running tests/security/main.rs (target/debug/build/marqdo-view/6dc7f51fb0afdc26/out/security-6dc7f51fb0afdc26)
+
+running 11 tests
+test path_traversal_is_rejected_and_the_old_document_route_is_gone ... ok
+test adversarial_markdown_never_injects_markup_or_handlers ... ok
+test session_cookie_and_headers_are_hardened ... ok
+test oversized_and_unknown_fields_are_rejected_before_execution ... ok
+test aggressive_markdown_links_cannot_become_a_file_read_api ... ok
+test host_origin_session_csrf_and_json_are_all_required_before_execution ... ok
+test sec_fetch_site_cross_site_is_rejected_even_with_a_valid_token ... ok
+test cancel_cannot_be_replayed_to_start_a_new_process ... ok
+test symlink_escape_outside_the_project_root_is_rejected ... ok
+test sse_and_cancel_are_scoped_to_the_owning_session ... ok
+test sse_requires_a_session_and_only_the_owning_session_can_read_or_cancel ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+

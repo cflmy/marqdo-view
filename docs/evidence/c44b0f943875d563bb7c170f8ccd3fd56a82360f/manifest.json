@@ -1,0 +1,111 @@
+{
+  "cli_archive_sha256": "sha256:fd7a313e0ddaf38a9b1901ff2a9aa7b9a0a153e65522a9c0c60f01e2549f583b",
+  "cli_binary_sha256": "sha256:a19049ee111f41512a69c5ed748aaa4968eb3a3f5abd585ccdcf9bbb201bd7ee",
+  "cli_source_sha": "c44b0f943875d563bb7c170f8ccd3fd56a82360f",
+  "cli_version": "3.0.0-rc.5",
+  "contracts": {
+    "analysis": 3,
+    "api_revision": 1,
+    "observation": 1
+  },
+  "extras": {
+    "browser": "UNVERIFIED",
+    "cargo_tests_passed": 174,
+    "notes": "Generated from real command exit statuses. UNVERIFIED gates are not release evidence and must never be read as PASS."
+  },
+  "gates": {
+    "G01_no_legacy": {
+      "command": "./scripts/check-no-legacy.sh",
+      "exit_code": 0,
+      "log": "docs/evidence/c44b0f943875d563bb7c170f8ccd3fd56a82360f/logs/G01_no_legacy.log",
+      "state": "PASS"
+    },
+    "G02_build": {
+      "command": "cargo fmt --all -- --check && cargo clippy --locked --all-targets -- -D warnings && cargo test --locked && cargo build --release --locked",
+      "exit_code": 0,
+      "log": "docs/evidence/c44b0f943875d563bb7c170f8ccd3fd56a82360f/logs/G02_build.log",
+      "state": "PASS"
+    },
+    "G03_install": {
+      "command": "scripts/package.sh && marqdo tool install/list/remove && marqdo view --help && scripts/install-smoke.sh && tamper refusal",
+      "exit_code": 0,
+      "log": "docs/evidence/c44b0f943875d563bb7c170f8ccd3fd56a82360f/logs/G03_install.log",
+      "state": "PASS"
+    },
+    "G04_static": {
+      "command": "\"/root/work/marqdo/.build/release-rc5/install/marqdo-3.0.0-rc.5-x86_64-unknown-linux-gnu/marqdo\" view verify examples/mixed-modes/index.mq.md && MARQDO_BIN=\"/root/work/marqdo/.build/release-rc5/install/marqdo-3.0.0-rc.5-x86_64-unknown-linux-gnu/marqdo\" ./scripts/check-examples.sh",
+      "exit_code": 0,
+      "log": "docs/evidence/c44b0f943875d563bb7c170f8ccd3fd56a82360f/logs/G04_static.log",
+      "state": "PASS"
+    },
+    "G05_run": {
+      "command": "installed marqdo view examples/welcome + scripts/acceptance-run.py over SSE",
+      "exit_code": 0,
+      "log": "docs/evidence/c44b0f943875d563bb7c170f8ccd3fd56a82360f/logs/G05_run.log",
+      "state": "PASS"
+    },
+    "G06_stream_snapshot": {
+      "command": "python3 scripts/check-observation.py stream-snapshot",
+      "exit_code": 0,
+      "log": "docs/evidence/c44b0f943875d563bb7c170f8ccd3fd56a82360f/logs/G06_stream_snapshot.log",
+      "state": "PASS"
+    },
+    "G07_binding_stale": {
+      "command": "python3 scripts/check-observation.py binding && cargo test --lib execution::controller::tests::stale_and_incomplete_never_map_to_success && cargo test --test integration execution::source_edit_during_a_run_marks_the_result_stale_and_drops_anchor_ids && cargo test --test contract observation_contract::stale_and_wrong_root_bindings_are_observation_stale",
+      "exit_code": 0,
+      "log": "docs/evidence/c44b0f943875d563bb7c170f8ccd3fd56a82360f/logs/G07_binding_stale.log",
+      "note": "CLI exact-byte binding probe + controller unit mapping + real run/source-change e2e + wrong-digest stale contract all PASS",
+      "state": "PASS"
+    },
+    "G08_negative": {
+      "command": "python3 scripts/check-observation.py fail-closed && cargo test --lib execution:: && cargo test --test contract observation_contract:: && cargo test --test contract core_contract:: && cargo test --test contract presentation_states:: && cargo test --test contract no_coupling:: && cargo test --test security",
+      "exit_code": 0,
+      "log": "docs/evidence/c44b0f943875d563bb7c170f8ccd3fd56a82360f/logs/G08_negative.log",
+      "note": "N01-N11 decoder/contract negatives, N12-N13 controller hard rejection, N14-N15 CLI fail-closed probes, N16 G01 static check, N17 tool_v1 product-range unit test, N18-N20 security suite: all PASS",
+      "state": "PASS"
+    },
+    "G09_security": {
+      "command": "env MARQDO_BIN=\"/root/work/marqdo/.build/release-rc5/install/marqdo-3.0.0-rc.5-x86_64-unknown-linux-gnu/marqdo\" ./scripts/test-no-exec.sh && ./scripts/test-security.sh",
+      "exit_code": 0,
+      "log": "docs/evidence/c44b0f943875d563bb7c170f8ccd3fd56a82360f/logs/G09_security.log",
+      "state": "PASS"
+    },
+    "G10_export": {
+      "command": "env MARQDO_BIN=\"/root/work/marqdo/.build/release-rc5/install/marqdo-3.0.0-rc.5-x86_64-unknown-linux-gnu/marqdo\" ./scripts/test-export.sh && cargo test --locked --test contract",
+      "exit_code": 0,
+      "log": "docs/evidence/c44b0f943875d563bb7c170f8ccd3fd56a82360f/logs/G10_export.log",
+      "state": "PASS"
+    },
+    "G11_evidence_ci": {
+      "command": "remote CI run",
+      "exit_code": null,
+      "note": "remote CI was not executed in this environment; this local manifest cannot attest CI. CI red => no release.",
+      "state": "UNVERIFIED"
+    },
+    "G12_docs": {
+      "command": "./scripts/check-docs.sh",
+      "exit_code": 0,
+      "log": "docs/evidence/c44b0f943875d563bb7c170f8ccd3fd56a82360f/logs/G12_docs.log",
+      "state": "PASS"
+    }
+  },
+  "generated_utc": "2026-11-27T07:15:39.340746+00:00",
+  "markdown_profile": "marqdo.md.v1",
+  "platform": "linux-x86_64-glibc2.39",
+  "product": {
+    "name": "marqdo-view",
+    "target": "linux-x86_64-glibc2.39",
+    "version": "0.3.0"
+  },
+  "product_range": ">=3.0.0-rc.3,<4.0.0",
+  "result": "PARTIAL",
+  "schema": "marqdo.view.acceptance",
+  "schema_version": 1,
+  "unverified": [
+    "G11_evidence_ci"
+  ],
+  "view_binary_sha256": "sha256:9cf9468858d343d2cbc79981b87869660d1b6db4cad60ed5d7b66e8c96b6204e",
+  "view_commit": "39e83554d75028990f0224cb1d791cc727419044",
+  "view_tool_bundle_digest": "sha256:86cc2a9c10b1a83d33c51b3ceef8c9e9a9bc0143fb734ea0c40f9e745b8db826",
+  "view_tool_bundle_digest_method": "sha256 of the canonical SHA256SUMS file bytes in the bundle"
+}

@@ -13,8 +13,8 @@ Observation revision 1——附着回原文，而不是把文档翻译成另一�
 - 冻结 CLI 合同审计：[`docs/audits/protocol-contract-0002.md`](docs/audits/protocol-contract-0002.md)
 - 兼容性：[`COMPATIBILITY.md`](COMPATIBILITY.md) / 变更：[`CHANGELOG.md`](CHANGELOG.md)
 
-> 0.3.0 只支持当前预发布契约：`marqdo 3.0.0-rc.4`（产品范围
-> `>=3.0.0-rc.3,<4.0.0`；验收固定 rc.4）。静态语义只有一个来源
+> 0.3.0 只支持当前预发布契约：`marqdo 3.0.0-rc.5`（产品范围
+> `>=3.0.0-rc.3,<4.0.0`；验收固定 rc.5）。静态语义只有一个来源
 > `check --emit`（Analysis revision 3，含精确 source、Markdown AST、heading 作用域、
 > anchors 与状态化 references）；运行事实只有一条 Observation revision 1 事件序列
 > （`run`/`call --output jsonl`，原子快照 `--observation-file`）。旧格式显式拒绝，
@@ -22,7 +22,7 @@ Observation revision 1——附着回原文，而不是把文档翻译成另一�
 
 ## 能力（0.3.0 实现范围）
 
-> 下表的“实现”表示当前代码路径按 rc.4 契约实现；`PASS/FAIL/UNVERIFIED` 的机器
+> 下表的“实现”表示当前代码路径按 rc.5 契约实现；`PASS/FAIL/UNVERIFIED` 的机器
 > 验收结论只以 [`docs/evidence/`](docs/evidence/README.md) 中绑定 CLI 源码 SHA 的
 > manifest 为准。new manifest 生成前，全部发布门禁在 STATUS 中保持 `UNVERIFIED`。
 
@@ -50,9 +50,9 @@ Observation revision 1——附着回原文，而不是把文档翻译成另一�
 ## 安装
 
 ```bash
-# 1) 取得官方冻结 CLI 发布包（验收固定 3.0.0-rc.4）
-MARQDO_BIN=/absolute/path/to/marqdo-3.0.0-rc.4-x86_64-unknown-linux-gnu/marqdo
-"$MARQDO_BIN" --version   # marqdo 3.0.0-rc.4
+# 1) 取得官方冻结 CLI 发布包（验收固定 3.0.0-rc.5）
+MARQDO_BIN=/absolute/path/to/marqdo-3.0.0-rc.5-x86_64-unknown-linux-gnu/marqdo
+"$MARQDO_BIN" --version   # marqdo 3.0.0-rc.5
 
 # 2) 构建并制作 CLI Tool revision 1 bundle
 ./scripts/package.sh
@@ -135,7 +135,7 @@ scripts/check-no-legacy.sh   # G01：当前树 0 条旧契约残留（cmd 可单
 scripts/check-docs.sh        # G12：当前文档不把旧格式写成当前能力
 ```
 
-全链路验收使用 Rust 1.89 或更新版本，以及能运行官方 rc.4 的 Linux x86_64
+全链路验收使用 Rust 1.89 或更新版本，以及能运行官方 rc.5 的 Linux x86_64
 环境（glibc 2.39 起）。浏览器、显式运行和离线导出通过已安装的 Tool 执行。
 
 ```bash
@@ -143,7 +143,7 @@ scripts/check-docs.sh        # G12：当前文档不把旧格式写成当前能�
 MARQDO_BIN="$(./scripts/frozen-beta.sh fetch "$(mktemp -d)")"
 export MARQDO_BIN
 ./scripts/acceptance.sh      # G01–G12，写 docs/evidence/452e9a32…/manifest.json
-cat docs/evidence/452e9a32bd9e40dba427d4180691c58bab74449e/manifest.json
+cat docs/evidence/c44b0f943875d563bb7c170f8ccd3fd56a82360f/manifest.json
 ```
 
 验收会核对 CLI 源码 SHA、归档 SHA-256 与二进制 SHA-256，并在前后两次记录 CLI 摘要。

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# G12 (issue #5): current documentation must describe the rc.4 contracts as the
+# G12 (issue #5): current documentation must describe the rc.5 contracts as the
 # only current capability. Historical CHANGELOG entries may name retired
 # interfaces only under an explicit `## History` heading.
 #
@@ -7,7 +7,7 @@
 #   README.md, COMPATIBILITY.md, CHANGELOG.md, docs/STATUS.md, docs/ACCEPTANCE.md
 #
 # The script never rewrites files and never claims a gate is PASS: it only
-# reports fact drift between the current docs and the rc.4 contract baseline.
+# reports fact drift between the current docs and the rc.5 contract baseline.
 #
 # Usage: scripts/check-docs.sh
 set -euo pipefail
@@ -73,17 +73,17 @@ if [[ "$fail" -ne 0 ]]; then
   cat >&2 <<'EOF'
 
 check-docs: FAIL
-  Update the current docs to the rc.4 baseline:
+  Update the current docs to the rc.5 baseline:
     * one static source: `check --emit` Analysis revision 3 (ADR-0069);
     * one runtime sequence: Observation revision 1 (`--output jsonl` /
       `--observation-file`), no retired trace file or event stream;
     * CLI Tool revision 1 with exact `requires` (api_revision 1, analysis 3,
       observation 1), no `compatibility` field;
-    * product range >=3.0.0-rc.3,<4.0.0, acceptance pinned to rc.4.
+    * product range >=3.0.0-rc.3,<4.0.0, acceptance pinned to rc.5.
   Old release notes belong under CHANGELOG's explicit `## History` heading.
   Do not claim PASS/UNVERIFIED results that have no generated evidence.
 EOF
   exit 1
 fi
 
-echo "check-docs: PASS (README/COMPATIBILITY/CHANGELOG/STATUS/ACCEPTANCE describe the rc.4 baseline; CHANGELOG history is explicit)"
+echo "check-docs: PASS (README/COMPATIBILITY/CHANGELOG/STATUS/ACCEPTANCE describe the rc.5 baseline; CHANGELOG history is explicit)"

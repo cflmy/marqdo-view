@@ -1,7 +1,7 @@
 # marqdo-view 现状（STATUS）
 
 > 最后更新：2026-11-25。当前目标：`marqdo-view 0.3.0`，只支持
-> `marqdo 3.0.0-rc.4` 的公开契约（adaptation #4，验收 #5，公共 Analysis 边界 #6）。
+> `marqdo 3.0.0-rc.5` 的公开契约（adaptation #4，验收 #5，公共 Analysis 边界 #6）。
 > 机器证据只认绑定 CLI 源码 SHA 的 manifest；未生成的证据一律 `UNVERIFIED`。
 
 ## 版本与基线
@@ -9,18 +9,18 @@
 | 项 | 值 |
 |---|---|
 | View 产品版本 | `0.3.0` |
-| 产品范围 | `>=3.0.0-rc.3,<4.0.0`；验收固定 `3.0.0-rc.4` |
+| 产品范围 | `>=3.0.0-rc.3,<4.0.0`；验收固定 `3.0.0-rc.5` |
 | CLI Tool | revision 1：`requires {api_revision: 1, analysis: 3, observation: 1}`，无 `compatibility` |
 | 静态语义 | Analysis revision 3（`marqdo.analysis`，ADR-0069 公共边界） |
 | 运行事实 | Observation revision 1（`marqdo.observation`，单一事件序列） |
 | Markdown profile | `marqdo.md.v1` |
-| 冻结 CLI 版本 | `marqdo 3.0.0-rc.4` |
-| CLI 源码 SHA | `452e9a32bd9e40dba427d4180691c58bab74449e` |
-| CLI 归档 SHA-256 | `9c3f166b5e5b8840d39d10019074e4e1c42432fc23e26c69670e64fdcf4e15d8` |
-| CLI 二进制 SHA-256 | `a7306962689c635445a59043971ea2eb09298e01feeee81f0ba07b1f3e10306e` |
+| 冻结 CLI 版本 | `marqdo 3.0.0-rc.5` |
+| CLI 源码 SHA | `c44b0f943875d563bb7c170f8ccd3fd56a82360f` |
+| CLI 归档 SHA-256 | `fd7a313e0ddaf38a9b1901ff2a9aa7b9a0a153e65522a9c0c60f01e2549f583b` |
+| CLI 二进制 SHA-256 | `a19049ee111f41512a69c5ed748aaa4968eb3a3f5abd585ccdcf9bbb201bd7ee` |
 | 平台 | Linux x86_64 / glibc 2.39（唯一正式验证） |
 | 视觉基准 | `docs/design/reference-old-view-reader.png`（**2048×1133**） |
-| 验收 manifest | `docs/evidence/452e9a32bd9e40dba427d4180691c58bab74449e/manifest.json`（**result: PASS，G01–G12 全部 PASS**） |
+| 验收 manifest | `docs/evidence/c44b0f943875d563bb7c170f8ccd3fd56a82360f/manifest.json`（**result: PASS，G01–G12 全部 PASS**） |
 
 ## 0.3.0 适配交付（实现状态）
 
@@ -35,7 +35,7 @@
 | G01 无旧契约静态检查 | 通过 | `scripts/check-no-legacy.sh` |
 | G12 文档事实一致 | 通过 | `scripts/check-docs.sh` |
 | 验收 manifest G01–G12 + `unverified` | 已生成 `result: PASS` | `scripts/acceptance.sh` |
-| CI 钉 rc.4 + 独立 no-legacy job | 远端 Woodpecker pipeline #10 对 `340ecb0` 成功 | `.github/workflows/ci.yml`、`.woodpecker.yml` |
+| CI 钉 rc.5 + 独立 no-legacy job | 远端 Woodpecker pipeline #10 对 `340ecb0` 成功 | `.github/workflows/ci.yml`、`.woodpecker.yml` |
 
 ## 发布门禁 G01–G12（issue #5）
 
@@ -48,7 +48,7 @@
 |---|---|---|
 | G01 | 协议层无旧契约残留（`scripts/check-no-legacy.sh`，0 命中） | `PASS` |
 | G02 | fmt + clippy + test + release build 全 exit 0 | `PASS` |
-| G03 | rc.4 归档独立安装、`view --help`、CLI SHA 前后不变、篡改拒绝 | `PASS` |
+| G03 | rc.5 归档独立安装、`view --help`、CLI SHA 前后不变、篡改拒绝 | `PASS` |
 | G04 | 静态契约正向：`check --emit` + `view verify` | `PASS` |
 | G05 | 运行契约正向：显式 run/call，终态与 CLI 一致 | `PASS` |
 | G06 | 流/快照等价（同一次执行两个目的地事件序列一致） | `PASS` |
@@ -77,7 +77,7 @@
 | 引用/调用/分支/循环/副作用标注 + stale 降级 | 实现（分组 chip、来源标注、截断/无效显式） |
 | Tool revision 1 独立安装/分发、冻结 CLI SHA 前后一致 | 实现（0.3.0 包，篡改拒绝） |
 | 静态离线导出（无执行、无联网、manifest/哈希、不可变发布） | 实现 |
-| 固定 examples（welcome/branch-loop/function-params/knowledge-only/unsafe-side-effect） | 实现，rc.4 check/call/run 实测脚本 |
+| 固定 examples（welcome/branch-loop/function-params/knowledge-only/unsafe-side-effect） | 实现，rc.5 check/call/run 实测脚本 |
 | 逐语句变量值 / 参数实际值 / 内存快照 | **默认不请求、不展示**（协议支持显式选择；View 0.3.0 不请求，绝不伪造） |
 | 知识“已证明” / Prove / Lint | **UNSUPPORTED**（等待独立版本化报告协议） |
 | 调试器/断点/单步/调用栈、Notebook/持久内核、Session/journal | **不实现**（明确非目标） |
@@ -123,7 +123,7 @@
 ## 历史
 
 `0.2.0`（2026-11-22）是旧预发布契约时代的完整阅读/执行/导出基线，相关证据
-仅作历史参考，不能替代 0.3.0 的 rc.4 门禁：`docs/evidence/2c7c4f31…/`、
+仅作历史参考，不能替代 0.3.0 的 rc.5 门禁：`docs/evidence/2c7c4f31…/`、
 `docs/evidence/issue-2/`、`docs/evidence/issue-3/`、`docs/evidence/PR-01..PR-06/`。
 旧实现规范与决策保留在 `docs/architecture/RFC-VIEW-0001*.md`、
 `docs/architecture/RFC-VIEW-0002.md`、`docs/decisions/0001..0011`（历史记录）。

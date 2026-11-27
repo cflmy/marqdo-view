@@ -1,0 +1,8 @@
+==> cargo build --release --locked
+    Finished `release` profile [optimized] target(s) in 0.04s
+==> smoke install against frozen core
+manifest: PASS (revision 1 requires api_revision=1 analysis=3 observation=1)
+install-smoke: PASS (view installed/dispatched, api_revision 1 injected, core sha256 a19049ee111f41512a69c5ed748aaa4968eb3a3f5abd585ccdcf9bbb201bd7ee unchanged, tool home /root/work/marqdo/tools/view/dist/smoke-tool-home.UZF9ni)
+bundle: /root/work/marqdo/tools/view/dist/marqdo-view
+archive: /root/work/marqdo/tools/view/dist/marqdo-view-0.3.0-x86_64-unknown-linux-gnu.tar.gz
+sha256: d2f19b9d7bb8fbfec450ce7ebd384e36c7cd5dd6fb9233162f30ed65c0be8fa8

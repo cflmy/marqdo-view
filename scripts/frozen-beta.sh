@@ -2,15 +2,15 @@
 # Identity of the released CLI used by the marqdo-view 0.3.0 acceptance gate.
 #
 # The pinned release is the current public-contract baseline:
-#   marqdo 3.0.0-rc.4 (Analysis v3 / ADR-0069, Observation v1, CLI Tool revision 1)
+#   marqdo 3.0.0-rc.5 (Analysis v3 / ADR-0069, Observation v1, CLI Tool revision 1)
 # The script only downloads, unpacks and verifies the official archive; it never
 # rebuilds or modifies the CLI.
 set -euo pipefail
 
-version=3.0.0-rc.4
-source_sha=452e9a32bd9e40dba427d4180691c58bab74449e
-binary_sha=a7306962689c635445a59043971ea2eb09298e01feeee81f0ba07b1f3e10306e
-archive_sha=9c3f166b5e5b8840d39d10019074e4e1c42432fc23e26c69670e64fdcf4e15d8
+version=3.0.0-rc.5
+source_sha=c44b0f943875d563bb7c170f8ccd3fd56a82360f
+binary_sha=a19049ee111f41512a69c5ed748aaa4968eb3a3f5abd585ccdcf9bbb201bd7ee
+archive_sha=fd7a313e0ddaf38a9b1901ff2a9aa7b9a0a153e65522a9c0c60f01e2549f583b
 artifact="marqdo-$version-x86_64-unknown-linux-gnu"
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 

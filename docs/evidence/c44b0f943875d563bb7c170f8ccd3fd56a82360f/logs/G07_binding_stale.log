@@ -1,0 +1,25 @@
+exact Analysis binding: PASS (digest=sha256:3fa3109fb671d21ebc161d41bb6193260b4119141569dc78c948d99ff0c9ab43, root/module/span checks, source edit invalidates)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.04s
+     Running unittests src/lib.rs (target/debug/build/marqdo-view/01b4917d83f17a50/out/marqdo_view-01b4917d83f17a50)
+
+running 1 test
+test execution::controller::tests::stale_and_incomplete_never_map_to_success ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 64 filtered out; finished in 0.00s
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.04s
+     Running tests/integration/main.rs (target/debug/build/marqdo-view/77a45afd23a2f454/out/integration-77a45afd23a2f454)
+
+running 1 test
+test execution::source_edit_during_a_run_marks_the_result_stale_and_drops_anchor_ids ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 44 filtered out; finished in 1.08s
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.04s
+     Running tests/contract/main.rs (target/debug/build/marqdo-view/4db88ce592e41fad/out/contract-4db88ce592e41fad)
+
+running 1 test
+test observation_contract::stale_and_wrong_root_bindings_are_observation_stale ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 52 filtered out; finished in 0.01s
+

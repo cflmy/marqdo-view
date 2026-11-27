@@ -1,4 +1,4 @@
-# 验收状态（marqdo-view 0.3.0 / rc.4 契约）
+# 验收状态（marqdo-view 0.3.0 / rc.5 契约）
 
 > 本文件定义**当前**验收基线，不代替机器证据。`PASS/FAIL/UNVERIFIED` 只以
 > `docs/evidence/<CLI-SOURCE-SHA>/manifest.json` 为准；manifest 生成前，全部
@@ -12,10 +12,10 @@
 | View 源码提交 | manifest 生成时的 `git rev-parse HEAD` |
 | View release 二进制 SHA-256 | `dist/marqdo-view/bin/marqdo-view`，`sha256:` 前缀 |
 | View Tool 包摘要 | bundle 内规范化 `SHA256SUMS` 字节的 SHA-256，`sha256:` 前缀 |
-| 冻结 CLI 版本 | `3.0.0-rc.4` |
-| 冻结 CLI 源码 SHA | `452e9a32bd9e40dba427d4180691c58bab74449e` |
-| 冻结 CLI 归档 SHA-256 | `sha256:9c3f166b5e5b8840d39d10019074e4e1c42432fc23e26c69670e64fdcf4e15d8` |
-| 冻结 CLI 二进制 SHA-256 | `sha256:a7306962689c635445a59043971ea2eb09298e01feeee81f0ba07b1f3e10306e` |
+| 冻结 CLI 版本 | `3.0.0-rc.5` |
+| 冻结 CLI 源码 SHA | `c44b0f943875d563bb7c170f8ccd3fd56a82360f` |
+| 冻结 CLI 归档 SHA-256 | `sha256:fd7a313e0ddaf38a9b1901ff2a9aa7b9a0a153e65522a9c0c60f01e2549f583b` |
+| 冻结 CLI 二进制 SHA-256 | `sha256:a19049ee111f41512a69c5ed748aaa4968eb3a3f5abd585ccdcf9bbb201bd7ee` |
 | 平台 | `linux-x86_64-glibc2.39` |
 | Markdown profile | `marqdo.md.v1` |
 | 生成时间 | UTC ISO-8601 |
@@ -25,7 +25,7 @@ manifest schema：`marqdo.view.acceptance`，`schema_version: 1`。结构见
 [`docs/evidence/README.md`](evidence/README.md)。生成命令：
 
 ```bash
-export MARQDO_BIN=/abs/unpacked/marqdo-3.0.0-rc.4-x86_64-unknown-linux-gnu/marqdo
+export MARQDO_BIN=/abs/unpacked/marqdo-3.0.0-rc.5-x86_64-unknown-linux-gnu/marqdo
 scripts/check-no-legacy.sh
 scripts/check-docs.sh
 scripts/acceptance.sh        # 生成 docs/evidence/452e9a32…/manifest.json + dist/acceptance/manifest.json
@@ -33,13 +33,13 @@ scripts/acceptance.sh        # 生成 docs/evidence/452e9a32…/manifest.json + 
 
 ## 1. P0 发布门禁（G01–G12）
 
-当前状态：**G01–G12 全部 `PASS`**（manifest `docs/evidence/452e9a32bd9e40dba427d4180691c58bab74449e/manifest.json`，`result: PASS`；View 源码提交 `340ecb035fbde0a825c1e5edf1d28b41342d1002`；远端 Woodpecker pipeline #10 对同一 SHA 成功）。
+当前状态：**G01–G12 全部 `PASS`**（manifest `docs/evidence/c44b0f943875d563bb7c170f8ccd3fd56a82360f/manifest.json`，`result: PASS`；View 源码提交 `340ecb035fbde0a825c1e5edf1d28b41342d1002`；远端 Woodpecker pipeline #10 对同一 SHA 成功）。
 
 | # | 门禁 | 命令 / 方式 | 通过判据 | 当前 |
 |---|---|---|---|---|
 | G01 | 协议层无旧契约残留 | `scripts/check-no-legacy.sh` | 0 命中 | `PASS` |
 | G02 | 构建与静态检查 | `cargo fmt --all -- --check && cargo clippy --locked --all-targets -- -D warnings && cargo test --locked && cargo build --release --locked` | 全部 exit 0，记录测试数 | `PASS` |
-| G03 | rc.4 归档独立安装 | `scripts/package.sh` + 归档解包安装 + `scripts/install-smoke.sh` | `tool list` 含 `view`；`view --help` exit 0；`MARQDO_API_REVISION=1` 注入；CLI SHA 前后不变；篡改拒绝 | `PASS` |
+| G03 | rc.5 归档独立安装 | `scripts/package.sh` + 归档解包安装 + `scripts/install-smoke.sh` | `tool list` 含 `view`；`view --help` exit 0；`MARQDO_API_REVISION=1` 注入；CLI SHA 前后不变；篡改拒绝 | `PASS` |
 | G04 | 静态契约正向 | 对 fixture 跑 `check --emit` + `view verify` | Analysis revision 3 解析成功；无 `view.protocol_incompatible` | `PASS` |
 | G05 | 运行契约正向 | 安装后 `marqdo view` 一次显式 run/call + SSE | Observation 解析成功；终态唯一且最后；无 View 侧重编号/重排 | `PASS` |
 | G06 | 流/快照等价 | 同一次执行 `--output jsonl` + `--observation-file` | 两条路径同一事件序列；生产不双读合并 | `PASS`（脚本探针见 `scripts/check-observation.py stream-snapshot`） |
@@ -56,7 +56,7 @@ scripts/acceptance.sh        # 生成 docs/evidence/452e9a32…/manifest.json + 
 
 | ID | 场景 | 期望 | 当前 |
 |---|---|---|---|
-| E01 | Tool 安装/分发/卸载（rc.4 归档） | 安装成功；分发 `view`；退出码透传；卸载后分发失败 | `PASS` |
+| E01 | Tool 安装/分发/卸载（rc.5 归档） | 安装成功；分发 `view`；退出码透传；卸载后分发失败 | `PASS` |
 | E02 | 打开含 `@knowledge` 的文档 | 不执行；无 run 调用 | `PASS` |
 | E03 | Source/Document 切换 | 字节保真；span 来自 Analysis revision 3 | `PASS` |
 | E04 | 中文/Emoji/表格/公式 | span 按模块原始 UTF-8 半开字节解释；不越界 | `PASS` |
@@ -111,14 +111,14 @@ scripts/acceptance.sh        # 生成 docs/evidence/452e9a32…/manifest.json + 
 ## 5. 复现
 
 ```bash
-export MARQDO_BIN=/abs/unpacked/marqdo-3.0.0-rc.4-x86_64-unknown-linux-gnu/marqdo
-sha256sum "$MARQDO_BIN"                       # a7306962689c635445a59043971ea2eb09298e01feeee81f0ba07b1f3e10306e
+export MARQDO_BIN=/abs/unpacked/marqdo-3.0.0-rc.5-x86_64-unknown-linux-gnu/marqdo
+sha256sum "$MARQDO_BIN"                       # a19049ee111f41512a69c5ed748aaa4968eb3a3f5abd585ccdcf9bbb201bd7ee
 scripts/frozen-beta.sh verify "$MARQDO_BIN"
 scripts/check-no-legacy.sh
 scripts/check-docs.sh
 cargo fmt --all -- --check && cargo clippy --locked --all-targets -- -D warnings && cargo test --locked
 scripts/acceptance.sh
-cat docs/evidence/452e9a32bd9e40dba427d4180691c58bab74449e/manifest.json
+cat docs/evidence/c44b0f943875d563bb7c170f8ccd3fd56a82360f/manifest.json
 ```
 
 单项：
@@ -147,4 +147,4 @@ MARQDO_BIN=... scripts/test-browser.sh
 
 `0.2.0`（2026-11-22）按旧预发布契约完成过阅读/执行/导出验收，证据保留在
 `docs/evidence/2c7c4f31…/`、`docs/evidence/issue-2/`、`docs/evidence/issue-3/`、
-`docs/evidence/PR-01..PR-06/`。这些结果只记录历史，**不能**替代 rc.4 门禁。
+`docs/evidence/PR-01..PR-06/`。这些结果只记录历史，**不能**替代 rc.5 门禁。

@@ -5,7 +5,7 @@
 | 轴 | 本 View 值 | 说明 |
 |---|---|---|
 | View 产品版本 | `0.3.0` | 独立 SemVer，与 CLI 不共用 |
-| `marqdo` 产品范围 | `>=3.0.0-rc.3,<4.0.0` | 预发布契约只在 rc.3 起有意义；验收固定 `3.0.0-rc.4` |
+| `marqdo` 产品范围 | `>=3.0.0-rc.3,<4.0.0` | 预发布契约只在 rc.3 起有意义；验收固定 `3.0.0-rc.5` |
 | CLI Tool revision | `1` | `tool.json`：`requires.api_revision = 1`，无 `compatibility` 字段 |
 | Analysis revision | `3` | `marqdo.analysis`，ADR-0069 公共边界（含 source/document/anchors/references/heading_span） |
 | Observation revision | `1` | `marqdo.observation`，单一事件序列（JSONL 流 / 原子快照） |
@@ -16,9 +16,9 @@
 
 `3.0.0-rc.3,<4.0.0` 是当前预发布范围；`>=3.0.0,<4.0.0` 不匹配任何 rc 预发布版。
 验收与证据只认绑定 CLI 源码 SHA / 归档 SHA / 二进制 SHA 的结果：
-`marqdo 3.0.0-rc.4`，源码 `452e9a32bd9e40dba427d4180691c58bab74449e`，
-归档 `9c3f166b5e5b8840d39d10019074e4e1c42432fc23e26c69670e64fdcf4e15d8`，
-二进制 `a7306962689c635445a59043971ea2eb09298e01feeee81f0ba07b1f3e10306e`。
+`marqdo 3.0.0-rc.5`，源码 `c44b0f943875d563bb7c170f8ccd3fd56a82360f`，
+归档 `fd7a313e0ddaf38a9b1901ff2a9aa7b9a0a153e65522a9c0c60f01e2549f583b`，
+二进制 `a19049ee111f41512a69c5ed748aaa4968eb3a3f5abd585ccdcf9bbb201bd7ee`。
 
 ## 契约替换（0.3.0 一次性完成）
 
@@ -37,7 +37,7 @@
 
 | 平台 | 状态 | 说明 |
 |---|---|---|
-| Linux x86_64 (glibc 2.39+) | **Supported** | 完整阅读、显式运行与导出使用官方 rc.4 验收；媒体需要 Linux 5.6+ |
+| Linux x86_64 (glibc 2.39+) | **Supported** | 完整阅读、显式运行与导出使用官方 rc.5 验收；媒体需要 Linux 5.6+ |
 | Linux aarch64 | 未构建 | 未验证 |
 | macOS / Windows | 未验证 | 不声明支持 |
 

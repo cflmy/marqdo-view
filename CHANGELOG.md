@@ -37,7 +37,16 @@ old code paths, fixtures and documents were replaced, not branched.
   docs. Historical evidence and ADRs are exempt.
 - `scripts/check-docs.sh` (G12): README/COMPATIBILITY/CHANGELOG/STATUS/ACCEPTANCE
   must describe the rc.4 baseline; old CHANGELOG entries are allowed only under
-  the explicit `## History` heading.
+  the explicit `## Current acceptance baseline (0.3.0)
+
+- Frozen CLI pin moved to the published `marqdo 3.0.0-rc.5` release
+  (source `c44b0f943875d563bb7c170f8ccd3fd56a82360f`, archive
+  `fd7a313e0ddaf38a9b1901ff2a9aa7b9a0a153e65522a9c0c60f01e2549f583b`, binary
+  `a19049ee111f41512a69c5ed748aaa4968eb3a3f5abd585ccdcf9bbb201bd7ee`).
+  Analysis v3 / Observation v1 / Tool revision 1 are unchanged; this is a
+  release-line update, not a protocol change.
+
+## History` heading.
 - `scripts/check-observation.py`: machine probes for stream/snapshot
   equivalence, truncation, exact Analysis binding and fail-closed retired input.
 - `docs/architecture/observation-v1-and-analysis-v3.md`: final layering

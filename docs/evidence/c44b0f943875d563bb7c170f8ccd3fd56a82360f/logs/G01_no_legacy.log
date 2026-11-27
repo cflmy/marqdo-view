@@ -1,0 +1,1 @@
+check-no-legacy: PASS (0 retired references in src/, tool.json and current docs; rc.4 baseline)

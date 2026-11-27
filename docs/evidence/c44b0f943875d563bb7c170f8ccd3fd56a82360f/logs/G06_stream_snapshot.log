@@ -1,0 +1,2 @@
+stream/snapshot equivalence: PASS (7 events, one run_id, contiguous seq, one terminal)
+observation truncation: PASS (capture.truncated=event_budget, terminal=run.completed)
