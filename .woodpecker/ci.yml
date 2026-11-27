@@ -1,0 +1,34 @@
+# Unified Woodpecker CI for marqdo-view.
+#
+# Rust build/non-browser acceptance reuses the shared rust image; the real
+# Chromium suite runs in the matching Playwright image against the binary built
+# in the previous step. No per-run rustup install.
+when:
+  event: [push, pull_request, manual]
+
+steps:
+  build-acceptance:
+    image: git.cflmy.cn/cflmy/marqdo-ci-rust:3.0.0-rc.5
+    commands:
+      - cargo fmt --all -- --check
+      - cargo clippy --all-targets --locked -- -D warnings
+      - cargo test --locked
+      - cargo build --release --locked
+      - SKIP_BROWSER=1 scripts/acceptance.sh
+
+  browser:
+    depends_on: [build-acceptance]
+    image: mcr.microsoft.com/playwright:v1.49.0-noble
+    environment:
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
+    commands:
+      - (cd tests/browser && npm ci --no-audit --no-fund)
+      - |
+        set -eu
+        curl -fsSL --retry 3 -o /tmp/marqdo.tar.gz "https://git.cflmy.cn/cflmy/marqdo-cli/releases/download/v3.0.0-rc.5/marqdo-3.0.0-rc.5-x86_64-unknown-linux-gnu.tar.gz"
+        echo "fd7a313e0ddaf38a9b1901ff2a9aa7b9a0a153e65522a9c0c60f01e2549f583b  /tmp/marqdo.tar.gz" | sha256sum -c -
+        mkdir -p /opt/marqdo
+        tar -xzf /tmp/marqdo.tar.gz -C /opt/marqdo
+        export MARQDO_BIN=/opt/marqdo/marqdo-3.0.0-rc.5-x86_64-unknown-linux-gnu/marqdo
+        "$MARQDO_BIN" --version
+        ./scripts/test-browser.sh
