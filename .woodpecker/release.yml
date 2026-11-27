@@ -1,0 +1,18 @@
+# Fast-path notification: a completed Gitea release asks the root reconcile
+# workflow to check it. The payload is only a hint; the root reconcile verifies
+# the release/assets from the authoritative Gitea API. A lost call is recovered
+# by the root `release-reconcile` cron.
+when:
+  event: [release]
+
+steps:
+  notify:
+    image: git.cflmy.cn/cflmy/marqdo-ci-shell:3.0.0-rc.5
+    environment:
+      WOODPECKER_TOKEN:
+        from_secret: woodpecker_token
+    commands:
+      - |
+        set -eu
+        test -n "${WOODPECKER_TOKEN:?woodpecker_token secret missing}"
+        curl -fsS -X POST           -H "Authorization: Bearer $WOODPECKER_TOKEN"           -H "Content-Type: application/json"           -d '{"branch":"main","workflow":"reconcile"}'           https://ci.cflmy.cn/api/repos/6/pipelines
