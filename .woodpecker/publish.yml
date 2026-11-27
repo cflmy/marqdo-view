@@ -1,0 +1,60 @@
+when:
+  - event: [tag, manual]
+
+steps:
+  publish:
+    image: git.cflmy.cn/cflmy/marqdo-ci-rust:3.0.0-rc.5
+    environment:
+      GITEA_PUBLISH_TOKEN:
+        from_secret: gitea_publish_token
+      COMPONENT_ID: view
+      REPOSITORY: cflmy/marqdo-view
+    commands:
+      - |
+        set -eu
+        test -n "${GITEA_PUBLISH_TOKEN:?}"
+        test -n "${CI_COMMIT_TAG:?}"
+        export SOURCE_SHA="${CI_COMMIT_SHA}"
+        export VERSION="${CI_COMMIT_TAG#v}"
+        export COMPONENT_ID=view
+        export REPOSITORY=cflmy/marqdo-view
+        # Build tool artifacts when the package entry exists; always emit source archive + evidence.
+        if [ -x scripts/package.sh ] || [ -f scripts/package.sh ]; then
+          scripts/package.sh || true
+        fi
+        sh scripts/package.sh
+        ARCHIVE="dist/marqdo-view-${VERSION}-source.tar.gz"
+        ASSETS="--asset $ARCHIVE --asset ${ARCHIVE}.sha256 --asset dist/release-evidence.json"
+        for extra in dist/*.tar.gz dist/*.sha256 dist/RELEASE_INFO.json dist/tool.json; do
+          [ -f "$extra" ] || continue
+          case "$extra" in
+            $ARCHIVE|${ARCHIVE}.sha256|dist/release-evidence.json) continue ;;
+          esac
+          ASSETS="$ASSETS --asset $extra"
+        done
+        # Rebuild evidence including any extra packaged assets.
+        EXTRA_ARGS=""
+        for extra in dist/*.tar.gz dist/*.sha256 dist/RELEASE_INFO.json dist/tool.json; do
+          [ -f "$extra" ] || continue
+          case "$extra" in
+            $ARCHIVE|${ARCHIVE}.sha256|dist/release-evidence.json) continue ;;
+          esac
+          EXTRA_ARGS="$EXTRA_ARGS --asset $extra"
+        done
+        python3 scripts/release/write_evidence.py \
+          --component-id view \
+          --repository cflmy/marqdo-view \
+          --tag "${CI_COMMIT_TAG}" \
+          --source-sha "$SOURCE_SHA" \
+          --asset "$ARCHIVE" \
+          --asset "${ARCHIVE}.sha256" \
+          $EXTRA_ARGS \
+          --out dist/release-evidence.json
+        python3 scripts/release/publish_gitea.py \
+          --repo cflmy/marqdo-view \
+          --tag "${CI_COMMIT_TAG}" \
+          --target "$SOURCE_SHA" \
+          --prerelease \
+          --body "Automated release for view ${CI_COMMIT_TAG}." \
+          $ASSETS \
+          --evidence-out dist/gitea-publish-result.json

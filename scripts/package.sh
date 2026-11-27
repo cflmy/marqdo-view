@@ -1,130 +1,49 @@
-#!/usr/bin/env bash
-# Build and assemble the CLI Tool revision 1 release bundle for marqdo-view 0.3.0.
+#!/bin/sh
+# Deterministic source archive + release-evidence.json for this component.
 #
-# Produces:
-#   dist/marqdo-view/                                  stable bundle path
-#   dist/marqdo-view-<version>-<target>.tar.gz (+ .sha256)
-#
-# The bundle contains only the runtime binary, the manifest and the legal /
-# release-note files. CSS/JS/images are compiled into the binary (ADR-0002),
-# so there is exactly one asset source for Live and Export.
-#
-# The current public contracts are exact: api_revision 1, Analysis 3 and
-# Observation 1. There is no version negotiation and no `compatibility` field.
-set -euo pipefail
-
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$repo_root"
-
-: "${CARGO:=cargo}"
-: "${MARQDO_BIN:=}"
-
-version="$("$CARGO" metadata --no-deps --format-version 1 \
-  | python3 -c 'import json,sys; print(json.load(sys.stdin)["packages"][0]["version"])')"
-target="$("$CARGO" -vV 2>/dev/null | sed -n 's/^host: //p')"
-target="${target:-x86_64-unknown-linux-gnu}"
-
-echo "==> cargo build --release --locked"
-"$CARGO" build --release --locked
-
-dist="$repo_root/dist"
-bundle="$dist/marqdo-view"
-rm -rf "$bundle"
-mkdir -p "$bundle/bin"
-
-binary="$repo_root/target/release/marqdo-view"
-if [[ ! -x "$binary" ]]; then
-  echo "error: missing release binary $binary" >&2
+# Required env:
+#   COMPONENT_ID   catalog id (e.g. std-text)
+#   REPOSITORY     owner/name (e.g. cflmy/marqdo-std-text)
+# Optional:
+#   VERSION        without leading v (default: derived from CI_COMMIT_TAG)
+#   SOURCE_SHA     full commit (default: HEAD)
+#   OUT_DIR        default dist
+#   DEPENDENCY     repeatable write_evidence dependency specs via env DEP_ARGS
+set -eu
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+COMPONENT_ID=${COMPONENT_ID:?COMPONENT_ID is required}
+REPOSITORY=${REPOSITORY:?REPOSITORY is required}
+SOURCE_SHA=${SOURCE_SHA:-$(git -C "$ROOT" rev-parse HEAD)}
+OUT_DIR=${OUT_DIR:-dist}
+TAG=${CI_COMMIT_TAG:-${TAG:-}}
+if [ -n "${VERSION:-}" ]; then
+  :
+elif [ -n "$TAG" ]; then
+  VERSION=${TAG#v}
+else
+  echo "package.sh: set VERSION or CI_COMMIT_TAG" >&2
   exit 1
 fi
+TAG=${TAG:-v$VERSION}
 
-cp "$binary" "$bundle/bin/marqdo-view"
-chmod 755 "$bundle/bin/marqdo-view"
-cp tool.json "$bundle/tool.json"
-cp README.md COMPATIBILITY.md CHANGELOG.md LICENSE-MIT LICENSE-APACHE "$bundle/"
+python3 "$ROOT/scripts/release/package_source.py" \
+  --root "$ROOT" \
+  --component-id "$COMPONENT_ID" \
+  --version "$VERSION" \
+  --out-dir "$OUT_DIR"
 
-# Verify the tool manifest and the binary agree on the version.
-manifest_version="$(python3 -c 'import json;print(json.load(open("tool.json"))["version"])')"
-if [[ "$manifest_version" != "$version" ]]; then
-  echo "error: tool.json version $manifest_version != package version $version" >&2
-  exit 1
+ARCHIVE=$(ls "$ROOT/$OUT_DIR"/marqdo-"$COMPONENT_ID"-"$VERSION"-source.tar.gz)
+SHAFILE="$ARCHIVE.sha256"
+
+EVIDENCE_ARGS="--component-id $COMPONENT_ID --repository $REPOSITORY --tag $TAG --source-sha $SOURCE_SHA --asset $ARCHIVE --asset $SHAFILE --out $ROOT/$OUT_DIR/release-evidence.json"
+if [ -n "${CI_PIPELINE_NUMBER:-}" ]; then
+  EVIDENCE_ARGS="$EVIDENCE_ARGS --pipeline-number $CI_PIPELINE_NUMBER"
 fi
-binary_version="$("$bundle/bin/marqdo-view" --version | awk '{print $2}')"
-if [[ "$binary_version" != "$version" ]]; then
-  echo "error: binary prints version $binary_version, package is $version" >&2
-  exit 1
+if [ -n "${CI_PIPELINE_URL:-}" ]; then
+  EVIDENCE_ARGS="$EVIDENCE_ARGS --pipeline-url $CI_PIPELINE_URL"
 fi
-
-source_sha="unknown"
-if git rev-parse --verify HEAD >/dev/null 2>&1; then
-  source_sha="$(git rev-parse HEAD)"
-fi
-printf '%s\n' "$source_sha" > "$bundle/SOURCE_SHA"
-
-python3 - "$bundle" "$version" "$target" "$source_sha" <<'PY'
-import hashlib
-import json
-import pathlib
-import sys
-
-bundle = pathlib.Path(sys.argv[1])
-version, target, source_sha = sys.argv[2], sys.argv[3], sys.argv[4]
-tool = json.loads((bundle / 'tool.json').read_text())
-requires = tool.get('requires') or {}
-if 'compatibility' in tool:
-    raise SystemExit('tool.json must not contain a compatibility field')
-if requires != {'api_revision': 1, 'analysis': 3, 'observation': 1}:
-    raise SystemExit('tool.json requires must be exactly api_revision 1 / analysis 3 / observation 1')
-files = []
-for path in sorted(bundle.rglob('*')):
-    if not path.is_file():
-        continue
-    rel = path.relative_to(bundle).as_posix()
-    if rel in ('RELEASE_INFO.json', 'SHA256SUMS'):
-        continue
-    data = path.read_bytes()
-    files.append({
-        'path': rel,
-        'size': len(data),
-        'sha256': hashlib.sha256(data).hexdigest(),
-    })
-info = {
-    'schema': 'marqdo.view-release-info',
-    'schema_version': 1,
-    'tool_name': 'marqdo-view',
-    'tool_version': version,
-    'command': 'view',
-    'target': target,
-    'source_sha': source_sha,
-    'requires': {
-        'api_revision': 1,
-        'analysis': 3,
-        'observation': 1,
-    },
-    'release': {
-        'product_range': '>=3.0.0-rc.3,<4.0.0',
-        'markdown_profile': 'marqdo.md.v1',
-        'platform': 'linux-x86_64-glibc2.39',
-    },
-    'files': files,
-}
-(bundle / 'RELEASE_INFO.json').write_text(json.dumps(info, indent=2, sort_keys=True) + '\n')
-with (bundle / 'SHA256SUMS').open('w') as out:
-    for entry in files:
-        out.write(f"{entry['sha256']}  {entry['path']}\n")
-PY
-
-# Deterministic archive: sorted paths, fixed owner, gzip without timestamps.
-archive="marqdo-view-${version}-${target}.tar.gz"
-tar --sort=name --owner=0 --group=0 --numeric-owner --mtime='UTC 2026-01-01' \
-  -C "$dist" -cf - marqdo-view | gzip -n > "$dist/$archive"
-( cd "$dist" && sha256sum "$archive" > "$archive.sha256" )
-
-if [[ -n "$MARQDO_BIN" ]]; then
-  echo "==> smoke install against frozen core"
-  MARQDO_BIN="$MARQDO_BIN" "$repo_root/scripts/install-smoke.sh" "$bundle/tool.json"
-fi
-
-echo "bundle: $bundle"
-echo "archive: $dist/$archive"
-echo "sha256: $(cut -d' ' -f1 "$dist/$archive.sha256")"
+# shellcheck disable=SC2086
+eval "python3 \"$ROOT/scripts/release/write_evidence.py\" $EVIDENCE_ARGS ${DEP_ARGS:-}"
+echo "$ARCHIVE"
+echo "$SHAFILE"
+echo "$ROOT/$OUT_DIR/release-evidence.json"
